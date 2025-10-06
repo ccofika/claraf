@@ -245,6 +245,12 @@ const QuickLinks = () => {
     }
   };
 
+  // Truncate URL to max length
+  const truncateUrl = (url, maxLength = 50) => {
+    if (url.length <= maxLength) return url;
+    return url.substring(0, maxLength) + '...';
+  };
+
   // Handle link click (copy or open)
   const handleLinkClick = async (link) => {
     if (link.type === 'open') {
@@ -401,6 +407,7 @@ const QuickLinks = () => {
                       <button
                         onClick={() => handleLinkClick(link)}
                         className="flex-1 text-left flex items-center gap-3"
+                        title={link.url}
                       >
                         {link.type === 'open' ? (
                           <Launch size={20} className="text-gray-900 dark:text-neutral-50 flex-shrink-0" />
@@ -411,17 +418,17 @@ const QuickLinks = () => {
                           <p className="text-sm font-medium text-gray-900 dark:text-neutral-50 truncate">
                             {link.name}
                           </p>
-                          <p className="text-xs text-gray-600 dark:text-neutral-400 truncate">
-                            {link.url}
+                          <p className="text-xs text-gray-600 dark:text-neutral-400">
+                            {truncateUrl(link.url)}
                           </p>
                         </div>
                         {copiedLinkId === link._id ? (
-                          <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                          <div className="flex items-center gap-1 text-green-600 dark:text-green-400 flex-shrink-0">
                             <Checkmark size={16} />
                             <span className="text-xs font-medium">Copied!</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-500 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs text-gray-500 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 whitespace-nowrap">
                             {link.type === 'open' ? 'Click to open' : 'Click to copy'}
                           </span>
                         )}

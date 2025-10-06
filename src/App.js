@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TextFormattingProvider } from './context/TextFormattingContext';
@@ -31,6 +32,12 @@ function App() {
               />
             </Routes>
           </Router>
+          <Toaster
+            position="top-center"
+            richColors
+            closeButton
+            theme="system"
+          />
         </TextFormattingProvider>
       </AuthProvider>
     </ThemeProvider>

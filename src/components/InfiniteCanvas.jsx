@@ -7,14 +7,19 @@ import Minimap from './Minimap';
 import ElementSettingsModal from './ElementSettingsModal';
 import TextFormattingDock from './TextFormattingDock';
 import CanvasSearchBar from './CanvasSearchBar';
+import ViewModeSwitch from './ViewModeSwitch';
 import { useTheme } from '../context/ThemeContext';
 import { useTextFormatting } from '../context/TextFormattingContext';
 
-const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, canEditContent = true, workspaces = [], onElementNavigate }) => {
+const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, canEditContent = true, isViewMode = false, onViewModeToggle, workspaces = [], onElementNavigate, onBookmarkCreated }) => {
   const [canvasElements, setCanvasElements] = useState(elements);
   const transformWrapperRef = useRef(null);
   const { theme } = useTheme();
   const { isEditing } = useTextFormatting();
+  const [highlightedElement, setHighlightedElement] = useState(null);
+
+  // Determine if user is actually in edit mode (has permission AND not in view mode)
+  const isInEditMode = canEditContent && !isViewMode;
   const [viewport, setViewport] = useState({
     x: -50000 + (window.innerWidth / 2),
     y: -50000 + (window.innerHeight / 2),
@@ -88,7 +93,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   }, []);
 
   const handleDockItemClick = async (itemId) => {
-    if (!canEditContent) return;
+    if (!isInEditMode) return;
 
     // Set dimensions based on element type
     let dimensions = { width: 400, height: 50 };
@@ -241,7 +246,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       }
     }, 50);
 
-    if (!canEditContent) return;
+    if (!isInEditMode) return;
 
     const draggedElement = canvasElements.find((el) => el._id === active.id);
     if (!draggedElement) return;
@@ -277,7 +282,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         position: newPosition,
       });
     }
-  }, [canvasElements, onElementUpdate, canEditContent, viewport.scale]);
+  }, [canvasElements, onElementUpdate, isInEditMode, viewport.scale]);
 
 
   const handleElementSelect = useCallback((element) => {
@@ -330,9 +335,60 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     return () => window.removeEventListener('zoomToElement', handleZoomToElement);
   }, []);
 
+  // Handle share link URL parameters
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const elementId = params.get('element');
+
+    if (elementId && canvasElements.length > 0 && transformWrapperRef.current) {
+      const targetElement = canvasElements.find(el => el._id === elementId);
+      if (targetElement && targetElement.position) {
+        // Wait for canvas to be ready, then zoom to element
+        setTimeout(() => {
+          const targetScale = 1.5;
+
+          // Calculate element center position
+          const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
+          const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
+
+          // Calculate transform position to center the element
+          const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+          const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+
+          // Set transform
+          if (transformWrapperRef.current) {
+            transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
+          }
+
+          // Highlight element
+          setHighlightedElement(elementId);
+
+          // Remove highlight after 3 seconds
+          setTimeout(() => setHighlightedElement(null), 3000);
+
+          // Clean URL after zoom animation completes
+          setTimeout(() => {
+            window.history.replaceState({}, '', window.location.pathname);
+          }, 600);
+        }, 300);
+      }
+    }
+  }, [canvasElements]);
+
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <DockBar onItemClick={handleDockItemClick} />
+      {/* View Mode Switch - shown only if user has edit permission */}
+      {canEditContent && (
+        <div className="absolute top-6 right-6 z-50">
+          <ViewModeSwitch
+            isViewMode={isViewMode}
+            onToggle={onViewModeToggle}
+          />
+        </div>
+      )}
+
+      {/* Only show DockBar if user can edit AND is in edit mode */}
+      {isInEditMode && <DockBar onItemClick={handleDockItemClick} />}
 
       {/* Search Bar with fade animation - shown when NOT editing */}
       <div
@@ -352,19 +408,21 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         />
       </div>
 
-      {/* Text Formatting Dock with fade animation - shown when editing */}
-      <div
-        className={`
-          absolute top-0 left-0 right-0 z-50
-          transition-all duration-300 ease-out
-          ${isEditing
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 -translate-y-full pointer-events-none'
-          }
-        `}
-      >
-        <TextFormattingDock />
-      </div>
+      {/* Text Formatting Dock with fade animation - shown when editing AND user is in edit mode */}
+      {isInEditMode && (
+        <div
+          className={`
+            absolute top-0 left-0 right-0 z-50
+            transition-all duration-300 ease-out
+            ${isEditing
+              ? 'opacity-100 translate-y-0'
+              : 'opacity-0 -translate-y-full pointer-events-none'
+            }
+          `}
+        >
+          <TextFormattingDock />
+        </div>
+      )}
 
       <TransformWrapper
         ref={transformWrapperRef}
@@ -409,7 +467,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                 }}
               >
               <DndContext
-                sensors={canEditContent ? sensors : []}
+                sensors={isInEditMode ? sensors : []}
                 onDragStart={handleDragStart}
                 onDragMove={handleDragMove}
                 onDragEnd={handleDragEnd}
@@ -418,10 +476,13 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                   <CanvasElement
                     key={element._id}
                     element={element}
-                    canEdit={canEditContent}
+                    canEdit={isInEditMode}
+                    workspaceId={workspaceId}
                     onUpdate={handleElementUpdate}
                     onDelete={handleElementDelete}
                     onSettingsClick={handleSettingsClick}
+                    isHighlighted={highlightedElement === element._id}
+                    onBookmarkCreated={onBookmarkCreated}
                   />
                 ))}
               </DndContext>

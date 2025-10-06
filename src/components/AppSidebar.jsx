@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ProfileModal from './ProfileModal';
+import DeleteBookmarkDialog from './DeleteBookmarkDialog';
 import {
   Home,
   Calculator,
@@ -13,6 +14,9 @@ import {
   Logout,
   Edit,
   TrashCan,
+  Bookmark as BookmarkIcon,
+  Checkmark,
+  Close,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -144,8 +148,9 @@ function SectionTitle({ title, onToggleCollapse, isCollapsed }) {
   );
 }
 
-function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit, onDelete }) {
+function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit, onDelete, isBookmark, isEditing, editValue, onEditChange, onSaveEdit, onCancelEdit }) {
   const handleClick = (e) => {
+    if (isEditing) return; // Don't navigate when editing
     if (item.hasDropdown && onToggle) onToggle();
     else onItemClick?.();
   };
@@ -160,6 +165,16 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
     onDelete?.();
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onSaveEdit?.();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancelEdit?.();
+    }
+  };
+
   return (
     <div
       className={`relative shrink-0 transition-all duration-500 ${
@@ -170,7 +185,7 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
       <div
         className={`rounded-lg cursor-pointer transition-all duration-500 flex items-center relative ${
           item.isActive ? 'bg-gray-200 dark:bg-neutral-800' : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
-        } ${isCollapsed ? 'w-10 min-w-10 h-10 justify-center p-4' : 'w-full h-10 px-4 py-2'}`}
+        } ${isCollapsed ? 'w-10 min-w-10 h-10 justify-center p-4' : isBookmark ? 'w-full min-h-[72px] px-4 py-2.5' : 'w-full h-10 px-4 py-2'}`}
         style={{ transitionTimingFunction: softSpringEasing }}
         onClick={handleClick}
         title={isCollapsed ? item.label : undefined}
@@ -183,28 +198,87 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
           }`}
           style={{ transitionTimingFunction: softSpringEasing }}
         >
-          <div className="text-sm text-gray-900 dark:text-neutral-50 truncate">{item.label}</div>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => onEditChange?.(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+              className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-blue-500 dark:border-blue-400 rounded text-gray-900 dark:text-neutral-50 focus:outline-none"
+            />
+          ) : isBookmark && item.preview ? (
+            <div className="flex flex-col gap-1">
+              {/* Bookmark Custom Name (editable) */}
+              <div className="text-sm font-medium text-gray-900 dark:text-neutral-50 truncate">{item.label}</div>
+              {/* Element Preview and Details */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-xs text-gray-600 dark:text-neutral-400 truncate">{item.preview}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-neutral-500">{item.typeLabel}</span>
+                  {item.workspaceIcon && (
+                    <>
+                      <span className="text-gray-400 dark:text-neutral-600">•</span>
+                      <div className="flex items-center gap-1">
+                        {item.workspaceIcon}
+                        <span className="text-xs text-gray-500 dark:text-neutral-500">{item.workspaceName}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-900 dark:text-neutral-50 truncate">{item.label}</div>
+          )}
         </div>
 
         {/* Edit and Delete buttons */}
-        {!isCollapsed && item.canEdit && (
+        {!isCollapsed && !isEditing && item.canEdit && (
           <button
             onClick={handleEdit}
             className="ml-2 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
-            title="Edit workspace"
+            title={isBookmark ? "Edit bookmark" : "Edit workspace"}
           >
             <Edit size={16} className="text-gray-700 dark:text-neutral-300" />
           </button>
         )}
 
-        {!isCollapsed && item.canDelete && (
+        {!isCollapsed && !isEditing && item.canDelete && (
           <button
             onClick={handleDelete}
             className="ml-1 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-            title="Delete workspace"
+            title={isBookmark ? "Delete bookmark" : "Delete workspace"}
           >
             <TrashCan size={16} className="text-red-600 dark:text-red-400" />
           </button>
+        )}
+
+        {/* Save and Cancel buttons when editing */}
+        {!isCollapsed && isEditing && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSaveEdit?.();
+              }}
+              className="ml-2 p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+              title="Save"
+            >
+              <Checkmark size={16} className="text-green-600 dark:text-green-400" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelEdit?.();
+              }}
+              className="ml-1 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
+              title="Cancel"
+            >
+              <Close size={16} className="text-gray-700 dark:text-neutral-300" />
+            </button>
+          </>
         )}
 
         {item.hasDropdown && (
@@ -229,7 +303,7 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
   );
 }
 
-function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, onEditWorkspace, onDeleteWorkspace }) {
+function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, onEditWorkspace, onDeleteWorkspace, onEditBookmark, onDeleteBookmark, editingBookmark, bookmarkName, onBookmarkNameChange, onSaveBookmark, onCancelBookmark }) {
   return (
     <div className="flex flex-col w-full">
       <div
@@ -245,6 +319,8 @@ function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, on
       {section.items.map((item, index) => {
         const itemKey = `${section.title}-${index}`;
         const isExpanded = expandedItems.has(itemKey);
+        const isEditingThisBookmark = item.bookmarkId && editingBookmark === item.bookmarkId;
+
         return (
           <div key={itemKey} className="w-full flex flex-col">
             <MenuItem
@@ -253,8 +329,14 @@ function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, on
               onToggle={() => onToggleExpanded(itemKey)}
               onItemClick={item.onClick}
               isCollapsed={isCollapsed}
-              onEdit={item.workspaceId ? () => onEditWorkspace(item.workspaceId) : undefined}
-              onDelete={item.workspaceId ? () => onDeleteWorkspace(item.workspaceId) : undefined}
+              onEdit={item.workspaceId ? () => onEditWorkspace(item.workspaceId) : item.bookmarkId ? () => onEditBookmark(item.bookmarkId) : undefined}
+              onDelete={item.workspaceId ? () => onDeleteWorkspace(item.workspaceId) : item.bookmarkId ? () => onDeleteBookmark(item.bookmarkId) : undefined}
+              isBookmark={item.isBookmark || !!item.bookmarkId}
+              isEditing={isEditingThisBookmark}
+              editValue={bookmarkName}
+              onEditChange={onBookmarkNameChange}
+              onSaveEdit={() => onSaveBookmark(item.bookmarkId)}
+              onCancelEdit={onCancelBookmark}
             />
           </div>
         );
@@ -267,13 +349,22 @@ function DetailSidebar({
   activeSection,
   currentWorkspace,
   workspaces,
+  bookmarks,
   onAddWorkspace,
   onEditWorkspace,
   onDeleteWorkspace,
-  onWorkspaceClick
+  onWorkspaceClick,
+  onBookmarkClick,
+  onBookmarkUpdate,
+  onBookmarkDelete,
+  onCollapsedChange
 }) {
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState(null);
+  const [bookmarkName, setBookmarkName] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState(null);
 
   const toggleExpanded = (itemKey) => {
     setExpandedItems((prev) => {
@@ -285,6 +376,90 @@ function DetailSidebar({
   };
 
   const toggleCollapse = () => setIsCollapsed((s) => !s);
+
+  // Notify parent when collapsed state changes
+  React.useEffect(() => {
+    if (onCollapsedChange) {
+      onCollapsedChange(isCollapsed);
+    }
+  }, [isCollapsed, onCollapsedChange]);
+
+  const handleEditBookmark = (bookmarkId) => {
+    const bookmark = bookmarks?.find(b => b._id === bookmarkId);
+    if (bookmark) {
+      setEditingBookmark(bookmarkId);
+      setBookmarkName(bookmark.customName || '');
+    }
+  };
+
+  const handleSaveBookmarkName = (bookmarkId) => {
+    if (bookmarkName.trim()) {
+      onBookmarkUpdate(bookmarkId, bookmarkName.trim());
+    }
+    setEditingBookmark(null);
+    setBookmarkName('');
+  };
+
+  const handleCancelBookmarkEdit = () => {
+    setEditingBookmark(null);
+    setBookmarkName('');
+  };
+
+  const handleDeleteBookmarkClick = (bookmarkId) => {
+    const bookmark = bookmarks?.find(b => b._id === bookmarkId);
+    setBookmarkToDelete(bookmark);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteBookmark = () => {
+    if (bookmarkToDelete) {
+      onBookmarkDelete(bookmarkToDelete._id);
+      setBookmarkToDelete(null);
+    }
+  };
+
+  const getElementTypeLabel = (type) => {
+    const labels = {
+      title: 'Title',
+      description: 'Description',
+      macro: 'Macro',
+      example: 'Example',
+      text: 'Text',
+      card: 'Card',
+      'sticky-note': 'Note'
+    };
+    return labels[type] || type;
+  };
+
+  const stripHtml = (html) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
+  const getElementPreview = (element) => {
+    if (!element) return 'No content';
+
+    if (element.type === 'title') {
+      const text = stripHtml(element.content?.value || '');
+      return text.substring(0, 50) || 'No content';
+    }
+    if (element.type === 'description') {
+      const text = stripHtml(element.content?.value || '');
+      const words = text.split(' ').slice(0, 6).join(' ');
+      return words || 'No content';
+    }
+    if (element.type === 'macro') {
+      const title = stripHtml(element.content?.title || '');
+      return title.substring(0, 50) || stripHtml(element.content?.description || '').substring(0, 50) || 'No content';
+    }
+    if (element.type === 'example') {
+      const currentExample = element.content?.examples?.[element.content?.currentExampleIndex || 0];
+      const title = stripHtml(currentExample?.title || '');
+      return title.substring(0, 50) || 'No content';
+    }
+    return element.content?.text || element.content?.title || 'No content';
+  };
 
   const getSectionContent = () => {
     if (activeSection === 'workspaces') {
@@ -327,14 +502,45 @@ function DetailSidebar({
         onClick: onAddWorkspace,
       });
 
+      // Prepare bookmarks items
+      const bookmarkItems = (bookmarks || []).map((bookmark) => {
+        const preview = getElementPreview(bookmark.element);
+        const typeLabel = getElementTypeLabel(bookmark.element?.type);
+        const workspaceName = bookmark.workspace?.name || 'Unknown';
+
+        return {
+          icon: <BookmarkIcon size={16} className="text-gray-900 dark:text-neutral-50" />,
+          label: bookmark.customName || 'Untitled Bookmark',
+          preview: preview,
+          typeLabel: typeLabel,
+          workspaceIcon: <Home size={12} className="text-gray-600 dark:text-neutral-400" />,
+          workspaceName: workspaceName,
+          onClick: () => onBookmarkClick(bookmark),
+          bookmarkId: bookmark._id,
+          canEdit: true,
+          canDelete: true,
+          isBookmark: true,
+        };
+      });
+
+      const sections = [
+        {
+          title: 'All Workspaces',
+          items: workspaceItems,
+        },
+      ];
+
+      // Add bookmarks section if there are any bookmarks
+      if (bookmarkItems.length > 0) {
+        sections.push({
+          title: 'All Bookmarks',
+          items: bookmarkItems,
+        });
+      }
+
       return {
         title: 'Workspaces',
-        sections: [
-          {
-            title: 'All Workspaces',
-            items: workspaceItems,
-          },
-        ],
+        sections,
       };
     }
 
@@ -374,9 +580,27 @@ function DetailSidebar({
             isCollapsed={isCollapsed}
             onEditWorkspace={onEditWorkspace}
             onDeleteWorkspace={onDeleteWorkspace}
+            onEditBookmark={handleEditBookmark}
+            onDeleteBookmark={handleDeleteBookmarkClick}
+            editingBookmark={editingBookmark}
+            bookmarkName={bookmarkName}
+            onBookmarkNameChange={setBookmarkName}
+            onSaveBookmark={handleSaveBookmarkName}
+            onCancelBookmark={handleCancelBookmarkEdit}
           />
         ))}
       </div>
+
+      {/* Delete Bookmark Dialog */}
+      <DeleteBookmarkDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setBookmarkToDelete(null);
+        }}
+        onConfirm={confirmDeleteBookmark}
+        bookmarkName={bookmarkToDelete?.customName || 'this bookmark'}
+      />
     </aside>
   );
 }
@@ -384,12 +608,17 @@ function DetailSidebar({
 export default function AppSidebar({
   currentWorkspace,
   workspaces,
+  bookmarks,
   onAddWorkspace,
   onEditWorkspace,
   onDeleteWorkspace,
   onWorkspaceClick,
+  onBookmarkClick,
+  onBookmarkUpdate,
+  onBookmarkDelete,
   activeSection,
-  onSectionChange
+  onSectionChange,
+  onCollapsedChange
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -405,10 +634,15 @@ export default function AppSidebar({
           activeSection={activeSection}
           currentWorkspace={currentWorkspace}
           workspaces={workspaces}
+          bookmarks={bookmarks}
           onAddWorkspace={onAddWorkspace}
           onEditWorkspace={onEditWorkspace}
           onDeleteWorkspace={onDeleteWorkspace}
           onWorkspaceClick={onWorkspaceClick}
+          onBookmarkClick={onBookmarkClick}
+          onBookmarkUpdate={onBookmarkUpdate}
+          onBookmarkDelete={onBookmarkDelete}
+          onCollapsedChange={onCollapsedChange}
         />
       </div>
 
