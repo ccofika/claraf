@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Undo, Redo, Settings, X } from 'lucide-react';
+import { Undo, Redo, Settings, X, Copy, Share2, Bookmark } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import axios from 'axios';
+import { toast } from 'sonner';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import RichTextEditor from './RichTextEditor';
 import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
+import { copyElementContent, shareElement } from '../utils/clipboard';
 
-const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick }) => {
+const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
@@ -32,7 +35,7 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
     cursor: isDragging ? 'grabbing' : isEditing ? 'text' : canEdit ? 'grab' : 'default',
     pointerEvents: 'auto',
     touchAction: isEditing ? 'auto' : 'none',
-    userSelect: isEditing ? 'text' : 'none',
+    userSelect: isEditing || !canEdit ? 'text' : 'none',
   };
 
 
@@ -147,6 +150,41 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
   const canUndo = history.length > 0 && currentHistoryIndex < history.length - 1;
   const canRedo = currentHistoryIndex >= 0;
 
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    await copyElementContent(element);
+  };
+
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    await shareElement(workspaceId, element._id);
+  };
+
+  const handleBookmark = async (e) => {
+    e.stopPropagation();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/bookmarks`,
+        {
+          elementId: element._id,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Bookmark saved!');
+
+      // Call the callback to update bookmarks list
+      if (onBookmarkCreated) {
+        onBookmarkCreated(response.data);
+      }
+    } catch (error) {
+      if (error.response?.status === 400) {
+        toast.error('Bookmark already exists');
+      } else {
+        toast.error('Failed to save bookmark');
+      }
+    }
+  };
 
   return (
     <>
@@ -159,65 +197,93 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
       >
         <div className="relative">
         {/* Action Buttons - Top Right */}
-        {canEdit && (
-          <div className="absolute -top-10 right-0 flex gap-1 bg-white dark:bg-black rounded-lg shadow-lg border border-gray-200 dark:border-neutral-800 p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleUndo();
-              }}
-              disabled={!canUndo}
-              className={`p-1.5 rounded-md transition-colors ${
-                canUndo
-                  ? 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
-                  : 'text-gray-300 dark:text-neutral-600 cursor-not-allowed'
-              }`}
-              title="Undo"
-            >
-              <Undo size={14} />
-            </button>
+        <div className="absolute -top-10 right-0 flex gap-1 bg-white dark:bg-black rounded-lg shadow-lg border border-gray-200 dark:border-neutral-800 p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {canEdit ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUndo();
+                }}
+                disabled={!canUndo}
+                className={`p-1.5 rounded-md transition-colors ${
+                  canUndo
+                    ? 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
+                    : 'text-gray-300 dark:text-neutral-600 cursor-not-allowed'
+                }`}
+                title="Undo"
+              >
+                <Undo size={14} />
+              </button>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRedo();
-              }}
-              disabled={!canRedo}
-              className={`p-1.5 rounded-md transition-colors ${
-                canRedo
-                  ? 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
-                  : 'text-gray-300 dark:text-neutral-600 cursor-not-allowed'
-              }`}
-              title="Redo"
-            >
-              <Redo size={14} />
-            </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRedo();
+                }}
+                disabled={!canRedo}
+                className={`p-1.5 rounded-md transition-colors ${
+                  canRedo
+                    ? 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
+                    : 'text-gray-300 dark:text-neutral-600 cursor-not-allowed'
+                }`}
+                title="Redo"
+              >
+                <Redo size={14} />
+              </button>
 
-            <div className="w-px bg-gray-300 dark:bg-neutral-700" />
+              <div className="w-px bg-gray-300 dark:bg-neutral-700" />
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSettingsClick?.(element);
-              }}
-              className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300"
-              title="Settings"
-            >
-              <Settings size={14} />
-            </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSettingsClick?.(element);
+                }}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300"
+                title="Settings"
+              >
+                <Settings size={14} />
+              </button>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-md transition-colors text-red-600 dark:text-red-400"
-              title="Delete"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+                className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-md transition-colors text-red-600 dark:text-red-400"
+                title="Delete"
+              >
+                <X size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleCopy}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300"
+                title="Copy"
+              >
+                <Copy size={14} />
+              </button>
+
+              <button
+                onClick={handleShare}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300"
+                title="Share"
+              >
+                <Share2 size={14} />
+              </button>
+
+              <button
+                onClick={handleBookmark}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300"
+                title="Bookmark"
+              >
+                <Bookmark size={14} />
+              </button>
+            </>
+          )}
+        </div>
 
         {/* Title Input/Display */}
         <div
@@ -228,6 +294,7 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
               ? 'border-blue-500 dark:border-blue-400 bg-white dark:bg-neutral-900'
               : 'bg-white dark:bg-black'
             }
+            ${isHighlighted ? 'animate-pulse ring-4 ring-blue-500 ring-opacity-75' : ''}
             transition-all duration-200
           `}
           style={{
@@ -241,11 +308,13 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
             backgroundColor: element?.style?.backgroundColor === 'transparent' ? 'transparent' : getAdaptiveBackgroundColor(element?.style?.backgroundColor || 'white', isDarkMode),
             padding: `${element?.style?.padding || 12}px`,
             opacity: element?.style?.opacity || 1,
-            boxShadow: element?.style?.shadowBlur > 0
+            boxShadow: isHighlighted
+              ? '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)'
+              : element?.style?.shadowBlur > 0
               ? `${element.style.shadowOffsetX}px ${element.style.shadowOffsetY}px ${element.style.shadowBlur}px ${element.style.shadowColor}`
               : 'none',
-            userSelect: isEditing ? 'text' : 'none',
-            WebkitUserSelect: isEditing ? 'text' : 'none',
+            userSelect: isEditing || !canEdit ? 'text' : 'none',
+            WebkitUserSelect: isEditing || !canEdit ? 'text' : 'none',
           }}
         >
           {isEditing ? (
@@ -278,6 +347,7 @@ const TitleElement = ({ element, canEdit, onUpdate, onDelete, onSettingsClick })
                 textAlign: element?.style?.textAlign || 'left',
                 lineHeight: element?.style?.lineHeight || 1.5,
                 letterSpacing: `${element?.style?.letterSpacing || 0}px`,
+                cursor: !canEdit ? 'text' : 'default',
               }}
               dangerouslySetInnerHTML={{ __html: value || 'Double-click to edit' }}
               onClick={(e) => {

@@ -108,6 +108,35 @@
   scrollbar-color: #525252 transparent; /* thumb track for dark mode */
 }
 
+/* Title Navigation Scrollbar - smaller height */
+.title-navigation-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+.title-navigation-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin-top: 4px;
+}
+
+.title-navigation-scroll::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.title-navigation-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.dark .title-navigation-scroll::-webkit-scrollbar-thumb {
+  background: #525252;
+}
+
+.dark .title-navigation-scroll::-webkit-scrollbar-thumb:hover {
+  background: #737373;
+}
+
 /* Custom animations for minimap */
 @keyframes fadeIn {
   from {

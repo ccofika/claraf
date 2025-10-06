@@ -6,7 +6,7 @@ import DescriptionElement from './DescriptionElement';
 import MacroElement from './MacroElement';
 import ExampleElement from './ExampleElement';
 
-const CanvasElement = ({ element, canEdit = true, onUpdate, onDelete, onSettingsClick }) => {
+const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
     disabled: element.locked || !canEdit, // Disable dragging if user can't edit
@@ -18,9 +18,12 @@ const CanvasElement = ({ element, canEdit = true, onUpdate, onDelete, onSettings
       <TitleElement
         element={element}
         canEdit={canEdit}
+        workspaceId={workspaceId}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
+        isHighlighted={isHighlighted}
+        onBookmarkCreated={onBookmarkCreated}
       />
     );
   }
@@ -31,9 +34,12 @@ const CanvasElement = ({ element, canEdit = true, onUpdate, onDelete, onSettings
       <DescriptionElement
         element={element}
         canEdit={canEdit}
+        workspaceId={workspaceId}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
+        isHighlighted={isHighlighted}
+        onBookmarkCreated={onBookmarkCreated}
       />
     );
   }
@@ -44,9 +50,12 @@ const CanvasElement = ({ element, canEdit = true, onUpdate, onDelete, onSettings
       <MacroElement
         element={element}
         canEdit={canEdit}
+        workspaceId={workspaceId}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
+        isHighlighted={isHighlighted}
+        onBookmarkCreated={onBookmarkCreated}
       />
     );
   }
@@ -57,9 +66,12 @@ const CanvasElement = ({ element, canEdit = true, onUpdate, onDelete, onSettings
       <ExampleElement
         element={element}
         canEdit={canEdit}
+        workspaceId={workspaceId}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
+        isHighlighted={isHighlighted}
+        onBookmarkCreated={onBookmarkCreated}
       />
     );
   }

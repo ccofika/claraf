@@ -8,6 +8,7 @@ import VIPProgressCalculator from './VIPProgressCalculator';
 import QuickLinks from './QuickLinks';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
+import TitleNavigation from '../components/TitleNavigation';
 
 const Workspace = () => {
   const { workspaceId } = useParams();
@@ -20,6 +21,9 @@ const Workspace = () => {
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('workspaces');
+  const [bookmarks, setBookmarks] = useState([]);
+  const [isViewMode, setIsViewMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -72,6 +76,48 @@ const Workspace = () => {
 
     fetchWorkspaceData();
   }, [workspaceId]);
+
+  // Fetch bookmarks
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/bookmarks`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setBookmarks(response.data);
+      } catch (err) {
+        console.error('Error fetching bookmarks:', err);
+      }
+    };
+
+    fetchBookmarks();
+  }, []);
+
+  // Fetch and load view mode preference for current workspace
+  useEffect(() => {
+    const fetchViewModePreference = async () => {
+      if (!workspaceId || !workspace?.permissions?.canEditContent) {
+        setIsViewMode(false); // Force view mode if can't edit
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setIsViewMode(response.data.viewMode === 'view');
+      } catch (err) {
+        console.error('Error fetching view mode preference:', err);
+        setIsViewMode(false); // Default to edit mode on error
+      }
+    };
+
+    fetchViewModePreference();
+  }, [workspaceId, workspace?.permissions?.canEditContent]);
 
   const handleElementUpdate = async (updatedElement) => {
     try {
@@ -183,6 +229,71 @@ const Workspace = () => {
     }
   }, [workspaceId, navigate]);
 
+  const handleBookmarkClick = useCallback((bookmark) => {
+    if (bookmark.workspace._id !== workspaceId) {
+      // Navigate to different workspace with element ID
+      navigate(`/workspace/${bookmark.workspace._id}?element=${bookmark.element._id}`);
+    } else {
+      // Zoom to element in current workspace
+      const event = new CustomEvent('zoomToElement', { detail: bookmark.element });
+      window.dispatchEvent(event);
+    }
+  }, [workspaceId, navigate]);
+
+  const handleBookmarkUpdate = async (bookmarkId, newName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/bookmarks/${bookmarkId}`,
+        { customName: newName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update local state
+      setBookmarks(bookmarks.map(b => b._id === bookmarkId ? response.data : b));
+    } catch (err) {
+      console.error('Error updating bookmark:', err);
+    }
+  };
+
+  const handleBookmarkDelete = async (bookmarkId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `${process.env.REACT_APP_API_URL}/api/bookmarks/${bookmarkId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update local state
+      setBookmarks(bookmarks.filter(b => b._id !== bookmarkId));
+    } catch (err) {
+      console.error('Error deleting bookmark:', err);
+    }
+  };
+
+  const handleBookmarkCreated = useCallback((newBookmark) => {
+    setBookmarks(prevBookmarks => [...prevBookmarks, newBookmark]);
+  }, []);
+
+  const handleTitleClick = useCallback((element) => {
+    // Zoom to the title element
+    const event = new CustomEvent('zoomToElement', { detail: element });
+    window.dispatchEvent(event);
+  }, []);
+
+  const handleViewModeToggle = async (newViewMode) => {
+    setIsViewMode(newViewMode);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
+        { viewMode: newViewMode ? 'view' : 'edit' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.error('Error saving view mode preference:', err);
+    }
+  };
+
   // Handle pending element navigation after workspace switch
   React.useEffect(() => {
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
@@ -230,27 +341,42 @@ const Workspace = () => {
         <AppSidebar
           currentWorkspace={workspace}
           workspaces={workspaces}
+          bookmarks={bookmarks}
           onAddWorkspace={handleAddWorkspace}
           onEditWorkspace={handleEditWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
           onWorkspaceClick={handleWorkspaceClick}
+          onBookmarkClick={handleBookmarkClick}
+          onBookmarkUpdate={handleBookmarkUpdate}
+          onBookmarkDelete={handleBookmarkDelete}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          onCollapsedChange={setIsSidebarCollapsed}
         />
 
         {/* Main Content */}
         <div className="flex-1 relative overflow-hidden">
           {activeSection === 'workspaces' && (
-            <InfiniteCanvas
-              workspaceId={workspaceId}
-              elements={elements}
-              onElementUpdate={handleElementUpdate}
-              onElementCreate={handleElementCreate}
-              onElementDelete={handleElementDelete}
-              canEditContent={workspace?.permissions?.canEditContent}
-              workspaces={workspaces}
-              onElementNavigate={handleElementNavigate}
-            />
+            <>
+              <InfiniteCanvas
+                workspaceId={workspaceId}
+                elements={elements}
+                onElementUpdate={handleElementUpdate}
+                onElementCreate={handleElementCreate}
+                onElementDelete={handleElementDelete}
+                canEditContent={workspace?.permissions?.canEditContent}
+                isViewMode={isViewMode}
+                onViewModeToggle={handleViewModeToggle}
+                workspaces={workspaces}
+                onElementNavigate={handleElementNavigate}
+                onBookmarkCreated={handleBookmarkCreated}
+              />
+              <TitleNavigation
+                elements={elements}
+                onTitleClick={handleTitleClick}
+                isSidebarCollapsed={isSidebarCollapsed}
+              />
+            </>
           )}
           {activeSection === 'vip-calculator' && (
             <VIPProgressCalculator />
