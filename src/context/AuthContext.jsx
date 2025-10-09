@@ -18,7 +18,8 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/auth/profile');
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await axios.get(`${API_URL}/api/auth/profile`);
       setUser(response.data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -40,7 +41,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await axios.post(`${API_URL}/api/auth/login`, {
         email,
         password
       });
@@ -60,7 +62,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password, role = 'user') => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await axios.post(`${API_URL}/api/auth/register`, {
         name,
         email,
         password,
