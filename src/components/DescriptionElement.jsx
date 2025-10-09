@@ -10,7 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
 
-const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
+const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
@@ -191,9 +191,11 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
       <div
         ref={setNodeRef}
         style={style}
-        {...attributes}
-        {...listeners}
+        {...(canEdit ? attributes : {})}
+        {...(canEdit ? listeners : {})}
         className="group canvas-draggable-element"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         <div className="relative">
         {/* Action Buttons - Top Right */}
@@ -315,6 +317,8 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
               : 'none',
             userSelect: isEditing || !canEdit ? 'text' : 'none',
             WebkitUserSelect: isEditing || !canEdit ? 'text' : 'none',
+            MozUserSelect: isEditing || !canEdit ? 'text' : 'none',
+            cursor: !canEdit ? 'text' : 'default',
           }}
         >
           {isEditing ? (
@@ -349,9 +353,18 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
                 lineHeight: element?.style?.lineHeight || 1.5,
                 letterSpacing: `${element?.style?.letterSpacing || 0}px`,
                 cursor: !canEdit ? 'text' : 'default',
+                pointerEvents: !canEdit ? 'auto' : 'none',
               }}
               dangerouslySetInnerHTML={{ __html: value || 'Double-click to edit' }}
+              onMouseDown={(e) => {
+                if (!canEdit) {
+                  e.stopPropagation();
+                }
+              }}
               onClick={(e) => {
+                if (!canEdit) {
+                  e.stopPropagation();
+                }
                 // Handle link clicks - only open with Ctrl/Cmd
                 if (e.target.tagName === 'A') {
                   e.preventDefault();
