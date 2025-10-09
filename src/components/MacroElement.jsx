@@ -10,7 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
 
-const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
+const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
@@ -328,9 +328,11 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
       <div
         ref={setNodeRef}
         style={style}
-        {...attributes}
-        {...listeners}
+        {...(canEdit ? attributes : {})}
+        {...(canEdit ? listeners : {})}
         className="group canvas-draggable-element"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         <div className="relative">
           {/* Action Buttons - Top Right */}
@@ -453,7 +455,9 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                 ? `${element.style.shadowOffsetX}px ${element.style.shadowOffsetY}px ${element.style.shadowBlur}px ${element.style.shadowColor}`
                 : 'none',
               userSelect: isEditing || !canEdit ? 'text' : 'none',
-              WebkitUserSelect: isEditing ? 'text' : 'none',
+              WebkitUserSelect: isEditing || !canEdit ? 'text' : 'none',
+              MozUserSelect: isEditing || !canEdit ? 'text' : 'none',
+              cursor: !canEdit ? 'text' : 'default',
             }}
           >
             {/* Header with Title and Expand Icon */}
@@ -485,9 +489,18 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                       fontWeight: element?.style?.titleFontWeight || 'semibold',
                       color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
                       cursor: !canEdit ? 'text' : 'default',
+                      pointerEvents: !canEdit ? 'auto' : 'none',
                     }}
                     dangerouslySetInnerHTML={{ __html: title || 'Double-click to add title' }}
+                    onMouseDown={(e) => {
+                      if (!canEdit) {
+                        e.stopPropagation();
+                      }
+                    }}
                     onClick={(e) => {
+                      if (!canEdit) {
+                        e.stopPropagation();
+                      }
                       // Handle link clicks - only open with Ctrl/Cmd
                       if (e.target.tagName === 'A') {
                         e.preventDefault();
@@ -543,9 +556,18 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                         fontWeight: 'normal',
                         color: getAdaptiveColor(element?.style?.descriptionColor || '#000000', isDarkMode),
                         cursor: !canEdit ? 'text' : 'default',
+                        pointerEvents: !canEdit ? 'auto' : 'none',
                       }}
                       dangerouslySetInnerHTML={{ __html: description || 'Double-click to add description' }}
+                      onMouseDown={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
+                        }
+                      }}
                       onClick={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
+                        }
                         // Handle link clicks - only open with Ctrl/Cmd
                         if (e.target.tagName === 'A') {
                           e.preventDefault();

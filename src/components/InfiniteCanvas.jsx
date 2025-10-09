@@ -17,6 +17,9 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   const { theme } = useTheme();
   const { isEditing } = useTextFormatting();
   const [highlightedElement, setHighlightedElement] = useState(null);
+  const [isHoveringElement, setIsHoveringElement] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
+  const zoomTimeoutRef = useRef(null);
 
   // Determine if user is actually in edit mode (has permission AND not in view mode)
   const isInEditMode = canEditContent && !isViewMode;
@@ -40,6 +43,15 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Cleanup zoom timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (zoomTimeoutRef.current) {
+        clearTimeout(zoomTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Track previous workspace ID to detect workspace changes
@@ -80,6 +92,22 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       });
     }
   }, []);
+
+  // Handle zoom events to prevent hover state reset during zooming
+  const handleZoom = useCallback((ref) => {
+    setIsZooming(true);
+    handleTransformChange(ref);
+
+    // Clear existing timeout
+    if (zoomTimeoutRef.current) {
+      clearTimeout(zoomTimeoutRef.current);
+    }
+
+    // Reset zooming state after a short delay
+    zoomTimeoutRef.current = setTimeout(() => {
+      setIsZooming(false);
+    }, 150);
+  }, [handleTransformChange]);
 
   // Handle viewport change from minimap
   const handleMinimapViewportChange = useCallback((newViewport) => {
@@ -311,6 +339,48 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     }
   }, [workspaceId, onElementNavigate]);
 
+  // Handle mouse enter/leave on elements to disable panning in view mode
+  const handleElementMouseEnter = useCallback(() => {
+    if (!isInEditMode) {
+      setIsHoveringElement(true);
+    }
+  }, [isInEditMode]);
+
+  const handleElementMouseLeave = useCallback(() => {
+    if (!isInEditMode) {
+      // Check if there's an active text selection
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        // Don't reset hover state if there's a selection
+        return;
+      }
+
+      // Don't reset hover state if currently zooming
+      if (isZooming) {
+        return;
+      }
+
+      setIsHoveringElement(false);
+    }
+  }, [isInEditMode, isZooming]);
+
+  // Handle clicks outside elements to reset hover state
+  React.useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!isInEditMode && isHoveringElement) {
+        // Check if click is on canvas background (not on an element)
+        if (e.target.classList.contains('cursor-grab') ||
+            e.target.classList.contains('cursor-grabbing') ||
+            !e.target.closest('.canvas-draggable-element')) {
+          setIsHoveringElement(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isInEditMode, isHoveringElement]);
+
   // Listen for zoom to element events
   React.useEffect(() => {
     const handleZoomToElement = (event) => {
@@ -434,7 +504,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         initialPositionX={-50000 + (window.innerWidth / 2)}
         initialPositionY={-50000 + (window.innerHeight / 2)}
         panning={{
-          disabled: isDraggingElement,
+          disabled: isDraggingElement || (isHoveringElement && !isInEditMode),
           excluded: ['input', 'textarea', 'button', 'svg', 'path'],
           excludedClass: 'canvas-draggable-element'
         }}
@@ -442,7 +512,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         doubleClick={{ disabled: true }}
         onTransformed={handleTransformChange}
         onPanning={handleTransformChange}
-        onZoom={handleTransformChange}
+        onZoom={handleZoom}
         disablePadding={true}
       >
         {({ zoomIn, zoomOut, resetTransform, state, ...rest }) => (
@@ -483,6 +553,8 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                     onSettingsClick={handleSettingsClick}
                     isHighlighted={highlightedElement === element._id}
                     onBookmarkCreated={onBookmarkCreated}
+                    onMouseEnter={handleElementMouseEnter}
+                    onMouseLeave={handleElementMouseLeave}
                   />
                 ))}
               </DndContext>

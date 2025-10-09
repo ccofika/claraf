@@ -10,7 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
 
-const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
+const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
@@ -446,9 +446,11 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
       <div
         ref={setNodeRef}
         style={style}
-        {...attributes}
-        {...listeners}
+        {...(canEdit ? attributes : {})}
+        {...(canEdit ? listeners : {})}
         className="group"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         <div className="relative">
           {/* Action Buttons - Top Right */}
@@ -571,7 +573,9 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                 ? `${element.style.shadowOffsetX}px ${element.style.shadowOffsetY}px ${element.style.shadowBlur}px ${element.style.shadowColor}`
                 : 'none',
               userSelect: isEditing || !canEdit ? 'text' : 'none',
-              WebkitUserSelect: isEditing ? 'text' : 'none',
+              WebkitUserSelect: isEditing || !canEdit ? 'text' : 'none',
+              MozUserSelect: isEditing || !canEdit ? 'text' : 'none',
+              cursor: !canEdit ? 'text' : 'default',
             }}
           >
             {/* Header with Title and Expand Icon */}
@@ -603,9 +607,18 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                       fontWeight: element?.style?.titleFontWeight || 'semibold',
                       color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
                       cursor: !canEdit ? 'text' : 'default',
+                      pointerEvents: !canEdit ? 'auto' : 'none',
                     }}
                     dangerouslySetInnerHTML={{ __html: title || 'Double-click to add title' }}
+                    onMouseDown={(e) => {
+                      if (!canEdit) {
+                        e.stopPropagation();
+                      }
+                    }}
                     onClick={(e) => {
+                      if (!canEdit) {
+                        e.stopPropagation();
+                      }
                       // Handle link clicks - only open with Ctrl/Cmd
                       if (e.target.tagName === 'A') {
                         e.preventDefault();
@@ -702,10 +715,19 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                                 fontSize: `${element?.style?.messageFontSize || 14}px`,
                                 fontWeight: 'normal',
                                 cursor: !canEdit ? 'text' : 'default',
+                                pointerEvents: !canEdit ? 'auto' : 'none',
                               }}
                               onDoubleClick={(e) => handleMessageDoubleClick(index, e)}
                               dangerouslySetInnerHTML={{ __html: message.text || 'Double-click to edit' }}
+                              onMouseDown={(e) => {
+                                if (!canEdit) {
+                                  e.stopPropagation();
+                                }
+                              }}
                               onClick={(e) => {
+                                if (!canEdit) {
+                                  e.stopPropagation();
+                                }
                                 // Handle link clicks - only open with Ctrl/Cmd
                                 if (e.target.tagName === 'A') {
                                   e.preventDefault();

@@ -6,7 +6,7 @@ import DescriptionElement from './DescriptionElement';
 import MacroElement from './MacroElement';
 import ExampleElement from './ExampleElement';
 
-const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated }) => {
+const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
     disabled: element.locked || !canEdit, // Disable dragging if user can't edit
@@ -24,6 +24,8 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
         onSettingsClick={onSettingsClick}
         isHighlighted={isHighlighted}
         onBookmarkCreated={onBookmarkCreated}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       />
     );
   }
@@ -40,6 +42,8 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
         onSettingsClick={onSettingsClick}
         isHighlighted={isHighlighted}
         onBookmarkCreated={onBookmarkCreated}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       />
     );
   }
@@ -56,6 +60,8 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
         onSettingsClick={onSettingsClick}
         isHighlighted={isHighlighted}
         onBookmarkCreated={onBookmarkCreated}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       />
     );
   }
@@ -72,6 +78,8 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
         onSettingsClick={onSettingsClick}
         isHighlighted={isHighlighted}
         onBookmarkCreated={onBookmarkCreated}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       />
     );
   }
@@ -84,7 +92,7 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
     minHeight: `${element.dimensions.height}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: element.position.z,
-    cursor: (element.locked || !canEdit) ? 'default' : 'move',
+    cursor: !canEdit ? 'text' : (element.locked || !canEdit) ? 'default' : 'move',
     opacity: isDragging ? 0.5 : element.style?.opacity || 1,
     backgroundColor: element.style?.backgroundColor || element.content?.color || '#ffffff',
     borderColor: element.style?.borderColor || '#e5e7eb',
@@ -95,27 +103,30 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
     color: element.style?.textColor || '#000000',
     fontSize: `${element.style?.fontSize || 14}px`,
     fontWeight: element.style?.fontWeight || 'normal',
+    userSelect: !canEdit ? 'text' : 'none',
+    WebkitUserSelect: !canEdit ? 'text' : 'none',
+    MozUserSelect: !canEdit ? 'text' : 'none',
   };
 
   const renderContent = () => {
     switch (element.type) {
       case 'text':
         return (
-          <div className="whitespace-pre-wrap break-words">
+          <div className="whitespace-pre-wrap break-words" style={{ cursor: !canEdit ? 'text' : 'default' }}>
             {element.content?.text || 'Text element'}
           </div>
         );
 
       case 'subtext':
         return (
-          <div className="text-sm text-gray-600 whitespace-pre-wrap break-words">
+          <div className="text-sm text-gray-600 whitespace-pre-wrap break-words" style={{ cursor: !canEdit ? 'text' : 'default' }}>
             {element.content?.text || 'Subtext element'}
           </div>
         );
 
       case 'card':
         return (
-          <div className="space-y-2">
+          <div className="space-y-2" style={{ cursor: !canEdit ? 'text' : 'default' }}>
             <h3 className="font-semibold text-lg">
               {element.content?.title || 'Card Title'}
             </h3>
@@ -129,7 +140,7 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
 
       case 'sticky-note':
         return (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex items-center justify-center" style={{ cursor: !canEdit ? 'text' : 'default' }}>
             <p className="text-center whitespace-pre-wrap break-words">
               {element.content?.text || 'Sticky note'}
             </p>
@@ -173,7 +184,9 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
       style={style}
       {...(canEdit ? listeners : {})}
       {...(canEdit ? attributes : {})}
-      className={`select-none shadow-sm transition-shadow duration-200 ${canEdit ? 'hover:shadow-md' : ''}`}
+      className={`${canEdit ? 'select-none' : 'select-text'} shadow-sm transition-shadow duration-200 ${canEdit ? 'hover:shadow-md' : ''}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {renderContent()}
       {!canEdit && (
