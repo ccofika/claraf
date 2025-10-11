@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { DndContext, useSensor, useSensors, PointerSensor, DragOverlay } from '@dnd-kit/core';
 import CanvasElement from './CanvasElement';
@@ -8,6 +8,7 @@ import ElementSettingsModal from './ElementSettingsModal';
 import TextFormattingDock from './TextFormattingDock';
 import CanvasSearchBar from './CanvasSearchBar';
 import ViewModeSwitch from './ViewModeSwitch';
+import DynamicGrid from './DynamicGrid';
 import { useTheme } from '../context/ThemeContext';
 import { useTextFormatting } from '../context/TextFormattingContext';
 
@@ -19,17 +20,81 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   const [highlightedElement, setHighlightedElement] = useState(null);
   const [isHoveringElement, setIsHoveringElement] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
   const zoomTimeoutRef = useRef(null);
+  const panningTimeoutRef = useRef(null);
+  const rafRef = useRef(null);
+  const frozenCanvasBoundsRef = useRef(null);
 
   // Determine if user is actually in edit mode (has permission AND not in view mode)
   const isInEditMode = canEditContent && !isViewMode;
+  const [isDraggingElement, setIsDraggingElement] = React.useState(false);
+  const [activeId, setActiveId] = React.useState(null);
   const [viewport, setViewport] = useState({
-    x: -50000 + (window.innerWidth / 2),
-    y: -50000 + (window.innerHeight / 2),
+    x: 0,
+    y: 0,
     width: window.innerWidth,
     height: window.innerHeight,
     scale: 1
   });
+
+  // Calculate dynamic canvas bounds based on elements and viewport
+  const canvasBounds = useMemo(() => {
+    // During dragging, return frozen bounds to prevent viewport shift
+    if (isDraggingElement && frozenCanvasBoundsRef.current) {
+      return frozenCanvasBoundsRef.current;
+    }
+    const padding = 3000; // Padding around content
+    const minCanvasExtent = 20000; // Minimum extent in each direction from origin
+
+    // Start with viewport bounds
+    const scale = viewport.scale || 1;
+    const viewportLeft = (-viewport.x / scale);
+    const viewportTop = (-viewport.y / scale);
+    const viewportRight = viewportLeft + (viewport.width / scale);
+    const viewportBottom = viewportTop + (viewport.height / scale);
+
+    // Calculate bounds that include both viewport and all elements
+    let minX = Math.min(0, viewportLeft - padding);
+    let minY = Math.min(0, viewportTop - padding);
+    let maxX = Math.max(0, viewportRight + padding);
+    let maxY = Math.max(0, viewportBottom + padding);
+
+    // Expand bounds to include all elements
+    canvasElements.forEach(element => {
+      if (element.position && element.dimensions) {
+        const elementLeft = element.position.x;
+        const elementTop = element.position.y;
+        const elementRight = elementLeft + (element.dimensions.width || 0);
+        const elementBottom = elementTop + (element.dimensions.height || 0);
+
+        minX = Math.min(minX, elementLeft - padding);
+        minY = Math.min(minY, elementTop - padding);
+        maxX = Math.max(maxX, elementRight + padding);
+        maxY = Math.max(maxY, elementBottom + padding);
+      }
+    });
+
+    // Ensure minimum extent from origin
+    minX = Math.min(minX, -minCanvasExtent);
+    minY = Math.min(minY, -minCanvasExtent);
+    maxX = Math.max(maxX, minCanvasExtent);
+    maxY = Math.max(maxY, minCanvasExtent);
+
+    const bounds = {
+      left: minX,
+      top: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+
+    // Store the calculated bounds for potential freezing during drag
+    if (!isDraggingElement) {
+      frozenCanvasBoundsRef.current = bounds;
+    }
+
+    return bounds;
+  }, [canvasElements, viewport.x, viewport.y, viewport.width, viewport.height, viewport.scale, isDraggingElement]);
 
   // Update viewport dimensions on window resize
   React.useEffect(() => {
@@ -45,11 +110,17 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Cleanup zoom timeout on unmount
+  // Cleanup timeouts and RAF on unmount
   React.useEffect(() => {
     return () => {
       if (zoomTimeoutRef.current) {
         clearTimeout(zoomTimeoutRef.current);
+      }
+      if (panningTimeoutRef.current) {
+        clearTimeout(panningTimeoutRef.current);
+      }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
       }
     };
   }, []);
@@ -57,17 +128,14 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Track previous workspace ID to detect workspace changes
   const prevWorkspaceId = React.useRef(workspaceId);
 
-  // Update canvas elements when elements prop changes (e.g., workspace switch)
+  // Reset viewport when switching workspaces
   React.useEffect(() => {
-    setCanvasElements(elements);
-
-    // Only reset viewport when switching workspaces, not when elements change
     if (workspaceId !== prevWorkspaceId.current) {
       prevWorkspaceId.current = workspaceId;
 
       if (transformWrapperRef.current) {
-        const initialX = -50000 + (window.innerWidth / 2);
-        const initialY = -50000 + (window.innerHeight / 2);
+        const initialX = 0;
+        const initialY = 0;
         transformWrapperRef.current.setTransform(initialX, initialY, 1);
         setViewport({
           x: initialX,
@@ -78,19 +146,93 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         });
       }
     }
-  }, [elements, workspaceId]);
+  }, [workspaceId]);
 
-  // Handle viewport updates from transform changes
+  // Update canvas elements when elements prop changes
+  React.useEffect(() => {
+    setCanvasElements(elements);
+  }, [elements]);
+
+  // Virtualization: Only render elements visible in viewport (disabled during panning to prevent flicker)
+  const visibleElements = useMemo(() => {
+    // Disable virtualization while panning to prevent flickering
+    if (isPanning) return canvasElements;
+
+    if (!viewport.scale || canvasElements.length === 0) return canvasElements;
+
+    // If there are fewer than 50 elements, don't virtualize (no performance benefit)
+    if (canvasElements.length < 50) return canvasElements;
+
+    // Use larger padding for smoother experience
+    const padding = 2000; // Increased padding to reduce pop-in
+    const scale = viewport.scale;
+
+    // Calculate viewport bounds in canvas coordinates
+    const viewportLeft = (-viewport.x / scale) - padding;
+    const viewportTop = (-viewport.y / scale) - padding;
+    const viewportRight = viewportLeft + (viewport.width / scale) + (padding * 2);
+    const viewportBottom = viewportTop + (viewport.height / scale) + (padding * 2);
+
+    // Filter elements that intersect with viewport
+    return canvasElements.filter(element => {
+      if (!element.position || !element.dimensions) return true; // Always render if no position/dimensions
+
+      const elementLeft = element.position.x;
+      const elementTop = element.position.y;
+      const elementRight = elementLeft + (element.dimensions.width || 0);
+      const elementBottom = elementTop + (element.dimensions.height || 0);
+
+      // Check if element intersects with viewport
+      return !(
+        elementRight < viewportLeft ||
+        elementLeft > viewportRight ||
+        elementBottom < viewportTop ||
+        elementTop > viewportBottom
+      );
+    });
+  }, [canvasElements, viewport.x, viewport.y, viewport.scale, viewport.width, viewport.height, isPanning]);
+
+  // Handle viewport updates from transform changes with RAF for smooth updates
   const handleTransformChange = useCallback((ref) => {
     if (ref && ref.state) {
-      setViewport({
-        x: ref.state.positionX,
-        y: ref.state.positionY,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        scale: ref.state.scale
+      // Cancel any pending RAF
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      // Use RAF to batch viewport updates
+      rafRef.current = requestAnimationFrame(() => {
+        setViewport({
+          x: ref.state.positionX,
+          y: ref.state.positionY,
+          width: window.innerWidth,
+          height: window.innerHeight,
+          scale: ref.state.scale
+        });
       });
     }
+  }, []);
+
+  // Handle panning start/end to control virtualization
+  const handlePanningStart = useCallback(() => {
+    setIsPanning(true);
+
+    // Clear any existing timeout
+    if (panningTimeoutRef.current) {
+      clearTimeout(panningTimeoutRef.current);
+    }
+  }, []);
+
+  const handlePanningEnd = useCallback(() => {
+    // Clear any existing timeout
+    if (panningTimeoutRef.current) {
+      clearTimeout(panningTimeoutRef.current);
+    }
+
+    // Delay re-enabling virtualization slightly after panning stops
+    panningTimeoutRef.current = setTimeout(() => {
+      setIsPanning(false);
+    }, 150);
   }, []);
 
   // Handle zoom events to prevent hover state reset during zooming
@@ -120,7 +262,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     }
   }, []);
 
-  const handleDockItemClick = async (itemId) => {
+  const handleDockItemClick = useCallback(async (itemId) => {
     if (!isInEditMode) return;
 
     // Set dimensions based on element type
@@ -194,9 +336,9 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         );
       }
     }
-  };
+  }, [isInEditMode, viewport, canvasElements.length, theme, onElementCreate]);
 
-  const handleElementUpdate = (updatedElement) => {
+  const handleElementUpdate = useCallback((updatedElement) => {
     // Update local state
     setCanvasElements(prev =>
       prev.map(el => el._id === updatedElement._id ? updatedElement : el)
@@ -206,9 +348,9 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     if (onElementUpdate) {
       onElementUpdate(updatedElement);
     }
-  };
+  }, [onElementUpdate]);
 
-  const handleElementDelete = async (elementId) => {
+  const handleElementDelete = useCallback(async (elementId) => {
     // Update local state immediately for responsive UI
     setCanvasElements(prev => prev.filter(el => el._id !== elementId));
 
@@ -216,24 +358,21 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     if (onElementDelete) {
       await onElementDelete(elementId);
     }
-  };
+  }, [onElementDelete]);
 
   const [settingsModalOpen, setSettingsModalOpen] = React.useState(false);
   const [selectedElement, setSelectedElement] = React.useState(null);
 
-  const handleSettingsClick = (element) => {
+  const handleSettingsClick = useCallback((element) => {
     setSelectedElement(element);
     setSettingsModalOpen(true);
-  };
+  }, []);
 
-  const handleSettingsSave = (updatedElement) => {
+  const handleSettingsSave = useCallback((updatedElement) => {
     handleElementUpdate(updatedElement);
     setSettingsModalOpen(false);
     setSelectedElement(null);
-  };
-
-  const [isDraggingElement, setIsDraggingElement] = React.useState(false);
-  const [activeId, setActiveId] = React.useState(null);
+  }, [handleElementUpdate]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -490,7 +629,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
             }
           `}
         >
-          <TextFormattingDock />
+          <TextFormattingDock currentWorkspaceId={workspaceId} />
         </div>
       )}
 
@@ -501,8 +640,8 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         maxScale={5}
         limitToBounds={false}
         centerOnInit={true}
-        initialPositionX={-50000 + (window.innerWidth / 2)}
-        initialPositionY={-50000 + (window.innerHeight / 2)}
+        initialPositionX={0}
+        initialPositionY={0}
         panning={{
           disabled: isDraggingElement || (isHoveringElement && !isInEditMode),
           excluded: ['input', 'textarea', 'button', 'svg', 'path'],
@@ -511,54 +650,74 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         wheel={{ step: 0.1 }}
         doubleClick={{ disabled: true }}
         onTransformed={handleTransformChange}
+        onPanningStart={handlePanningStart}
         onPanning={handleTransformChange}
+        onPanningStop={handlePanningEnd}
         onZoom={handleZoom}
         disablePadding={true}
       >
         {({ zoomIn, zoomOut, resetTransform, state, ...rest }) => (
           <>
             <TransformComponent
-              wrapperStyle={{ width: '100%', height: '100%', overflow: 'hidden' }}
-              contentStyle={{ width: '100%', height: '100%', cursor: 'grab' }}
+              wrapperStyle={{
+                width: '100%',
+                height: '100%',
+                overflow: 'hidden'
+              }}
+              contentStyle={{
+                width: '100%',
+                height: '100%',
+                cursor: 'grab'
+              }}
             >
               <div
                 className="relative cursor-grab active:cursor-grabbing"
                 style={{
-                  width: '100000px',
-                  height: '100000px',
-                  minWidth: '100000px',
-                  minHeight: '100000px',
+                  width: `${canvasBounds.width}px`,
+                  height: `${canvasBounds.height}px`,
+                  minWidth: `${canvasBounds.width}px`,
+                  minHeight: `${canvasBounds.height}px`,
                   backgroundColor: theme === 'dark' ? '#000000' : '#ffffff',
-                  backgroundImage: theme === 'dark'
-                    ? `repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0px, rgba(255, 255, 255, 0.06) 1px, transparent 1px, transparent 50px),
-                       repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0px, rgba(255, 255, 255, 0.06) 1px, transparent 1px, transparent 50px)`
-                    : `repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0px, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 50px),
-                       repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0px, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 50px)`,
+                  transform: `translate(${canvasBounds.left}px, ${canvasBounds.top}px)`
                 }}
               >
-              <DndContext
-                sensors={isInEditMode ? sensors : []}
-                onDragStart={handleDragStart}
-                onDragMove={handleDragMove}
-                onDragEnd={handleDragEnd}
-              >
-                {canvasElements.map((element) => (
-                  <CanvasElement
-                    key={element._id}
-                    element={element}
-                    canEdit={isInEditMode}
-                    workspaceId={workspaceId}
-                    onUpdate={handleElementUpdate}
-                    onDelete={handleElementDelete}
-                    onSettingsClick={handleSettingsClick}
-                    isHighlighted={highlightedElement === element._id}
-                    onBookmarkCreated={onBookmarkCreated}
-                    onMouseEnter={handleElementMouseEnter}
-                    onMouseLeave={handleElementMouseLeave}
-                  />
-                ))}
-              </DndContext>
-            </div>
+                {/* Container for grid and elements with offset positioning */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    transform: `translate(${-canvasBounds.left}px, ${-canvasBounds.top}px)`
+                  }}
+                >
+                  {/* Dynamic infinite grid */}
+                  <DynamicGrid viewport={viewport} gridSize={50} />
+                  <DndContext
+                    sensors={isInEditMode ? sensors : []}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {visibleElements.map((element) => (
+                      <CanvasElement
+                        key={element._id}
+                        element={element}
+                        canEdit={isInEditMode}
+                        workspaceId={workspaceId}
+                        onUpdate={handleElementUpdate}
+                        onDelete={handleElementDelete}
+                        onSettingsClick={handleSettingsClick}
+                        isHighlighted={highlightedElement === element._id}
+                        onBookmarkCreated={onBookmarkCreated}
+                        onMouseEnter={handleElementMouseEnter}
+                        onMouseLeave={handleElementMouseLeave}
+                      />
+                    ))}
+                  </DndContext>
+                  </div>
+              </div>
           </TransformComponent>
         </>
         )}
@@ -566,7 +725,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
       <Minimap
         elements={canvasElements}
-        canvasSize={{ width: 100000, height: 100000 }}
+        canvasSize={{ width: canvasBounds.width, height: canvasBounds.height }}
         viewport={viewport}
         onViewportChange={handleMinimapViewportChange}
       />

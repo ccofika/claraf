@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Plus, Trash2, ChevronLeft, ChevronRight, Copy, Share2, Bookmark } from 'lucide-react';
+import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Plus, Trash2, ChevronLeft, ChevronRight, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
@@ -13,6 +14,7 @@ import { copyElementContent, shareElement } from '../utils/clipboard';
 const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
+  const navigate = useNavigate();
 
   // Initialize examples with at least one example
   const initialExamples = element?.content?.examples?.length > 0
@@ -73,11 +75,8 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
   }, [currentExampleIndex, examples]);
 
 
-  const handleCardDoubleClick = (e) => {
-    if (isEditingTitle || editingMessageIndex !== null) {
-      e.stopPropagation();
-      return;
-    }
+  const toggleExpand = (e) => {
+    e.stopPropagation();
 
     const newExpandedState = !isExpanded;
     setIsExpanded(newExpandedState);
@@ -93,12 +92,6 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     });
   };
 
-  const handleTitleDoubleClick = (e) => {
-    e.stopPropagation();
-    if (canEdit) {
-      setIsEditingTitle(true);
-    }
-  };
 
   const confirmTitleEdit = () => {
     setIsEditingTitle(false);
@@ -243,12 +236,6 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     });
   };
 
-  const handleMessageDoubleClick = (index, e) => {
-    e.stopPropagation();
-    if (canEdit && isExpanded) {
-      setEditingMessageIndex(index);
-    }
-  };
 
   const handleMessageChange = (index, newText) => {
     const updatedExamples = [...examples];
@@ -431,6 +418,19 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     }
   };
 
+  const handleElementLinkClick = (linkData) => {
+    if (linkData.workspaceId === workspaceId) {
+      // Same workspace - zoom to element
+      const event = new CustomEvent('zoomToElement', {
+        detail: { _id: linkData.elementId }
+      });
+      window.dispatchEvent(event);
+    } else {
+      // Different workspace - navigate
+      navigate(`/workspace/${linkData.workspaceId}?element=${linkData.elementId}`);
+    }
+  };
+
   // Get text style for title based on formatting
 
   const getFirstUserMessage = () => {
@@ -440,6 +440,11 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     const preview = words.slice(0, 8).join(' ');
     return words.length > 8 ? `${preview}...` : preview;
   };
+
+  const getFirstUserMessageIndex = () => {
+    return currentExample?.messages?.findIndex(m => m.type === 'user') ?? 0;
+  };
+
 
   return (
     <>
@@ -545,7 +550,6 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
 
           {/* Example Card */}
           <div
-            onDoubleClick={handleCardDoubleClick}
             className={`
               w-[500px] rounded-lg border-2 border-t-4 border-t-purple-600 dark:border-t-purple-400
               ${isExpanded ? 'min-h-[400px]' : 'h-[120px]'}
@@ -580,10 +584,7 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
           >
             {/* Header with Title and Expand Icon */}
             <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-neutral-800">
-              <div
-                className="flex-1"
-                onDoubleClick={handleTitleDoubleClick}
-              >
+              <div className="flex-1 group/title relative">
                 {isEditingTitle ? (
                   <RichTextEditor
                     value={title}
@@ -593,6 +594,8 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                     placeholder="Enter example title..."
                     className="w-full text-gray-900 dark:text-neutral-100"
                     autoFocus={true}
+                    workspaceId={workspaceId}
+                    onElementLinkClick={handleElementLinkClick}
                     style={{
                       fontSize: `${element?.style?.titleFontSize || 18}px`,
                       fontWeight: element?.style?.titleFontWeight || 'semibold',
@@ -600,42 +603,72 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                     }}
                   />
                 ) : (
-                  <h3
-                    className="text-gray-900 dark:text-neutral-100"
-                    style={{
-                      fontSize: `${element?.style?.titleFontSize || 18}px`,
-                      fontWeight: element?.style?.titleFontWeight || 'semibold',
-                      color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
-                      cursor: !canEdit ? 'text' : 'default',
-                      pointerEvents: !canEdit ? 'auto' : 'none',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: title || 'Double-click to add title' }}
-                    onMouseDown={(e) => {
-                      if (!canEdit) {
-                        e.stopPropagation();
-                      }
-                    }}
-                    onClick={(e) => {
-                      if (!canEdit) {
-                        e.stopPropagation();
-                      }
-                      // Handle link clicks - only open with Ctrl/Cmd
-                      if (e.target.tagName === 'A') {
-                        e.preventDefault();
-                        if (e.ctrlKey || e.metaKey) {
-                          window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                  <>
+                    <h3
+                      className="text-gray-900 dark:text-neutral-100 pr-8"
+                      style={{
+                        fontSize: `${element?.style?.titleFontSize || 18}px`,
+                        fontWeight: element?.style?.titleFontWeight || 'semibold',
+                        color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
+                        cursor: canEdit ? 'text' : 'text',
+                        pointerEvents: 'auto',
+                      }}
+                      dangerouslySetInnerHTML={{ __html: title || 'Example title' }}
+                      onMouseDown={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
                         }
-                      }
-                    }}
-                  />
+                      }}
+                      onClick={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
+                        }
+                        // Handle link clicks
+                        if (e.target.tagName === 'A') {
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          // Check if it's an element link
+                          const elementId = e.target.getAttribute('data-element-id');
+                          const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+
+                          if (elementId && elementWorkspaceId) {
+                            // Element link - navigate only with Ctrl/Cmd + click (like share function)
+                            if (e.ctrlKey || e.metaKey) {
+                              handleElementLinkClick({
+                                elementId,
+                                workspaceId: elementWorkspaceId,
+                                elementType: e.target.getAttribute('data-element-type'),
+                                elementTitle: e.target.getAttribute('data-element-title')
+                              });
+                            }
+                          } else {
+                            // Regular hyperlink - only open with Ctrl/Cmd
+                            if (e.ctrlKey || e.metaKey) {
+                              window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                            }
+                          }
+                        }
+                      }}
+                    />
+                    {canEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditingTitle(true);
+                        }}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-600 dark:text-neutral-400 opacity-0 group-hover/title:opacity-100 transition-opacity"
+                        title="Edit title"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCardDoubleClick(e);
-                }}
+                onClick={toggleExpand}
                 className="ml-2 p-1 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
               >
                 {isExpanded ? (
@@ -690,7 +723,11 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                           style={{
                             backgroundColor: message.type === 'user'
                               ? getAdaptiveBackgroundColor(element?.style?.userMessageColor || '#6b7280', isDarkMode)
-                              : getAdaptiveBackgroundColor(element?.style?.agentMessageColor || '#3b82f6', isDarkMode)
+                              : getAdaptiveBackgroundColor(element?.style?.agentMessageColor || '#3b82f6', isDarkMode),
+                            cursor: canEdit ? 'text' : 'text',
+                            userSelect: canEdit ? 'none' : 'text',
+                            WebkitUserSelect: canEdit ? 'none' : 'text',
+                            MozUserSelect: canEdit ? 'none' : 'text',
                           }}
                         >
                           {editingMessageIndex === index ? (
@@ -703,6 +740,8 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                               className="w-full text-white"
                               multiline={true}
                               autoFocus={true}
+                              workspaceId={workspaceId}
+                              onElementLinkClick={handleElementLinkClick}
                               style={{
                                 fontSize: `${element?.style?.messageFontSize || 14}px`,
                                 fontWeight: 'normal',
@@ -710,15 +749,15 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                             />
                           ) : (
                             <div
-                              className="whitespace-pre-wrap cursor-pointer"
+                              className="whitespace-pre-wrap"
                               style={{
                                 fontSize: `${element?.style?.messageFontSize || 14}px`,
                                 fontWeight: 'normal',
-                                cursor: !canEdit ? 'text' : 'default',
-                                pointerEvents: !canEdit ? 'auto' : 'none',
+                                width: '100%',
+                                minHeight: '100%',
+                                pointerEvents: 'auto',
                               }}
-                              onDoubleClick={(e) => handleMessageDoubleClick(index, e)}
-                              dangerouslySetInnerHTML={{ __html: message.text || 'Double-click to edit' }}
+                              dangerouslySetInnerHTML={{ __html: message.text || 'Message text' }}
                               onMouseDown={(e) => {
                                 if (!canEdit) {
                                   e.stopPropagation();
@@ -728,29 +767,58 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                                 if (!canEdit) {
                                   e.stopPropagation();
                                 }
-                                // Handle link clicks - only open with Ctrl/Cmd
+                                // Handle link clicks
                                 if (e.target.tagName === 'A') {
                                   e.preventDefault();
-                                  if (e.ctrlKey || e.metaKey) {
-                                    window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                                  e.stopPropagation();
+
+                                  // Check if it's an element link
+                                  const elementId = e.target.getAttribute('data-element-id');
+                                  const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+
+                                  if (elementId && elementWorkspaceId) {
+                                    // Element link - navigate on click
+                                    handleElementLinkClick({
+                                      elementId,
+                                      workspaceId: elementWorkspaceId,
+                                      elementType: e.target.getAttribute('data-element-type'),
+                                      elementTitle: e.target.getAttribute('data-element-title')
+                                    });
+                                  } else {
+                                    // Regular hyperlink - only open with Ctrl/Cmd
+                                    if (e.ctrlKey || e.metaKey) {
+                                      window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                                    }
                                   }
                                 }
                               }}
                             />
                           )}
 
-                          {/* Delete Message Button */}
-                          {canEdit && !editingMessageIndex && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteMessage(index);
-                              }}
-                              className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover/message:opacity-100 transition-opacity"
-                              title="Delete Message"
-                            >
-                              <X size={10} className="text-white" />
-                            </button>
+                          {/* Edit and Delete Message Buttons */}
+                          {canEdit && editingMessageIndex !== index && (
+                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingMessageIndex(index);
+                                }}
+                                className="p-1 bg-blue-500 hover:bg-blue-600 rounded-full"
+                                title="Edit Message"
+                              >
+                                <Pencil size={10} className="text-white" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteMessage(index);
+                                }}
+                                className="p-1 bg-red-500 hover:bg-red-600 rounded-full"
+                                title="Delete Message"
+                              >
+                                <X size={10} className="text-white" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -763,6 +831,7 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                   style={{
                     fontSize: `${element?.style?.descriptionFontSize || 14}px`,
                     color: getAdaptiveColor(element?.style?.descriptionColor || '#6b7280', isDarkMode),
+                    cursor: 'default',
                   }}
                 >
                   {getFirstUserMessage()}

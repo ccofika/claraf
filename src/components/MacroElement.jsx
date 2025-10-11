@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Copy, Share2, Bookmark } from 'lucide-react';
+import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
@@ -13,6 +14,7 @@ import { copyElementContent, shareElement } from '../utils/clipboard';
 const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
+  const navigate = useNavigate();
 
   const [isExpanded, setIsExpanded] = useState(element?.content?.isExpanded || false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -47,12 +49,8 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   };
 
 
-  const handleCardDoubleClick = (e) => {
-    // If clicking on title or description area while editing, don't toggle expansion
-    if (isEditingTitle || isEditingDescription) {
-      e.stopPropagation();
-      return;
-    }
+  const toggleExpand = (e) => {
+    e.stopPropagation();
 
     // Toggle expansion
     const newExpandedState = !isExpanded;
@@ -66,20 +64,6 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
         isExpanded: newExpandedState
       }
     });
-  };
-
-  const handleTitleDoubleClick = (e) => {
-    e.stopPropagation();
-    if (canEdit) {
-      setIsEditingTitle(true);
-    }
-  };
-
-  const handleDescriptionDoubleClick = (e) => {
-    e.stopPropagation();
-    if (canEdit && isExpanded) {
-      setIsEditingDescription(true);
-    }
   };
 
   const handleTitleBlur = () => {
@@ -313,6 +297,19 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
     }
   };
 
+  const handleElementLinkClick = (linkData) => {
+    if (linkData.workspaceId === workspaceId) {
+      // Same workspace - zoom to element
+      const event = new CustomEvent('zoomToElement', {
+        detail: { _id: linkData.elementId }
+      });
+      window.dispatchEvent(event);
+    } else {
+      // Different workspace - navigate
+      navigate(`/workspace/${linkData.workspaceId}?element=${linkData.elementId}`);
+    }
+  };
+
   // Get preview text (first few words of description)
   const getPreviewText = () => {
     if (!description) return 'No description yet...';
@@ -322,6 +319,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
     const preview = words.slice(0, 5).join(' ');
     return words.length > 5 ? `${preview}...` : preview;
   };
+
 
   return (
     <>
@@ -427,7 +425,6 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
 
           {/* Macro Card */}
           <div
-            onDoubleClick={handleCardDoubleClick}
             className={`
               w-[450px] rounded-lg border-2 border-t-4 border-t-green-600 dark:border-t-[#5FD3A3]
               ${isExpanded ? 'min-h-[300px]' : 'h-[150px]'}
@@ -462,10 +459,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
           >
             {/* Header with Title and Expand Icon */}
             <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-neutral-800">
-              <div
-                className="flex-1"
-                onDoubleClick={handleTitleDoubleClick}
-              >
+              <div className="flex-1 group/title relative">
                 {isEditingTitle ? (
                   <RichTextEditor
                     value={title}
@@ -475,6 +469,8 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                     placeholder="Enter macro title..."
                     className="w-full text-gray-900 dark:text-neutral-100"
                     autoFocus={true}
+                    workspaceId={workspaceId}
+                    onElementLinkClick={handleElementLinkClick}
                     style={{
                       fontSize: `${element?.style?.titleFontSize || 18}px`,
                       fontWeight: element?.style?.titleFontWeight || 'semibold',
@@ -482,42 +478,72 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                     }}
                   />
                 ) : (
-                  <h3
-                    className="text-gray-900 dark:text-neutral-100"
-                    style={{
-                      fontSize: `${element?.style?.titleFontSize || 18}px`,
-                      fontWeight: element?.style?.titleFontWeight || 'semibold',
-                      color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
-                      cursor: !canEdit ? 'text' : 'default',
-                      pointerEvents: !canEdit ? 'auto' : 'none',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: title || 'Double-click to add title' }}
-                    onMouseDown={(e) => {
-                      if (!canEdit) {
-                        e.stopPropagation();
-                      }
-                    }}
-                    onClick={(e) => {
-                      if (!canEdit) {
-                        e.stopPropagation();
-                      }
-                      // Handle link clicks - only open with Ctrl/Cmd
-                      if (e.target.tagName === 'A') {
-                        e.preventDefault();
-                        if (e.ctrlKey || e.metaKey) {
-                          window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                  <>
+                    <h3
+                      className="text-gray-900 dark:text-neutral-100 pr-8"
+                      style={{
+                        fontSize: `${element?.style?.titleFontSize || 18}px`,
+                        fontWeight: element?.style?.titleFontWeight || 'semibold',
+                        color: getAdaptiveColor(element?.style?.titleColor || '#000000', isDarkMode),
+                        cursor: canEdit ? 'text' : 'text',
+                        pointerEvents: 'auto',
+                      }}
+                      dangerouslySetInnerHTML={{ __html: title || 'Macro title' }}
+                      onMouseDown={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
                         }
-                      }
-                    }}
-                  />
+                      }}
+                      onClick={(e) => {
+                        if (!canEdit) {
+                          e.stopPropagation();
+                        }
+                        // Handle link clicks
+                        if (e.target.tagName === 'A') {
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          // Check if it's an element link
+                          const elementId = e.target.getAttribute('data-element-id');
+                          const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+
+                          if (elementId && elementWorkspaceId) {
+                            // Element link - navigate only with Ctrl/Cmd + click (like share function)
+                            if (e.ctrlKey || e.metaKey) {
+                              handleElementLinkClick({
+                                elementId,
+                                workspaceId: elementWorkspaceId,
+                                elementType: e.target.getAttribute('data-element-type'),
+                                elementTitle: e.target.getAttribute('data-element-title')
+                              });
+                            }
+                          } else {
+                            // Regular hyperlink - only open with Ctrl/Cmd
+                            if (e.ctrlKey || e.metaKey) {
+                              window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                            }
+                          }
+                        }
+                      }}
+                    />
+                    {canEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditingTitle(true);
+                        }}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-600 dark:text-neutral-400 opacity-0 group-hover/title:opacity-100 transition-opacity"
+                        title="Edit title"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCardDoubleClick(e);
-                }}
+                onClick={toggleExpand}
                 className="ml-2 p-1 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
               >
                 {isExpanded ? (
@@ -531,7 +557,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
             {/* Content Area */}
             <div className="flex-1 p-4 overflow-auto">
               {isExpanded ? (
-                <div onDoubleClick={handleDescriptionDoubleClick}>
+                <div className="group/description relative">
                   {isEditingDescription ? (
                     <RichTextEditor
                       value={description}
@@ -542,6 +568,8 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                       className="w-full text-gray-900 dark:text-neutral-100"
                       multiline={true}
                       autoFocus={true}
+                      workspaceId={workspaceId}
+                      onElementLinkClick={handleElementLinkClick}
                       style={{
                         fontSize: `${element?.style?.descriptionFontSize || 14}px`,
                         fontWeight: 'normal',
@@ -549,34 +577,65 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                       }}
                     />
                   ) : (
-                    <div
-                      className="text-gray-900 dark:text-neutral-100 whitespace-pre-wrap min-h-[200px]"
-                      style={{
-                        fontSize: `${element?.style?.descriptionFontSize || 14}px`,
-                        fontWeight: 'normal',
-                        color: getAdaptiveColor(element?.style?.descriptionColor || '#000000', isDarkMode),
-                        cursor: !canEdit ? 'text' : 'default',
-                        pointerEvents: !canEdit ? 'auto' : 'none',
-                      }}
-                      dangerouslySetInnerHTML={{ __html: description || 'Double-click to add description' }}
-                      onMouseDown={(e) => {
-                        if (!canEdit) {
-                          e.stopPropagation();
-                        }
-                      }}
-                      onClick={(e) => {
-                        if (!canEdit) {
-                          e.stopPropagation();
-                        }
-                        // Handle link clicks - only open with Ctrl/Cmd
-                        if (e.target.tagName === 'A') {
-                          e.preventDefault();
-                          if (e.ctrlKey || e.metaKey) {
-                            window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                    <>
+                      <div
+                        className="text-gray-900 dark:text-neutral-100 whitespace-pre-wrap min-h-[200px] pr-8"
+                        style={{
+                          fontSize: `${element?.style?.descriptionFontSize || 14}px`,
+                          fontWeight: 'normal',
+                          color: getAdaptiveColor(element?.style?.descriptionColor || '#000000', isDarkMode),
+                          cursor: canEdit ? 'text' : 'text',
+                          pointerEvents: 'auto',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: description || 'Macro description' }}
+                        onMouseDown={(e) => {
+                          if (!canEdit) {
+                            e.stopPropagation();
                           }
-                        }
-                      }}
-                    />
+                        }}
+                        onClick={(e) => {
+                          if (!canEdit) {
+                            e.stopPropagation();
+                          }
+                          // Handle link clicks
+                          if (e.target.tagName === 'A') {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            // Check if it's an element link
+                            const elementId = e.target.getAttribute('data-element-id');
+                            const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+
+                            if (elementId && elementWorkspaceId) {
+                              // Element link - navigate on click
+                              handleElementLinkClick({
+                                elementId,
+                                workspaceId: elementWorkspaceId,
+                                elementType: e.target.getAttribute('data-element-type'),
+                                elementTitle: e.target.getAttribute('data-element-title')
+                              });
+                            } else {
+                              // Regular hyperlink - only open with Ctrl/Cmd
+                              if (e.ctrlKey || e.metaKey) {
+                                window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                              }
+                            }
+                          }
+                        }}
+                      />
+                      {canEdit && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditingDescription(true);
+                          }}
+                          className="absolute right-0 top-0 p-1.5 rounded-md bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-600 dark:text-neutral-400 opacity-0 group-hover/description:opacity-100 transition-opacity"
+                          title="Edit description"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                    </>
                   )}
 
                   {/* Description History Controls - Bottom */}
@@ -624,6 +683,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                   style={{
                     fontSize: `${element?.style?.descriptionFontSize || 14}px`,
                     color: getAdaptiveColor(element?.style?.descriptionColor || '#6b7280', isDarkMode),
+                    cursor: 'default',
                   }}
                 >
                   {getPreviewText()}
