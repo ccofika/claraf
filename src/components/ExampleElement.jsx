@@ -10,6 +10,8 @@ import RichTextEditor from './RichTextEditor';
 import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
+import ImageLightbox from './ImageLightbox';
+import { extractImageMetadata } from '../utils/imageUpload';
 
 const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
@@ -40,6 +42,8 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
   const [currentTitleHistoryIndex, setCurrentTitleHistoryIndex] = useState(-1);
   const [currentTitleValue, setCurrentTitleValue] = useState(examples[currentExampleIndex]?.title || '');
   const [editingMessageIndex, setEditingMessageIndex] = useState(null);
+  const [inlineImages, setInlineImages] = useState(element?.content?.inlineImages || []);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   const currentExample = examples[currentExampleIndex] || examples[0];
   const [title, setTitle] = useState(currentExample?.title || '');
@@ -255,13 +259,40 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
   const confirmMessageEdit = (index) => {
     setEditingMessageIndex(null);
 
+    // Extract all images from all messages
+    const allImages = [];
+    examples.forEach(ex => {
+      ex.messages?.forEach(msg => {
+        const msgImages = extractImageMetadata(msg.text);
+        allImages.push(...msgImages);
+      });
+    });
+
     onUpdate?.({
       ...element,
       content: {
         ...element.content,
-        examples
+        examples,
+        inlineImages: allImages
       }
     });
+  };
+
+  const handleImagePaste = (imageMetadata) => {
+    // Add new image to the inlineImages array
+    setInlineImages(prev => [...prev, imageMetadata]);
+  };
+
+  const handleImageClick = (e) => {
+    // Check if clicked element is an image - require Ctrl/Cmd+click to not interfere with text selection
+    if (e.target.tagName === 'IMG' && e.target.classList.contains('inline-image')) {
+      // Only open lightbox with Ctrl/Cmd+click to not interfere with text selection hover
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLightboxImage(e.target.src);
+      }
+    }
   };
 
   const handleMessageBlur = (index) => {
@@ -742,6 +773,7 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                               autoFocus={true}
                               workspaceId={workspaceId}
                               onElementLinkClick={handleElementLinkClick}
+                              onImagePaste={handleImagePaste}
                               style={{
                                 fontSize: `${element?.style?.messageFontSize || 14}px`,
                                 fontWeight: 'normal',
@@ -760,13 +792,28 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                               dangerouslySetInnerHTML={{ __html: message.text || 'Message text' }}
                               onMouseDown={(e) => {
                                 if (!canEdit) {
-                                  e.stopPropagation();
+                                  // Don't stop propagation for images
+                                  if (e.target.tagName !== 'IMG') {
+                                    e.stopPropagation();
+                                  }
                                 }
                               }}
                               onClick={(e) => {
+                                // Handle image clicks FIRST - highest priority
+                                if (e.target.tagName === 'IMG' && e.target.classList.contains('inline-image')) {
+                                  // Only open lightbox with Ctrl/Cmd+click
+                                  if (e.ctrlKey || e.metaKey) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setLightboxImage(e.target.src);
+                                    return; // Stop further processing
+                                  }
+                                }
+
                                 if (!canEdit) {
                                   e.stopPropagation();
                                 }
+
                                 // Handle link clicks
                                 if (e.target.tagName === 'A') {
                                   e.preventDefault();
@@ -931,6 +978,13 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
         onConfirm={confirmDelete}
         elementType={element.type}
       />
+
+      {lightboxImage && (
+        <ImageLightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </>
   );
 };

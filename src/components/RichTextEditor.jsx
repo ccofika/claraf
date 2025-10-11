@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useTextFormatting } from '../context/TextFormattingContext';
+import { uploadImageToCloudinary, generateImageId } from '../utils/imageUpload';
+import { toast } from 'sonner';
 
 const RichTextEditor = ({
   value = '',
@@ -12,7 +14,8 @@ const RichTextEditor = ({
   style = {},
   autoFocus = false,
   workspaceId,
-  onElementLinkClick
+  onElementLinkClick,
+  onImagePaste // Callback when image is pasted - receives image metadata
 }) => {
   const editorRef = useRef(null);
   const { startEditing, stopEditing } = useTextFormatting();
@@ -211,6 +214,120 @@ const RichTextEditor = ({
     }
 
     onKeyDown?.(e);
+  };
+
+  const handlePaste = async (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const items = clipboardData.items;
+
+    // Check if there are any images in the clipboard
+    let hasImage = false;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        hasImage = true;
+        e.preventDefault(); // Prevent default paste for images
+
+        const imageFile = items[i].getAsFile();
+        if (imageFile) {
+          await handleImagePaste(imageFile);
+        }
+        break; // Handle only the first image
+      }
+    }
+
+    // If no image, let default paste behavior happen (for text, HTML, etc.)
+  };
+
+  const handleImagePaste = async (imageFile) => {
+    try {
+      // Show loading toast
+      const loadingToast = toast.loading('Uploading image...');
+
+      // Upload image to Cloudinary
+      const imageData = await uploadImageToCloudinary(imageFile);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      toast.success('Image uploaded!');
+
+      // Generate unique ID for this image
+      const imageId = generateImageId();
+
+      // Insert image at cursor position
+      insertImageAtCursor(imageData, imageId);
+
+      // Notify parent component about the new image
+      if (onImagePaste) {
+        onImagePaste({
+          id: imageId,
+          url: imageData.url,
+          publicId: imageData.publicId,
+          width: imageData.width,
+          height: imageData.height,
+          format: imageData.format,
+          bytes: imageData.bytes
+        });
+      }
+    } catch (error) {
+      console.error('Error pasting image:', error);
+      toast.error('Failed to upload image');
+    }
+  };
+
+  const insertImageAtCursor = (imageData, imageId) => {
+    if (!editorRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+
+    // Create image element
+    const img = document.createElement('img');
+    img.src = imageData.url;
+    img.alt = 'Pasted image';
+    img.className = 'inline-image';
+    img.style.maxWidth = '100%';
+    img.style.width = 'auto';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.margin = '8px 0';
+    img.style.borderRadius = '4px';
+    img.style.cursor = 'pointer';
+    img.style.objectFit = 'contain';
+    img.style.boxSizing = 'border-box';
+
+    // Add data attributes for metadata
+    img.setAttribute('data-image-id', imageId);
+    img.setAttribute('data-public-id', imageData.publicId);
+    img.setAttribute('data-width', imageData.width);
+    img.setAttribute('data-height', imageData.height);
+    img.setAttribute('data-format', imageData.format);
+    img.setAttribute('data-bytes', imageData.bytes);
+
+    // If cursor is in the middle of text, add line breaks
+    const needsLineBreak = !range.collapsed || range.startContainer.nodeType === Node.TEXT_NODE;
+
+    if (needsLineBreak) {
+      // Add line break before image
+      range.insertNode(document.createElement('br'));
+    }
+
+    // Insert image
+    range.insertNode(img);
+
+    // Add line break after image
+    const brAfter = document.createElement('br');
+    img.parentNode.insertBefore(brAfter, img.nextSibling);
+
+    // Move cursor after the image
+    range.setStartAfter(brAfter);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // Trigger onChange with updated HTML
+    onChange?.(editorRef.current.innerHTML);
   };
 
   const applyFormatting = (newFormatting, newFontSize) => {
@@ -416,6 +533,7 @@ const RichTextEditor = ({
       onBlur={handleBlur}
       onInput={handleInput}
       onKeyDown={handleKeyDownInternal}
+      onPaste={handlePaste}
       className={`outline-none ${className}`}
       style={{
         minHeight: multiline ? '80px' : 'auto',

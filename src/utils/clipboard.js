@@ -25,7 +25,40 @@ export const copyToClipboard = async (content, successMessage = 'Copied to clipb
 };
 
 /**
- * Get content from element for copying
+ * Get HTML content from element for copying (preserves images and formatting)
+ */
+export const getElementHtmlContent = (element) => {
+  if (!element) return '';
+
+  switch (element.type) {
+    case 'title':
+    case 'description':
+      return element.content?.value || '';
+
+    case 'macro':
+      const macroTitle = element.content?.title || '';
+      const macroDesc = element.content?.description || '';
+      return `<div><strong>${macroTitle}</strong></div><br/><div>${macroDesc}</div>`;
+
+    case 'example':
+      const currentExample = element.content?.examples?.[element.content?.currentExampleIndex || 0];
+      if (!currentExample) return '';
+
+      const exampleTitle = currentExample.title || '';
+      const messagesHtml = currentExample.messages?.map(msg => {
+        const msgType = msg.type === 'user' ? 'User' : 'Agent';
+        return `<div><strong>[${msgType}]:</strong> ${msg.text || ''}</div>`;
+      }).join('<br/>') || '';
+
+      return `<div><strong>${exampleTitle}</strong></div><br/>${messagesHtml}`;
+
+    default:
+      return element.content?.text || element.content?.title || '';
+  }
+};
+
+/**
+ * Get plain text content from element for copying
  */
 export const getElementContent = (element) => {
   if (!element) return '';
@@ -58,15 +91,41 @@ export const getElementContent = (element) => {
 };
 
 /**
- * Copy element content to clipboard
+ * Copy element content to clipboard with rich text (HTML) support including images
  */
 export const copyElementContent = async (element) => {
-  const content = getElementContent(element);
-  if (!content) {
+  const htmlContent = getElementHtmlContent(element);
+  const plainTextContent = getElementContent(element);
+
+  if (!htmlContent && !plainTextContent) {
     toast.error('No content to copy');
     return false;
   }
-  return await copyToClipboard(content, 'Element content copied!');
+
+  try {
+    // Use Clipboard API to write both HTML and plain text
+    const clipboardItem = new ClipboardItem({
+      'text/html': new Blob([htmlContent], { type: 'text/html' }),
+      'text/plain': new Blob([plainTextContent], { type: 'text/plain' })
+    });
+
+    await navigator.clipboard.write([clipboardItem]);
+    toast.success('Element content copied!');
+    return true;
+  } catch (error) {
+    console.error('Failed to copy with rich text:', error);
+
+    // Fallback to plain text only if rich text copy fails
+    try {
+      await navigator.clipboard.writeText(plainTextContent);
+      toast.success('Element content copied (plain text)!');
+      return true;
+    } catch (fallbackError) {
+      console.error('Failed to copy to clipboard:', fallbackError);
+      toast.error('Failed to copy to clipboard');
+      return false;
+    }
+  }
 };
 
 /**
