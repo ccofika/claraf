@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Bold, Italic, Underline, Link, Plus, Minus } from 'lucide-react';
+import { Bold, Italic, Underline, Link, Plus, Minus, LinkIcon } from 'lucide-react';
 import { useTextFormatting } from '../context/TextFormattingContext';
+import ElementLinkModal from './modals/ElementLinkModal';
 
-const TextFormattingDock = () => {
+const TextFormattingDock = ({ currentWorkspaceId }) => {
   const {
     isEditing,
     currentFormatting,
@@ -11,14 +12,17 @@ const TextFormattingDock = () => {
     toggleItalic,
     toggleUnderline,
     setHyperlink,
+    setElementLink,
     increaseFontSize,
     decreaseFontSize
   } = useTextFormatting();
 
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const [showElementLinkModal, setShowElementLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState(currentFormatting.hyperlink || '');
   const [hoveredItem, setHoveredItem] = useState(null);
   const [savedSelection, setSavedSelection] = useState(null);
+  const [activeElementLink, setActiveElementLink] = useState(null);
 
   const handleLinkClick = () => {
     // Save current selection before opening input
@@ -46,6 +50,151 @@ const TextFormattingDock = () => {
     setLinkUrl(currentFormatting.hyperlink || '');
     setShowLinkInput(false);
     setSavedSelection(null);
+  };
+
+  const handleElementLinkClick = (e) => {
+    // Prevent any default behavior and stop propagation
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    // Save current selection before opening modal
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+
+      // Check if there's actually selected text
+      if (range.toString().trim().length === 0) {
+        console.warn('No text selected for element link');
+        return;
+      }
+
+      // Check if the current selection already has an element link
+      const container = range.commonAncestorContainer;
+      const element = container.nodeType === 3 ? container.parentElement : container;
+
+      let currentElementLink = null;
+      let checkElement = element;
+
+      // Walk up the DOM to find if we're inside an element link
+      while (checkElement && checkElement.contentEditable !== 'true') {
+        if (checkElement.tagName === 'A') {
+          const elementId = checkElement.getAttribute('data-element-id');
+          const workspaceId = checkElement.getAttribute('data-workspace-id');
+
+          if (elementId && workspaceId) {
+            // Found an element link
+            currentElementLink = {
+              elementId,
+              workspaceId,
+              elementType: checkElement.getAttribute('data-element-type'),
+              elementTitle: checkElement.getAttribute('data-element-title')
+            };
+            break;
+          }
+        }
+        checkElement = checkElement.parentElement;
+      }
+
+      // Clone the range to preserve it - this ensures we work with the exact selection
+      const clonedRange = range.cloneRange();
+      setSavedSelection(clonedRange);
+      setActiveElementLink(currentElementLink);
+
+      console.log('Saved selection for element link:', {
+        text: range.toString(),
+        hasElementLink: !!currentElementLink,
+        elementLinkData: currentElementLink,
+        startContainer: range.startContainer,
+        startOffset: range.startOffset,
+        endContainer: range.endContainer,
+        endOffset: range.endOffset
+      });
+    } else {
+      console.warn('No selection available');
+      return;
+    }
+
+    setShowElementLinkModal(true);
+  };
+
+  const handleRemoveElementLink = () => {
+    console.log('Removing element link for:', activeElementLink);
+
+    // Close modal and reset state first
+    setShowElementLinkModal(false);
+
+    // Use requestAnimationFrame to ensure modal is fully closed and DOM is updated
+    requestAnimationFrame(() => {
+      if (savedSelection) {
+        try {
+          const selection = window.getSelection();
+
+          // Clear any existing selection first
+          selection.removeAllRanges();
+
+          // Restore the saved selection
+          const restoredRange = savedSelection.cloneRange();
+          selection.addRange(restoredRange);
+
+          console.log('Restored selection for link removal:', {
+            text: restoredRange.toString(),
+            elementLink: activeElementLink
+          });
+
+          // Set element link to null to remove it
+          setElementLink(null);
+        } catch (error) {
+          console.error('Error removing element link:', error);
+        }
+      }
+
+      // Reset state
+      setSavedSelection(null);
+      setActiveElementLink(null);
+    });
+  };
+
+  const handleElementLinkSelect = (linkData) => {
+    console.log('Element link selected:', linkData);
+
+    // Close modal first
+    setShowElementLinkModal(false);
+
+    // Use requestAnimationFrame to ensure modal is fully closed and DOM is updated
+    requestAnimationFrame(() => {
+      if (savedSelection) {
+        try {
+          const selection = window.getSelection();
+
+          // Clear any existing selection first
+          selection.removeAllRanges();
+
+          // Restore the saved selection
+          const restoredRange = savedSelection.cloneRange();
+          selection.addRange(restoredRange);
+
+          console.log('Restored selection:', restoredRange.toString());
+          console.log('Range details:', {
+            startContainer: restoredRange.startContainer,
+            startOffset: restoredRange.startOffset,
+            endContainer: restoredRange.endContainer,
+            endOffset: restoredRange.endOffset,
+            collapsed: restoredRange.collapsed
+          });
+
+          // Apply the element link with the restored selection
+          setElementLink(linkData);
+        } catch (error) {
+          console.error('Error restoring selection:', error);
+        }
+      }
+
+      // Reset state
+      setSavedSelection(null);
+      setActiveElementLink(null);
+    });
   };
 
   if (!isEditing) return null;
@@ -218,6 +367,30 @@ const TextFormattingDock = () => {
           >
             <Link size={16} className="text-white" />
           </button>
+
+          {/* Element Link Button */}
+          <button
+            onClick={handleElementLinkClick}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => setHoveredItem('elementLink')}
+            onMouseLeave={() => setHoveredItem(null)}
+            className={`
+              relative flex items-center justify-center
+              w-9 h-9 rounded-lg
+              ${currentFormatting.elementLink ? 'bg-green-500/30' : 'bg-white/5'}
+              backdrop-blur-[2px]
+              border ${currentFormatting.elementLink ? 'border-green-400/40' : 'border-white/10'}
+              transition-all duration-200 ease-out
+              cursor-pointer
+              ${hoveredItem === 'elementLink'
+                ? 'scale-110 bg-green-500/25 border-green-400/50 shadow-lg shadow-green-400/20'
+                : 'hover:scale-105 hover:bg-green-500/15'
+              }
+            `}
+            title="Link to Element"
+          >
+            <LinkIcon size={16} className={currentFormatting.elementLink ? 'text-green-300' : 'text-white'} />
+          </button>
         </div>
 
         {/* Link Input Popup */}
@@ -263,6 +436,20 @@ const TextFormattingDock = () => {
             </div>
           </div>
         )}
+
+        {/* Element Link Modal */}
+        <ElementLinkModal
+          isOpen={showElementLinkModal}
+          onClose={() => {
+            setShowElementLinkModal(false);
+            setActiveElementLink(null);
+            setSavedSelection(null);
+          }}
+          onElementSelect={handleElementLinkSelect}
+          onRemoveLink={handleRemoveElementLink}
+          currentElementLink={activeElementLink}
+          currentWorkspaceId={currentWorkspaceId}
+        />
       </div>
     </div>
   );

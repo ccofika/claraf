@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Undo, Redo, Settings, X, Copy, Share2, Bookmark } from 'lucide-react';
+import { Undo, Redo, Settings, X, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
@@ -13,6 +14,7 @@ import { copyElementContent, shareElement } from '../utils/clipboard';
 const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
+  const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(element?.content?.value || '');
@@ -39,11 +41,6 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
   };
 
 
-  const handleDoubleClick = () => {
-    if (canEdit) {
-      setIsEditing(true);
-    }
-  };
 
   const handleBlur = () => {
     if (isEditing) {
@@ -186,6 +183,19 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
     }
   };
 
+  const handleElementLinkClick = (linkData) => {
+    if (linkData.workspaceId === workspaceId) {
+      // Same workspace - zoom to element
+      const event = new CustomEvent('zoomToElement', {
+        detail: { _id: linkData.elementId }
+      });
+      window.dispatchEvent(event);
+    } else {
+      // Different workspace - navigate
+      navigate(`/workspace/${linkData.workspaceId}?element=${linkData.elementId}`);
+    }
+  };
+
   return (
     <>
       <div
@@ -289,9 +299,8 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
 
         {/* Description Input/Display */}
         <div
-          onDoubleClick={handleDoubleClick}
           className={`
-            min-w-[500px] max-w-[700px] rounded-lg border-2 border-t-4 border-t-gray-500 dark:border-t-[#B8B8B8]
+            group/content min-w-[500px] max-w-[700px] rounded-lg border-2 border-t-4 border-t-gray-500 dark:border-t-[#B8B8B8] relative
             ${isEditing
               ? 'border-blue-500 dark:border-blue-400 bg-white dark:bg-neutral-900'
               : 'bg-white dark:bg-black'
@@ -309,6 +318,7 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
             borderRadius: `${element?.style?.borderRadius || 8}px`,
             backgroundColor: element?.style?.backgroundColor === 'transparent' ? 'transparent' : getAdaptiveBackgroundColor(element?.style?.backgroundColor || 'white', isDarkMode),
             padding: `${element?.style?.padding || 12}px`,
+            paddingRight: canEdit && !isEditing ? `${(element?.style?.padding || 12) + 32}px` : `${element?.style?.padding || 12}px`,
             opacity: element?.style?.opacity || 1,
             boxShadow: isHighlighted
               ? '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)'
@@ -331,6 +341,8 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
               className="w-full text-gray-900 dark:text-neutral-100"
               multiline={true}
               autoFocus={true}
+              workspaceId={workspaceId}
+              onElementLinkClick={handleElementLinkClick}
               style={{
                 fontSize: `${element?.style?.fontSize || 16}px`,
                 fontWeight: element?.style?.fontWeight || 'normal',
@@ -342,38 +354,71 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
               }}
             />
           ) : (
-            <div
-              className="text-gray-900 dark:text-neutral-100 whitespace-pre-wrap min-h-[80px]"
-              style={{
-                fontSize: `${element?.style?.fontSize || 16}px`,
-                fontWeight: element?.style?.fontWeight || 'normal',
-                fontFamily: element?.style?.fontFamily || 'system-ui',
-                color: getAdaptiveColor(element?.style?.textColor || '#000000', isDarkMode),
-                textAlign: element?.style?.textAlign || 'left',
-                lineHeight: element?.style?.lineHeight || 1.5,
-                letterSpacing: `${element?.style?.letterSpacing || 0}px`,
-                cursor: !canEdit ? 'text' : 'default',
-                pointerEvents: !canEdit ? 'auto' : 'none',
-              }}
-              dangerouslySetInnerHTML={{ __html: value || 'Double-click to edit' }}
-              onMouseDown={(e) => {
-                if (!canEdit) {
-                  e.stopPropagation();
-                }
-              }}
-              onClick={(e) => {
-                if (!canEdit) {
-                  e.stopPropagation();
-                }
-                // Handle link clicks - only open with Ctrl/Cmd
-                if (e.target.tagName === 'A') {
-                  e.preventDefault();
-                  if (e.ctrlKey || e.metaKey) {
-                    window.open(e.target.href, '_blank', 'noopener,noreferrer');
+            <>
+              <div
+                className="text-gray-900 dark:text-neutral-100 whitespace-pre-wrap min-h-[80px]"
+                style={{
+                  fontSize: `${element?.style?.fontSize || 16}px`,
+                  fontWeight: element?.style?.fontWeight || 'normal',
+                  fontFamily: element?.style?.fontFamily || 'system-ui',
+                  color: getAdaptiveColor(element?.style?.textColor || '#000000', isDarkMode),
+                  textAlign: element?.style?.textAlign || 'left',
+                  lineHeight: element?.style?.lineHeight || 1.5,
+                  letterSpacing: `${element?.style?.letterSpacing || 0}px`,
+                  cursor: canEdit ? 'text' : 'text',
+                  pointerEvents: 'auto',
+                }}
+                dangerouslySetInnerHTML={{ __html: value || 'Click edit to start' }}
+                onMouseDown={(e) => {
+                  if (!canEdit) {
+                    e.stopPropagation();
                   }
-                }
-              }}
-            />
+                }}
+                onClick={(e) => {
+                  if (!canEdit) {
+                    e.stopPropagation();
+                  }
+                  // Handle link clicks
+                  if (e.target.tagName === 'A') {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Check if it's an element link
+                    const elementId = e.target.getAttribute('data-element-id');
+                    const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+
+                    if (elementId && elementWorkspaceId) {
+                      // Element link - navigate only with Ctrl/Cmd + click (like share function)
+                      if (e.ctrlKey || e.metaKey) {
+                        handleElementLinkClick({
+                          elementId,
+                          workspaceId: elementWorkspaceId,
+                          elementType: e.target.getAttribute('data-element-type'),
+                          elementTitle: e.target.getAttribute('data-element-title')
+                        });
+                      }
+                    } else {
+                      // Regular hyperlink - only open with Ctrl/Cmd
+                      if (e.ctrlKey || e.metaKey) {
+                        window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                      }
+                    }
+                  }
+                }}
+              />
+              {canEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(true);
+                  }}
+                  className="absolute right-2 top-2 p-1.5 rounded-md bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-600 dark:text-neutral-400 opacity-0 group-hover/content:opacity-100 transition-opacity"
+                  title="Edit"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -163,14 +163,14 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
           className={`
             flex items-center gap-2 px-4 py-3
             rounded-xl
-            bg-black/40 dark:bg-black/40 backdrop-blur-xl
-            border border-white/10
+            bg-white/90 dark:bg-black/40 backdrop-blur-xl
+            border border-gray-200 dark:border-white/10
             shadow-2xl
             transition-all duration-300 ease-out
           `}
         >
           {/* Search Icon */}
-          <Search size={18} className="text-white/70" />
+          <Search size={18} className="text-gray-600 dark:text-white/70" />
 
           {/* Search Input */}
           <input
@@ -181,27 +181,27 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
             onKeyDown={handleKeyDown}
             onFocus={() => query && setShowResults(true)}
             placeholder={`Search ${searchMode === 'local' ? 'workspace' : 'all workspaces'}...`}
-            className="flex-1 bg-transparent text-white placeholder-white/50 outline-none text-sm"
+            className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/50 outline-none text-sm"
           />
 
           {/* Loading Spinner */}
           {isSearching && (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-gray-300 dark:border-white/30 border-t-gray-900 dark:border-t-white rounded-full animate-spin" />
           )}
 
           {/* Divider */}
-          <div className="w-px h-6 bg-white/10" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-white/10" />
 
           {/* Local/Global Switch */}
-          <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-gray-200 dark:bg-white/5 rounded-lg p-1">
             <button
               onClick={() => setSearchMode('local')}
               className={`
                 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md
                 transition-all duration-200
                 ${searchMode === 'local'
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                  ? 'bg-gray-300 dark:bg-white/15 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white/80 hover:bg-gray-200 dark:hover:bg-white/5'
                 }
               `}
               title="Search current workspace"
@@ -215,8 +215,8 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
                 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md
                 transition-all duration-200
                 ${searchMode === 'global'
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                  ? 'bg-gray-300 dark:bg-white/15 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white/80 hover:bg-gray-200 dark:hover:bg-white/5'
                 }
               `}
               title="Search all workspaces"
@@ -231,7 +231,7 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
         {showResults && results.length > 0 && (
           <div
             ref={resultsRef}
-            className="absolute top-full left-0 right-0 mt-2 rounded-lg bg-black/90 backdrop-blur-xl border border-white/10 shadow-2xl max-h-[400px] overflow-y-auto"
+            className="absolute top-full left-0 right-0 mt-2 rounded-lg bg-white/95 dark:bg-black/90 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl max-h-[400px] overflow-y-auto"
           >
             {results.map((result, index) => (
               <div
@@ -239,10 +239,10 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
                 onClick={() => handleResultClick(result)}
                 className={`
                   px-4 py-3 cursor-pointer transition-all duration-150
-                  border-b border-white/5 last:border-b-0
+                  border-b border-gray-200 dark:border-white/5 last:border-b-0
                   ${index === selectedIndex
-                    ? 'bg-white/15'
-                    : 'hover:bg-white/10'
+                    ? 'bg-gray-200 dark:bg-white/15'
+                    : 'hover:bg-gray-100 dark:hover:bg-white/10'
                   }
                 `}
               >
@@ -261,14 +261,14 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
                     </div>
 
                     {/* Element Preview */}
-                    <div className="text-sm text-white line-clamp-2">
+                    <div className="text-sm text-gray-900 dark:text-white line-clamp-2">
                       {stripHtml(getElementPreview(result))}
                     </div>
                   </div>
 
                   {/* Match Score (if available) */}
                   {result.score && (
-                    <div className="text-xs text-white/50 whitespace-nowrap">
+                    <div className="text-xs text-gray-500 dark:text-white/50 whitespace-nowrap">
                       {Math.round(result.score * 100)}% match
                     </div>
                   )}
@@ -282,9 +282,9 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
         {showResults && results.length === 0 && !isSearching && query && (
           <div
             ref={resultsRef}
-            className="absolute top-full left-0 right-0 mt-2 rounded-lg bg-black/90 backdrop-blur-xl border border-white/10 shadow-2xl px-4 py-8 text-center"
+            className="absolute top-full left-0 right-0 mt-2 rounded-lg bg-white/95 dark:bg-black/90 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl px-4 py-8 text-center"
           >
-            <p className="text-white/50 text-sm">No results found for "{query}"</p>
+            <p className="text-gray-500 dark:text-white/50 text-sm">No results found for "{query}"</p>
           </div>
         )}
       </div>

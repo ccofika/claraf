@@ -10,7 +10,9 @@ const RichTextEditor = ({
   className = '',
   multiline = false,
   style = {},
-  autoFocus = false
+  autoFocus = false,
+  workspaceId,
+  onElementLinkClick
 }) => {
   const editorRef = useRef(null);
   const { startEditing, stopEditing } = useTextFormatting();
@@ -20,6 +22,7 @@ const RichTextEditor = ({
     italic: false,
     underline: false,
     hyperlink: '',
+    elementLink: null,
     fontSize: 16
   });
 
@@ -52,7 +55,8 @@ const RichTextEditor = ({
         bold: false,
         italic: false,
         underline: false,
-        hyperlink: ''
+        hyperlink: '',
+        elementLink: null
       };
     }
 
@@ -65,6 +69,8 @@ const RichTextEditor = ({
     let italic = false;
     let underline = false;
     let hyperlink = '';
+    let elementLink = null;
+    let foundLink = false; // Track if we found the closest link
 
     // Walk up the DOM tree to check for formatting
     while (currentElement && currentElement !== editorRef.current) {
@@ -80,14 +86,30 @@ const RichTextEditor = ({
       if (tagName === 'u' || computedStyle.textDecoration.includes('underline')) {
         underline = true;
       }
-      if (tagName === 'a') {
-        hyperlink = currentElement.getAttribute('href') || '';
+
+      // Only get the FIRST (closest) link we encounter
+      if (tagName === 'a' && !foundLink) {
+        foundLink = true;
+        const elementId = currentElement.getAttribute('data-element-id');
+        const elementWorkspaceId = currentElement.getAttribute('data-workspace-id');
+        if (elementId && elementWorkspaceId) {
+          // This is an element link
+          elementLink = {
+            elementId,
+            workspaceId: elementWorkspaceId,
+            elementType: currentElement.getAttribute('data-element-type'),
+            elementTitle: currentElement.getAttribute('data-element-title')
+          };
+        } else {
+          // Regular hyperlink
+          hyperlink = currentElement.getAttribute('href') || '';
+        }
       }
 
       currentElement = currentElement.parentElement;
     }
 
-    return { bold, italic, underline, hyperlink };
+    return { bold, italic, underline, hyperlink, elementLink };
   };
 
   // Update formatting context when selection changes
@@ -139,12 +161,19 @@ const RichTextEditor = ({
   const handleBlur = (e) => {
     // Don't blur if clicking on formatting toolbar, but allow focus on inputs
     const targetElement = e.relatedTarget;
+
+    // Check if clicking within formatting dock
     if (targetElement?.closest('.text-formatting-dock')) {
       // If clicking on an input or button within the dock, allow it
       if (targetElement.tagName === 'INPUT' || targetElement.tagName === 'BUTTON') {
         return;
       }
       editorRef.current?.focus();
+      return;
+    }
+
+    // Check if clicking within a modal (Dialog component)
+    if (targetElement?.closest('[role="dialog"]')) {
       return;
     }
 
@@ -243,6 +272,12 @@ const RichTextEditor = ({
           links.forEach(link => {
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
+            // Ensure it's not an element link
+            link.removeAttribute('data-element-id');
+            link.removeAttribute('data-workspace-id');
+            link.removeAttribute('data-element-type');
+            link.removeAttribute('data-element-title');
+            link.classList.remove('element-link');
           });
         } else if (prevFormat.hyperlink) {
           // Remove link
@@ -250,8 +285,121 @@ const RichTextEditor = ({
         }
       }
 
+      // Element Link
+      if (JSON.stringify(newFormatting.elementLink) !== JSON.stringify(prevFormat.elementLink)) {
+        if (newFormatting.elementLink) {
+          console.log('Creating element link with data:', newFormatting.elementLink);
+
+          // Get fresh selection
+          const currentSelection = window.getSelection();
+          if (!currentSelection.rangeCount) {
+            console.error('No selection range available');
+            return;
+          }
+          const freshRange = currentSelection.getRangeAt(0);
+
+          console.log('Current range:', {
+            toString: freshRange.toString(),
+            startContainer: freshRange.startContainer,
+            startOffset: freshRange.startOffset,
+            endContainer: freshRange.endContainer,
+            endOffset: freshRange.endOffset,
+            collapsed: freshRange.collapsed
+          });
+
+          // Check if current selection already has a link (any type)
+          const container = freshRange.commonAncestorContainer;
+          const element = container.nodeType === 3 ? container.parentElement : container;
+          let hasExistingLink = false;
+          let checkElement = element;
+
+          while (checkElement && checkElement !== editorRef.current) {
+            if (checkElement.tagName === 'A') {
+              hasExistingLink = true;
+              break;
+            }
+            checkElement = checkElement.parentElement;
+          }
+
+          // Remove any existing link on the CURRENT selection only if it exists
+          if (hasExistingLink) {
+            document.execCommand('unlink', false, null);
+            // Re-get the range after unlink
+            if (currentSelection.rangeCount > 0) {
+              const updatedRange = currentSelection.getRangeAt(0);
+              console.log('Range after unlink:', updatedRange.toString());
+            }
+          }
+
+          // Get fresh range after any modifications
+          if (!currentSelection.rangeCount) {
+            console.error('No selection range available after unlink');
+            return;
+          }
+          const finalRange = currentSelection.getRangeAt(0);
+
+          // Create element link
+          const selectedContent = finalRange.extractContents();
+          console.log('Extracted content:', selectedContent.textContent);
+
+          const link = document.createElement('a');
+          link.href = 'javascript:void(0)';
+          link.className = 'element-link';
+          link.style.color = '#10b981'; // Green color for element links
+          link.style.textDecoration = 'underline';
+          link.style.cursor = 'pointer';
+          link.setAttribute('data-element-id', newFormatting.elementLink.elementId);
+          link.setAttribute('data-workspace-id', newFormatting.elementLink.workspaceId);
+          link.setAttribute('data-element-type', newFormatting.elementLink.elementType || '');
+          link.setAttribute('data-element-title', newFormatting.elementLink.elementTitle || '');
+          link.appendChild(selectedContent);
+          finalRange.insertNode(link);
+
+          console.log('Element link created:', link.outerHTML);
+          console.log('Link text content:', link.textContent);
+
+          // Restore selection on the link
+          const newRange = document.createRange();
+          newRange.selectNodeContents(link);
+          currentSelection.removeAllRanges();
+          currentSelection.addRange(newRange);
+        } else if (prevFormat.elementLink) {
+          // Remove element link - need to manually remove to clear styles
+          const currentSelection = window.getSelection();
+          if (currentSelection.rangeCount > 0) {
+            const currentRange = currentSelection.getRangeAt(0);
+            const container = currentRange.commonAncestorContainer;
+            const element = container.nodeType === 3 ? container.parentElement : container;
+
+            // Find the closest element link anchor
+            let linkElement = element;
+            while (linkElement && linkElement !== editorRef.current) {
+              if (linkElement.tagName === 'A' && linkElement.getAttribute('data-element-id')) {
+                break;
+              }
+              linkElement = linkElement.parentElement;
+            }
+
+            if (linkElement && linkElement.tagName === 'A') {
+              // Extract text content without the link and its styles
+              const textContent = linkElement.textContent;
+              const textNode = document.createTextNode(textContent);
+              linkElement.parentNode.replaceChild(textNode, linkElement);
+
+              // Re-select the text
+              const newRange = document.createRange();
+              newRange.selectNodeContents(textNode);
+              currentSelection.removeAllRanges();
+              currentSelection.addRange(newRange);
+
+              console.log('Element link removed and styles cleared');
+            }
+          }
+        }
+      }
+
       // Update previous formatting
-      previousFormattingRef.current = { ...newFormatting, fontSize: newFontSize };
+      previousFormattingRef.current = { ...newFormatting, fontSize: newFontSize, elementLink: newFormatting.elementLink };
 
       // Trigger change
       onChange?.(editorRef.current.innerHTML);
@@ -288,12 +436,45 @@ const RichTextEditor = ({
         e.stopPropagation();
       }}
       onClick={(e) => {
-        // Handle link clicks - only open with Ctrl/Cmd
-        if (e.target.tagName === 'A') {
-          e.preventDefault();
-          if (e.ctrlKey || e.metaKey) {
-            window.open(e.target.href, '_blank', 'noopener,noreferrer');
+        // Handle link clicks - find closest anchor element
+        let target = e.target;
+
+        // Walk up the DOM to find an anchor tag
+        while (target && target !== editorRef.current) {
+          if (target.tagName === 'A') {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Check if it's an element link
+            const elementId = target.getAttribute('data-element-id');
+            const elementWorkspaceId = target.getAttribute('data-workspace-id');
+
+            if (elementId && elementWorkspaceId) {
+              // Element link - navigate only with Ctrl/Cmd + click
+              if ((e.ctrlKey || e.metaKey) && onElementLinkClick) {
+                console.log('Ctrl+Click on element link:', {
+                  elementId,
+                  workspaceId: elementWorkspaceId,
+                  elementType: target.getAttribute('data-element-type'),
+                  elementTitle: target.getAttribute('data-element-title')
+                });
+
+                onElementLinkClick({
+                  elementId,
+                  workspaceId: elementWorkspaceId,
+                  elementType: target.getAttribute('data-element-type'),
+                  elementTitle: target.getAttribute('data-element-title')
+                });
+              }
+            } else {
+              // Regular hyperlink - only open with Ctrl/Cmd
+              if (e.ctrlKey || e.metaKey) {
+                window.open(target.href, '_blank', 'noopener,noreferrer');
+              }
+            }
+            break;
           }
+          target = target.parentElement;
         }
       }}
     />

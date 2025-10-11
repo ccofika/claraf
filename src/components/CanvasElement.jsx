@@ -6,7 +6,7 @@ import DescriptionElement from './DescriptionElement';
 import MacroElement from './MacroElement';
 import ExampleElement from './ExampleElement';
 
-const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
+const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
     disabled: element.locked || !canEdit, // Disable dragging if user can't edit
@@ -196,6 +196,22 @@ const CanvasElement = ({ element, canEdit = true, workspaceId, onUpdate, onDelet
       )}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.element._id === nextProps.element._id &&
+    prevProps.element.position.x === nextProps.element.position.x &&
+    prevProps.element.position.y === nextProps.element.position.y &&
+    prevProps.element.position.z === nextProps.element.position.z &&
+    prevProps.canEdit === nextProps.canEdit &&
+    prevProps.isHighlighted === nextProps.isHighlighted &&
+    prevProps.element.dimensions?.width === nextProps.element.dimensions?.width &&
+    prevProps.element.dimensions?.height === nextProps.element.dimensions?.height &&
+    JSON.stringify(prevProps.element.style) === JSON.stringify(nextProps.element.style) &&
+    JSON.stringify(prevProps.element.content) === JSON.stringify(nextProps.element.content)
+  );
+});
+
+CanvasElement.displayName = 'CanvasElement';
 
 export default CanvasElement;

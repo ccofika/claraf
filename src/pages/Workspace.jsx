@@ -8,6 +8,7 @@ import VIPProgressCalculator from './VIPProgressCalculator';
 import QuickLinks from './QuickLinks';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
+import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
 import TitleNavigation from '../components/TitleNavigation';
 
 const Workspace = () => {
@@ -28,7 +29,22 @@ const Workspace = () => {
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [workspaceToEdit, setWorkspaceToEdit] = useState(null);
+  const [workspaceToManage, setWorkspaceToManage] = useState(null);
+
+  const fetchAllWorkspaces = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const workspacesRes = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/workspaces`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setWorkspaces(workspacesRes.data);
+    } catch (err) {
+      console.error('Error fetching workspaces:', err);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchWorkspaceData = async () => {
@@ -37,11 +53,7 @@ const Workspace = () => {
         const token = localStorage.getItem('token');
 
         // Fetch all workspaces
-        const workspacesRes = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/workspaces`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setWorkspaces(workspacesRes.data);
+        await fetchAllWorkspaces();
 
         // Fetch current workspace
         const workspaceRes = await axios.get(
@@ -75,7 +87,7 @@ const Workspace = () => {
     };
 
     fetchWorkspaceData();
-  }, [workspaceId]);
+  }, [workspaceId, fetchAllWorkspaces]);
 
   // Fetch bookmarks
   useEffect(() => {
@@ -99,7 +111,7 @@ const Workspace = () => {
   useEffect(() => {
     const fetchViewModePreference = async () => {
       if (!workspaceId || !workspace?.permissions?.canEditContent) {
-        setIsViewMode(false); // Force view mode if can't edit
+        setIsViewMode(true); // Force view mode if can't edit
         return;
       }
 
@@ -112,7 +124,7 @@ const Workspace = () => {
         setIsViewMode(response.data.viewMode === 'view');
       } catch (err) {
         console.error('Error fetching view mode preference:', err);
-        setIsViewMode(false); // Default to edit mode on error
+        setIsViewMode(true); // Default to view mode on error (no preference saved yet)
       }
     };
 
@@ -120,6 +132,12 @@ const Workspace = () => {
   }, [workspaceId, workspace?.permissions?.canEditContent]);
 
   const handleElementUpdate = async (updatedElement) => {
+    // Update local state immediately (optimistic update)
+    setElements(prevElements =>
+      prevElements.map(el => el._id === updatedElement._id ? updatedElement : el)
+    );
+
+    // Then save to backend
     try {
       const token = localStorage.getItem('token');
       await axios.put(
@@ -129,6 +147,7 @@ const Workspace = () => {
       );
     } catch (err) {
       console.error('Error updating element:', err);
+      // TODO: Optionally revert the optimistic update on error
     }
   };
 
@@ -140,7 +159,8 @@ const Workspace = () => {
         newElement,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setElements([...elements, response.data]);
+      // Use functional form to ensure we use the latest state
+      setElements(prevElements => [...prevElements, response.data]);
       return response.data;
     } catch (err) {
       console.error('Error creating element:', err);
@@ -155,7 +175,8 @@ const Workspace = () => {
         `${process.env.REACT_APP_API_URL}/api/canvas/elements/${elementId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setElements(elements.filter(el => el._id !== elementId));
+      // Use functional form to ensure we use the latest state
+      setElements(prevElements => prevElements.filter(el => el._id !== elementId));
     } catch (err) {
       console.error('Error deleting element:', err);
     }
@@ -166,7 +187,8 @@ const Workspace = () => {
   };
 
   const handleWorkspaceCreated = (newWorkspace) => {
-    setWorkspaces([...workspaces, newWorkspace]);
+    // Use functional form to ensure we use the latest state
+    setWorkspaces(prevWorkspaces => [...prevWorkspaces, newWorkspace]);
     navigate(`/workspace/${newWorkspace._id}`);
   };
 
@@ -178,13 +200,27 @@ const Workspace = () => {
     }
   };
 
-  const handleWorkspaceUpdated = (updatedWorkspace) => {
-    setWorkspaces(workspaces.map(w =>
+  const handleSettingsWorkspace = (workspaceId) => {
+    const ws = workspaces.find(w => w._id === workspaceId);
+    if (ws) {
+      setWorkspaceToManage(ws);
+      setIsSettingsModalOpen(true);
+    }
+  };
+
+  const handleWorkspaceUpdated = async (updatedWorkspace) => {
+    // Update the workspace in the list
+    setWorkspaces(prevWorkspaces => prevWorkspaces.map(w =>
       w._id === updatedWorkspace._id ? updatedWorkspace : w
     ));
+
+    // If it's the current workspace, update it
     if (workspace?._id === updatedWorkspace._id) {
       setWorkspace(updatedWorkspace);
     }
+
+    // Also refresh the full workspaces list to get any new invited members, etc.
+    await fetchAllWorkspaces();
   };
 
   const handleDeleteWorkspace = async (workspaceId) => {
@@ -199,17 +235,21 @@ const Workspace = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setWorkspaces(workspaces.filter(w => w._id !== workspaceId));
+      // Use functional form to ensure we use the latest state
+      setWorkspaces(prevWorkspaces => {
+        const remainingWorkspaces = prevWorkspaces.filter(w => w._id !== workspaceId);
 
-      // If deleting current workspace, navigate to another one
-      if (workspace?._id === workspaceId) {
-        const remainingWorkspaces = workspaces.filter(w => w._id !== workspaceId);
-        if (remainingWorkspaces.length > 0) {
-          navigate(`/workspace/${remainingWorkspaces[0]._id}`);
-        } else {
-          navigate('/');
+        // If deleting current workspace, navigate to another one
+        if (workspace?._id === workspaceId) {
+          if (remainingWorkspaces.length > 0) {
+            navigate(`/workspace/${remainingWorkspaces[0]._id}`);
+          } else {
+            navigate('/');
+          }
         }
-      }
+
+        return remainingWorkspaces;
+      });
     } catch (err) {
       console.error('Error deleting workspace:', err);
       alert(err.response?.data?.message || 'Failed to delete workspace');
@@ -248,8 +288,8 @@ const Workspace = () => {
         { customName: newName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Update local state
-      setBookmarks(bookmarks.map(b => b._id === bookmarkId ? response.data : b));
+      // Use functional form to ensure we use the latest state
+      setBookmarks(prevBookmarks => prevBookmarks.map(b => b._id === bookmarkId ? response.data : b));
     } catch (err) {
       console.error('Error updating bookmark:', err);
     }
@@ -262,8 +302,8 @@ const Workspace = () => {
         `${process.env.REACT_APP_API_URL}/api/bookmarks/${bookmarkId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Update local state
-      setBookmarks(bookmarks.filter(b => b._id !== bookmarkId));
+      // Use functional form to ensure we use the latest state
+      setBookmarks(prevBookmarks => prevBookmarks.filter(b => b._id !== bookmarkId));
     } catch (err) {
       console.error('Error deleting bookmark:', err);
     }
@@ -318,6 +358,21 @@ const Workspace = () => {
     }
   }, [canvas, elements, switchingWorkspace]);
 
+  // Auto-redirect to announcements workspace if access is denied
+  useEffect(() => {
+    if (error && error.toLowerCase().includes('access denied')) {
+      const timer = setTimeout(() => {
+        // Find announcements workspace
+        const announcementsWorkspace = workspaces.find(w => w.type === 'announcements');
+        if (announcementsWorkspace) {
+          navigate(`/workspace/${announcementsWorkspace._id}`);
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [error, workspaces, navigate]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-white dark:bg-black">
@@ -345,6 +400,7 @@ const Workspace = () => {
           onAddWorkspace={handleAddWorkspace}
           onEditWorkspace={handleEditWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
+          onSettingsWorkspace={handleSettingsWorkspace}
           onWorkspaceClick={handleWorkspaceClick}
           onBookmarkClick={handleBookmarkClick}
           onBookmarkUpdate={handleBookmarkUpdate}
@@ -352,6 +408,7 @@ const Workspace = () => {
           activeSection={activeSection}
           onSectionChange={setActiveSection}
           onCollapsedChange={setIsSidebarCollapsed}
+          onRefreshWorkspaces={fetchAllWorkspaces}
         />
 
         {/* Main Content */}
@@ -411,6 +468,16 @@ const Workspace = () => {
           setWorkspaceToEdit(null);
         }}
         workspace={workspaceToEdit}
+        onWorkspaceUpdated={handleWorkspaceUpdated}
+      />
+
+      <WorkspaceSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => {
+          setIsSettingsModalOpen(false);
+          setWorkspaceToManage(null);
+        }}
+        workspace={workspaceToManage}
         onWorkspaceUpdated={handleWorkspaceUpdated}
       />
     </>

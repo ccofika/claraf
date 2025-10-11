@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ProfileModal from './ProfileModal';
 import DeleteBookmarkDialog from './DeleteBookmarkDialog';
+import PendingInvites from './PendingInvites';
 import {
   Home,
   Calculator,
@@ -17,6 +18,7 @@ import {
   Bookmark as BookmarkIcon,
   Checkmark,
   Close,
+  Settings,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -148,7 +150,7 @@ function SectionTitle({ title, onToggleCollapse, isCollapsed }) {
   );
 }
 
-function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit, onDelete, isBookmark, isEditing, editValue, onEditChange, onSaveEdit, onCancelEdit }) {
+function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit, onDelete, onSettings, isBookmark, isEditing, editValue, onEditChange, onSaveEdit, onCancelEdit }) {
   const handleClick = (e) => {
     if (isEditing) return; // Don't navigate when editing
     if (item.hasDropdown && onToggle) onToggle();
@@ -163,6 +165,11 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
   const handleDelete = (e) => {
     e.stopPropagation();
     onDelete?.();
+  };
+
+  const handleSettings = (e) => {
+    e.stopPropagation();
+    onSettings?.();
   };
 
   const handleKeyDown = (e) => {
@@ -234,11 +241,21 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
           )}
         </div>
 
-        {/* Edit and Delete buttons */}
+        {/* Settings, Edit and Delete buttons */}
+        {!isCollapsed && !isEditing && item.canSettings && (
+          <button
+            onClick={handleSettings}
+            className="ml-2 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
+            title="Workspace settings"
+          >
+            <Settings size={16} className="text-gray-700 dark:text-neutral-300" />
+          </button>
+        )}
+
         {!isCollapsed && !isEditing && item.canEdit && (
           <button
             onClick={handleEdit}
-            className="ml-2 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
+            className="ml-1 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
             title={isBookmark ? "Edit bookmark" : "Edit workspace"}
           >
             <Edit size={16} className="text-gray-700 dark:text-neutral-300" />
@@ -303,7 +320,7 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
   );
 }
 
-function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, onEditWorkspace, onDeleteWorkspace, onEditBookmark, onDeleteBookmark, editingBookmark, bookmarkName, onBookmarkNameChange, onSaveBookmark, onCancelBookmark }) {
+function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, onEditWorkspace, onDeleteWorkspace, onSettingsWorkspace, onEditBookmark, onDeleteBookmark, editingBookmark, bookmarkName, onBookmarkNameChange, onSaveBookmark, onCancelBookmark }) {
   return (
     <div className="flex flex-col w-full">
       <div
@@ -329,6 +346,7 @@ function MenuSection({ section, expandedItems, onToggleExpanded, isCollapsed, on
               onToggle={() => onToggleExpanded(itemKey)}
               onItemClick={item.onClick}
               isCollapsed={isCollapsed}
+              onSettings={item.workspaceId && item.canSettings ? () => onSettingsWorkspace(item.workspaceId) : undefined}
               onEdit={item.workspaceId ? () => onEditWorkspace(item.workspaceId) : item.bookmarkId ? () => onEditBookmark(item.bookmarkId) : undefined}
               onDelete={item.workspaceId ? () => onDeleteWorkspace(item.workspaceId) : item.bookmarkId ? () => onDeleteBookmark(item.bookmarkId) : undefined}
               isBookmark={item.isBookmark || !!item.bookmarkId}
@@ -353,12 +371,15 @@ function DetailSidebar({
   onAddWorkspace,
   onEditWorkspace,
   onDeleteWorkspace,
+  onSettingsWorkspace,
   onWorkspaceClick,
   onBookmarkClick,
   onBookmarkUpdate,
   onBookmarkDelete,
-  onCollapsedChange
+  onCollapsedChange,
+  onRefreshWorkspaces
 }) {
+  const { user } = useAuth();
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
@@ -484,12 +505,18 @@ function DetailSidebar({
 
       // Add other workspaces
       otherWorkspaces.forEach(workspace => {
+        // Check if current user is the owner of this workspace
+        const isOwner = workspace.owner && user && (
+          (workspace.owner._id || workspace.owner) === user._id
+        );
+
         workspaceItems.push({
           icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />,
           label: workspace.name,
           isActive: currentWorkspace?._id === workspace._id,
           onClick: () => onWorkspaceClick(workspace._id),
           workspaceId: workspace._id,
+          canSettings: isOwner && workspace.type === 'personal', // Only owner of personal workspaces can access settings
           canEdit: workspace.permissions?.canEdit,
           canDelete: workspace.permissions?.canDelete,
         });
@@ -571,6 +598,11 @@ function DetailSidebar({
         }`}
         style={{ transitionTimingFunction: softSpringEasing }}
       >
+        {/* Pending Invites - Only show in workspaces section and when not collapsed */}
+        {activeSection === 'workspaces' && !isCollapsed && (
+          <PendingInvites onInviteResponse={onRefreshWorkspaces} />
+        )}
+
         {content.sections.map((section, index) => (
           <MenuSection
             key={`${activeSection}-${index}`}
@@ -580,6 +612,7 @@ function DetailSidebar({
             isCollapsed={isCollapsed}
             onEditWorkspace={onEditWorkspace}
             onDeleteWorkspace={onDeleteWorkspace}
+            onSettingsWorkspace={onSettingsWorkspace}
             onEditBookmark={handleEditBookmark}
             onDeleteBookmark={handleDeleteBookmarkClick}
             editingBookmark={editingBookmark}
@@ -612,13 +645,15 @@ export default function AppSidebar({
   onAddWorkspace,
   onEditWorkspace,
   onDeleteWorkspace,
+  onSettingsWorkspace,
   onWorkspaceClick,
   onBookmarkClick,
   onBookmarkUpdate,
   onBookmarkDelete,
   activeSection,
   onSectionChange,
-  onCollapsedChange
+  onCollapsedChange,
+  onRefreshWorkspaces
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -638,11 +673,13 @@ export default function AppSidebar({
           onAddWorkspace={onAddWorkspace}
           onEditWorkspace={onEditWorkspace}
           onDeleteWorkspace={onDeleteWorkspace}
+          onSettingsWorkspace={onSettingsWorkspace}
           onWorkspaceClick={onWorkspaceClick}
           onBookmarkClick={onBookmarkClick}
           onBookmarkUpdate={onBookmarkUpdate}
           onBookmarkDelete={onBookmarkDelete}
           onCollapsedChange={onCollapsedChange}
+          onRefreshWorkspaces={onRefreshWorkspaces}
         />
       </div>
 

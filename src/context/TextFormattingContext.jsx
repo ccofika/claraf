@@ -16,7 +16,8 @@ export const TextFormattingProvider = ({ children }) => {
     bold: false,
     italic: false,
     underline: false,
-    hyperlink: ''
+    hyperlink: '',
+    elementLink: null
   });
   const [currentFontSize, setCurrentFontSize] = useState(16);
   const [onFormattingChange, setOnFormattingChange] = useState(null);
@@ -27,7 +28,8 @@ export const TextFormattingProvider = ({ children }) => {
       bold: formatting?.bold || false,
       italic: formatting?.italic || false,
       underline: formatting?.underline || false,
-      hyperlink: formatting?.hyperlink || ''
+      hyperlink: formatting?.hyperlink || '',
+      elementLink: formatting?.elementLink || null
     });
     setCurrentFontSize(fontSize);
     setOnFormattingChange(() => onChange);
@@ -39,7 +41,8 @@ export const TextFormattingProvider = ({ children }) => {
       bold: false,
       italic: false,
       underline: false,
-      hyperlink: ''
+      hyperlink: '',
+      elementLink: null
     });
     setCurrentFontSize(16);
     setOnFormattingChange(null);
@@ -64,7 +67,13 @@ export const TextFormattingProvider = ({ children }) => {
   };
 
   const setHyperlink = (url) => {
-    const newFormatting = { ...currentFormatting, hyperlink: url };
+    const newFormatting = { ...currentFormatting, hyperlink: url, elementLink: null };
+    setCurrentFormatting(newFormatting);
+    onFormattingChange?.(newFormatting, currentFontSize);
+  };
+
+  const setElementLink = (linkData) => {
+    const newFormatting = { ...currentFormatting, elementLink: linkData, hyperlink: '' };
     setCurrentFormatting(newFormatting);
     onFormattingChange?.(newFormatting, currentFontSize);
   };
@@ -91,6 +100,7 @@ export const TextFormattingProvider = ({ children }) => {
     toggleItalic,
     toggleUnderline,
     setHyperlink,
+    setElementLink,
     increaseFontSize,
     decreaseFontSize
   };
