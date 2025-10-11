@@ -10,6 +10,8 @@ import RichTextEditor from './RichTextEditor';
 import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
+import ImageLightbox from './ImageLightbox';
+import { extractImageMetadata } from '../utils/imageUpload';
 
 const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
@@ -28,6 +30,8 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   const [currentTitleValue, setCurrentTitleValue] = useState(element?.content?.title || '');
   const [currentDescriptionValue, setCurrentDescriptionValue] = useState(element?.content?.description || '');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [inlineImages, setInlineImages] = useState(element?.content?.inlineImages || []);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
@@ -122,6 +126,9 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
     setIsEditingDescription(false);
 
     if (description !== element?.content?.description) {
+      // Extract current images from HTML content
+      const currentImages = extractImageMetadata(description);
+
       const newDescriptionHistory = [
         {
           value: element?.content?.description,
@@ -138,9 +145,27 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
         content: {
           ...element.content,
           description,
-          descriptionHistory: newDescriptionHistory
+          descriptionHistory: newDescriptionHistory,
+          inlineImages: currentImages
         }
       });
+    }
+  };
+
+  const handleImagePaste = (imageMetadata) => {
+    // Add new image to the inlineImages array
+    setInlineImages(prev => [...prev, imageMetadata]);
+  };
+
+  const handleImageClick = (e) => {
+    // Check if clicked element is an image - require Ctrl/Cmd+click to not interfere with text selection
+    if (e.target.tagName === 'IMG' && e.target.classList.contains('inline-image')) {
+      // Only open lightbox with Ctrl/Cmd+click to not interfere with text selection hover
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLightboxImage(e.target.src);
+      }
     }
   };
 
@@ -555,7 +580,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 p-4 overflow-auto">
+            <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
               {isExpanded ? (
                 <div className="group/description relative">
                   {isEditingDescription ? (
@@ -570,6 +595,7 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                       autoFocus={true}
                       workspaceId={workspaceId}
                       onElementLinkClick={handleElementLinkClick}
+                      onImagePaste={handleImagePaste}
                       style={{
                         fontSize: `${element?.style?.descriptionFontSize || 14}px`,
                         fontWeight: 'normal',
@@ -586,17 +612,35 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                           color: getAdaptiveColor(element?.style?.descriptionColor || '#000000', isDarkMode),
                           cursor: canEdit ? 'text' : 'text',
                           pointerEvents: 'auto',
+                          overflowWrap: 'break-word',
+                          wordWrap: 'break-word',
+                          maxWidth: '100%',
                         }}
                         dangerouslySetInnerHTML={{ __html: description || 'Macro description' }}
                         onMouseDown={(e) => {
                           if (!canEdit) {
-                            e.stopPropagation();
+                            // Don't stop propagation for images
+                            if (e.target.tagName !== 'IMG') {
+                              e.stopPropagation();
+                            }
                           }
                         }}
                         onClick={(e) => {
+                          // Handle image clicks FIRST - highest priority
+                          if (e.target.tagName === 'IMG' && e.target.classList.contains('inline-image')) {
+                            // Only open lightbox with Ctrl/Cmd+click
+                            if (e.ctrlKey || e.metaKey) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLightboxImage(e.target.src);
+                              return; // Stop further processing
+                            }
+                          }
+
                           if (!canEdit) {
                             e.stopPropagation();
                           }
+
                           // Handle link clicks
                           if (e.target.tagName === 'A') {
                             e.preventDefault();
@@ -700,6 +744,13 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
         onConfirm={confirmDelete}
         elementType={element.type}
       />
+
+      {lightboxImage && (
+        <ImageLightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </>
   );
 };
