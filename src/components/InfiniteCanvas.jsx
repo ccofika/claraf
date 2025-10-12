@@ -523,13 +523,21 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Listen for zoom to element events
   React.useEffect(() => {
     const handleZoomToElement = (event) => {
-      const element = event.detail;
-      if (element && transformWrapperRef.current && element.position) {
+      const eventData = event.detail;
+      if (!eventData || !transformWrapperRef.current) return;
+
+      // Find the element in canvasElements if only _id is provided
+      let targetElement = eventData;
+      if (eventData._id && !eventData.position) {
+        targetElement = canvasElements.find(el => el._id === eventData._id);
+      }
+
+      if (targetElement && targetElement.position) {
         const targetScale = 1.5;
 
         // Calculate element center position
-        const elementCenterX = element.position.x + (element.dimensions?.width || 0) / 2;
-        const elementCenterY = element.position.y + (element.dimensions?.height || 0) / 2;
+        const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
+        const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
 
         // Calculate transform position to center the element
         // Formula: -elementPos * scale + viewportCenter
@@ -537,12 +545,18 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
 
         transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
+
+        // Highlight element
+        setHighlightedElement(targetElement._id);
+
+        // Remove highlight after 3 seconds
+        setTimeout(() => setHighlightedElement(null), 3000);
       }
     };
 
     window.addEventListener('zoomToElement', handleZoomToElement);
     return () => window.removeEventListener('zoomToElement', handleZoomToElement);
-  }, []);
+  }, [canvasElements]);
 
   // Handle share link URL parameters
   React.useEffect(() => {
