@@ -654,14 +654,25 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                         if (!canEdit) {
                           e.stopPropagation();
                         }
-                        // Handle link clicks
-                        if (e.target.tagName === 'A') {
+                        // Handle link clicks - walk up DOM tree to find anchor tag
+                        let target = e.target;
+                        let linkElement = null;
+
+                        while (target && target !== e.currentTarget) {
+                          if (target.tagName === 'A') {
+                            linkElement = target;
+                            break;
+                          }
+                          target = target.parentElement;
+                        }
+
+                        if (linkElement) {
                           e.preventDefault();
                           e.stopPropagation();
 
                           // Check if it's an element link
-                          const elementId = e.target.getAttribute('data-element-id');
-                          const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+                          const elementId = linkElement.getAttribute('data-element-id');
+                          const elementWorkspaceId = linkElement.getAttribute('data-workspace-id');
 
                           if (elementId && elementWorkspaceId) {
                             // Element link - navigate only with Ctrl/Cmd + click (like share function)
@@ -669,14 +680,14 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                               handleElementLinkClick({
                                 elementId,
                                 workspaceId: elementWorkspaceId,
-                                elementType: e.target.getAttribute('data-element-type'),
-                                elementTitle: e.target.getAttribute('data-element-title')
+                                elementType: linkElement.getAttribute('data-element-type'),
+                                elementTitle: linkElement.getAttribute('data-element-title')
                               });
                             }
                           } else {
                             // Regular hyperlink - only open with Ctrl/Cmd
                             if (e.ctrlKey || e.metaKey) {
-                              window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                              window.open(linkElement.href, '_blank', 'noopener,noreferrer');
                             }
                           }
                         }
@@ -814,27 +825,38 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
                                   e.stopPropagation();
                                 }
 
-                                // Handle link clicks
-                                if (e.target.tagName === 'A') {
+                                // Handle link clicks - walk up DOM tree to find anchor tag
+                                let target = e.target;
+                                let linkElement = null;
+
+                                while (target && target !== e.currentTarget) {
+                                  if (target.tagName === 'A') {
+                                    linkElement = target;
+                                    break;
+                                  }
+                                  target = target.parentElement;
+                                }
+
+                                if (linkElement) {
                                   e.preventDefault();
                                   e.stopPropagation();
 
                                   // Check if it's an element link
-                                  const elementId = e.target.getAttribute('data-element-id');
-                                  const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+                                  const elementId = linkElement.getAttribute('data-element-id');
+                                  const elementWorkspaceId = linkElement.getAttribute('data-workspace-id');
 
                                   if (elementId && elementWorkspaceId) {
                                     // Element link - navigate on click
                                     handleElementLinkClick({
                                       elementId,
                                       workspaceId: elementWorkspaceId,
-                                      elementType: e.target.getAttribute('data-element-type'),
-                                      elementTitle: e.target.getAttribute('data-element-title')
+                                      elementType: linkElement.getAttribute('data-element-type'),
+                                      elementTitle: linkElement.getAttribute('data-element-title')
                                     });
                                   } else {
                                     // Regular hyperlink - only open with Ctrl/Cmd
                                     if (e.ctrlKey || e.metaKey) {
-                                      window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                                      window.open(linkElement.href, '_blank', 'noopener,noreferrer');
                                     }
                                   }
                                 }

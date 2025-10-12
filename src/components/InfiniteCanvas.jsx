@@ -507,6 +507,18 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   React.useEffect(() => {
     const handleClickOutside = (e) => {
       if (!isInEditMode && isHoveringElement) {
+        // Don't reset hover state if Ctrl/Cmd+clicking on a link (for element link navigation)
+        if (e.ctrlKey || e.metaKey) {
+          let target = e.target;
+          while (target && target !== document.body) {
+            if (target.tagName === 'A') {
+              // Clicking on a link with Ctrl/Cmd - don't reset hover state
+              return;
+            }
+            target = target.parentElement;
+          }
+        }
+
         // Check if click is on canvas background (not on an element)
         if (e.target.classList.contains('cursor-grab') ||
             e.target.classList.contains('cursor-grabbing') ||
@@ -523,39 +535,75 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Listen for zoom to element events
   React.useEffect(() => {
     const handleZoomToElement = (event) => {
+      console.log('=== InfiniteCanvas handleZoomToElement START ===');
+      console.log('Event received:', event);
+      console.log('Event detail:', event.detail);
+
       const eventData = event.detail;
-      if (!eventData || !transformWrapperRef.current) return;
+      if (!eventData) {
+        console.log('❌ No event data');
+        return;
+      }
+      if (!transformWrapperRef.current) {
+        console.log('❌ No transformWrapperRef');
+        return;
+      }
+
+      console.log('✓ Event data and transformWrapperRef exist');
+      console.log('Event data:', eventData);
+      console.log('Canvas elements count:', canvasElements.length);
 
       // Find the element in canvasElements if only _id is provided
       let targetElement = eventData;
       if (eventData._id && !eventData.position) {
+        console.log('Looking for element with _id:', eventData._id);
         targetElement = canvasElements.find(el => el._id === eventData._id);
+        console.log('Found element:', targetElement);
       }
 
-      if (targetElement && targetElement.position) {
-        const targetScale = 1.5;
-
-        // Calculate element center position
-        const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
-        const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
-
-        // Calculate transform position to center the element
-        // Formula: -elementPos * scale + viewportCenter
-        const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
-        const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
-
-        transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
-
-        // Highlight element
-        setHighlightedElement(targetElement._id);
-
-        // Remove highlight after 3 seconds
-        setTimeout(() => setHighlightedElement(null), 3000);
+      if (!targetElement) {
+        console.log('❌ Target element not found');
+        return;
       }
+      if (!targetElement.position) {
+        console.log('❌ Target element has no position');
+        return;
+      }
+
+      console.log('✓ Target element found with position:', targetElement.position);
+
+      const targetScale = 1.5;
+
+      // Calculate element center position
+      const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
+      const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
+
+      console.log('Element center:', { x: elementCenterX, y: elementCenterY });
+
+      // Calculate transform position to center the element
+      const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+      const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+
+      console.log('Transform target:', { x: targetX, y: targetY, scale: targetScale });
+
+      transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
+      console.log('✓ setTransform called');
+
+      // Highlight element
+      setHighlightedElement(targetElement._id);
+      console.log('✓ Element highlighted');
+
+      // Remove highlight after 3 seconds
+      setTimeout(() => setHighlightedElement(null), 3000);
+      console.log('=== InfiniteCanvas handleZoomToElement END ===');
     };
 
+    console.log('InfiniteCanvas: Adding zoomToElement event listener');
     window.addEventListener('zoomToElement', handleZoomToElement);
-    return () => window.removeEventListener('zoomToElement', handleZoomToElement);
+    return () => {
+      console.log('InfiniteCanvas: Removing zoomToElement event listener');
+      window.removeEventListener('zoomToElement', handleZoomToElement);
+    };
   }, [canvasElements]);
 
   // Handle share link URL parameters
@@ -658,7 +706,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         initialPositionY={0}
         panning={{
           disabled: isDraggingElement || (isHoveringElement && !isInEditMode),
-          excluded: ['input', 'textarea', 'button', 'svg', 'path'],
+          excluded: ['input', 'textarea', 'button', 'svg', 'path', 'a'],
           excludedClass: 'canvas-draggable-element'
         }}
         wheel={{ step: 0.1 }}
@@ -709,7 +757,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                   {/* Dynamic infinite grid */}
                   <DynamicGrid viewport={viewport} gridSize={50} />
                   <DndContext
-                    sensors={isInEditMode ? sensors : []}
+                    sensors={sensors}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
