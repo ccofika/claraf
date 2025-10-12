@@ -358,6 +358,45 @@ const Workspace = () => {
     }
   }, [canvas, elements, switchingWorkspace]);
 
+  // Auto-zoom to latest title element when workspace loads (unless there's pending navigation)
+  const hasZoomedToLatestTitle = React.useRef(false);
+  React.useEffect(() => {
+    // Reset the flag when workspace changes
+    if (workspaceId) {
+      hasZoomedToLatestTitle.current = false;
+    }
+  }, [workspaceId]);
+
+  React.useEffect(() => {
+    // Only zoom if:
+    // 1. No pending navigation
+    // 2. Canvas is ready
+    // 3. Elements are loaded
+    // 4. Haven't zoomed yet for this workspace
+    // 5. Not currently switching workspaces
+    const pendingNav = sessionStorage.getItem('pendingElementNavigation');
+
+    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
+      // Find the latest title element (sorted by createdAt descending)
+      const titleElements = elements
+        .filter(el => el.type === 'title')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      const latestTitle = titleElements[0];
+
+      if (latestTitle) {
+        // Mark that we've zoomed to prevent re-triggering
+        hasZoomedToLatestTitle.current = true;
+
+        // Trigger zoom to latest title after a short delay to ensure canvas is ready
+        setTimeout(() => {
+          const event = new CustomEvent('zoomToElement', { detail: latestTitle });
+          window.dispatchEvent(event);
+        }, 500);
+      }
+    }
+  }, [canvas, elements, switchingWorkspace]);
+
   // Auto-redirect to announcements workspace if access is denied
   useEffect(() => {
     if (error && error.toLowerCase().includes('access denied')) {

@@ -184,22 +184,37 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   };
 
   const handleElementLinkClick = (linkData) => {
-    console.log('Element link clicked:', linkData);
+    console.log('=== TitleElement handleElementLinkClick START ===');
+    console.log('Link data:', linkData);
     console.log('Current workspace:', workspaceId);
     console.log('Target workspace:', linkData.workspaceId);
+    console.log('Are they equal?', linkData.workspaceId === workspaceId);
+    console.log('Comparison (strict):', linkData.workspaceId, '===', workspaceId);
 
     if (linkData.workspaceId === workspaceId) {
       // Same workspace - zoom to element
-      console.log('Same workspace - zooming to element');
+      console.log('✓ Same workspace - dispatching zoomToElement event');
+      const eventDetail = { _id: linkData.elementId };
+      console.log('Event detail:', eventDetail);
+
       const event = new CustomEvent('zoomToElement', {
-        detail: { _id: linkData.elementId }
+        detail: eventDetail
       });
+      console.log('Created CustomEvent:', event);
+      console.log('Event type:', event.type);
+      console.log('Event detail:', event.detail);
+
       window.dispatchEvent(event);
+      console.log('✓ Event dispatched to window');
     } else {
       // Different workspace - navigate
-      console.log('Different workspace - navigating to:', `/workspace/${linkData.workspaceId}?element=${linkData.elementId}`);
-      navigate(`/workspace/${linkData.workspaceId}?element=${linkData.elementId}`);
+      console.log('✓ Different workspace - calling navigate()');
+      const path = `/workspace/${linkData.workspaceId}?element=${linkData.elementId}`;
+      console.log('Navigation path:', path);
+      navigate(path);
+      console.log('✓ Navigate called');
     }
+    console.log('=== TitleElement handleElementLinkClick END ===');
   };
 
   return (
@@ -386,29 +401,42 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                     e.stopPropagation();
                   }
 
-                  // Handle link clicks
-                  if (e.target.tagName === 'A') {
-                    console.log('Link clicked!', e.target);
+                  // Handle link clicks - walk up DOM tree to find anchor tag
+                  let target = e.target;
+                  let linkElement = null;
+
+                  // Walk up the DOM to find an anchor tag
+                  while (target && target !== e.currentTarget) {
+                    if (target.tagName === 'A') {
+                      linkElement = target;
+                      break;
+                    }
+                    target = target.parentElement;
+                  }
+
+                  if (linkElement) {
+                    console.log('Link clicked!', linkElement);
                     e.preventDefault();
                     e.stopPropagation();
 
                     // Check if it's an element link
-                    const elementId = e.target.getAttribute('data-element-id');
-                    const elementWorkspaceId = e.target.getAttribute('data-workspace-id');
+                    const elementId = linkElement.getAttribute('data-element-id');
+                    const elementWorkspaceId = linkElement.getAttribute('data-workspace-id');
 
                     console.log('Element ID:', elementId);
                     console.log('Workspace ID:', elementWorkspaceId);
+                    console.log('Ctrl/Cmd key:', e.ctrlKey || e.metaKey);
 
                     if (elementId && elementWorkspaceId) {
-                      // Element link - navigate only with Ctrl/Cmd + click (like share function)
+                      // Element link - navigate only with Ctrl/Cmd + click
                       console.log('This is an element link!');
                       if (e.ctrlKey || e.metaKey) {
                         console.log('Ctrl/Cmd pressed - navigating to element');
                         handleElementLinkClick({
                           elementId,
                           workspaceId: elementWorkspaceId,
-                          elementType: e.target.getAttribute('data-element-type'),
-                          elementTitle: e.target.getAttribute('data-element-title')
+                          elementType: linkElement.getAttribute('data-element-type'),
+                          elementTitle: linkElement.getAttribute('data-element-title')
                         });
                       } else {
                         console.log('Ctrl/Cmd not pressed - element link not activated');
@@ -418,7 +446,7 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                       console.log('This is a regular hyperlink');
                       if (e.ctrlKey || e.metaKey) {
                         console.log('Opening hyperlink in new tab');
-                        window.open(e.target.href, '_blank', 'noopener,noreferrer');
+                        window.open(linkElement.href, '_blank', 'noopener,noreferrer');
                       } else {
                         console.log('Ctrl/Cmd not pressed - hyperlink not opened');
                       }

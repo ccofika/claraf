@@ -554,12 +554,21 @@ const RichTextEditor = ({
         e.stopPropagation();
       }}
       onClick={(e) => {
+        console.log('RichTextEditor onClick triggered', { target: e.target, ctrlKey: e.ctrlKey, metaKey: e.metaKey });
+
         // Handle link clicks - find closest anchor element
         let target = e.target;
 
         // Walk up the DOM to find an anchor tag
         while (target && target !== editorRef.current) {
           if (target.tagName === 'A') {
+            console.log('Found anchor tag:', {
+              elementId: target.getAttribute('data-element-id'),
+              workspaceId: target.getAttribute('data-workspace-id'),
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey
+            });
+
             e.preventDefault();
             e.stopPropagation();
 
@@ -570,7 +579,7 @@ const RichTextEditor = ({
             if (elementId && elementWorkspaceId) {
               // Element link - navigate only with Ctrl/Cmd + click
               if ((e.ctrlKey || e.metaKey) && onElementLinkClick) {
-                console.log('Ctrl+Click on element link:', {
+                console.log('Calling onElementLinkClick with:', {
                   elementId,
                   workspaceId: elementWorkspaceId,
                   elementType: target.getAttribute('data-element-type'),
