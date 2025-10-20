@@ -68,16 +68,25 @@ const ProfileModal = ({ isOpen, onClose }) => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.put(
+      const response = await axios.put(
         `${process.env.REACT_APP_API_URL}/api/auth/change-password`,
         {
           oldPassword,
           newPassword,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true // Ensure cookies are sent/received
+        }
       );
 
-      setSuccess('Password changed successfully!');
+      // SECURITY: Update token in localStorage with new token from response
+      // This keeps the current session active while invalidating all other sessions
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+
+      setSuccess('Password changed successfully! All other sessions have been logged out.');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
