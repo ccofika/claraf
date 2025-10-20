@@ -6,6 +6,7 @@ import AppSidebar from '../components/AppSidebar';
 import HashExplorerFinder from './HashExplorerFinder';
 import VIPProgressCalculator from './VIPProgressCalculator';
 import QuickLinks from './QuickLinks';
+import DeveloperDashboard from './DeveloperDashboard';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
@@ -482,6 +483,9 @@ const Workspace = () => {
           )}
           {activeSection === 'quick-links' && (
             <QuickLinks />
+          )}
+          {activeSection === 'developer-dashboard' && (
+            <DeveloperDashboard />
           )}
         </div>
 

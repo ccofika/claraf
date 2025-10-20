@@ -19,6 +19,7 @@ import {
   Checkmark,
   Close,
   Settings,
+  ChartLine,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -66,6 +67,16 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     { id: 'hash-explorer', icon: <SearchIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Hash Explorer Finder' },
     { id: 'quick-links', icon: <LinkIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Quick Links' },
   ];
+
+  // Add developer dashboard for admin/developer roles only
+  const isDeveloperOrAdmin = user?.role === 'admin' || user?.role === 'developer';
+  if (isDeveloperOrAdmin) {
+    navItems.push({
+      id: 'developer-dashboard',
+      icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />,
+      label: 'Developer Dashboard'
+    });
+  }
 
   const handleLogout = () => {
     logout();
@@ -576,6 +587,8 @@ function DetailSidebar({
         ? 'VIP Progress Calculator'
         : activeSection === 'hash-explorer'
         ? 'Hash Explorer Finder'
+        : activeSection === 'developer-dashboard'
+        ? 'Developer Dashboard'
         : 'Quick Links',
       sections: [],
     };
