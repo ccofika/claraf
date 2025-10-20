@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { RefreshCw, Activity, Database, Users, FolderOpen, FileText, Server, Clock, Cpu, HardDrive, AlertCircle } from 'lucide-react';
 import ActivityLogsSection from '../components/ActivityLogsSection';
+import SecurityDashboard from '../components/SecurityDashboard';
 
 const DeveloperDashboard = () => {
   const [metrics, setMetrics] = useState(null);
@@ -490,6 +491,9 @@ const DeveloperDashboard = () => {
             </table>
           </div>
         </div>
+
+        {/* Security Dashboard Section */}
+        <SecurityDashboard />
 
         {/* Activity Logs Section with Filters and Pagination */}
         <ActivityLogsSection
