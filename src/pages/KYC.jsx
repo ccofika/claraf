@@ -15,7 +15,7 @@ const KYC = () => {
   const socketRef = useRef(null);
 
   // Recipient email (kolega za testiranje)
-  const RECIPIENT_EMAIL = 'markokrsticic@mebit.io';
+  const RECIPIENT_EMAIL = 'vasilijevitorovic@mebit.io';
 
   // Check Slack access and load messages on mount
   useEffect(() => {
