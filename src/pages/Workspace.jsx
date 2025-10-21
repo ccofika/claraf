@@ -8,6 +8,7 @@ import VIPProgressCalculator from './VIPProgressCalculator';
 import QuickLinks from './QuickLinks';
 import DeveloperDashboard from './DeveloperDashboard';
 import AffiliateBonusFinder from './AffiliateBonusFinder';
+import KYC from './KYC';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
@@ -487,6 +488,9 @@ const Workspace = () => {
           )}
           {activeSection === 'affiliate-bonus-finder' && (
             <AffiliateBonusFinder />
+          )}
+          {activeSection === 'kyc' && (
+            <KYC />
           )}
           {activeSection === 'developer-dashboard' && (
             <DeveloperDashboard />
