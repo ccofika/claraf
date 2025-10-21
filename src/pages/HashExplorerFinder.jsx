@@ -10,6 +10,7 @@ const HashExplorerFinder = () => {
   const [result, setResult] = useState({ message: '', type: '' });
   const [transactionData, setTransactionData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showContractTooltip, setShowContractTooltip] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,6 +23,7 @@ const HashExplorerFinder = () => {
     const trimmedHash = hash.trim();
     setLoading(true);
     setResult({ message: 'Searching for transaction...', type: 'info' });
+    setTransactionData(null);
 
     try {
       // Call backend API
@@ -33,25 +35,32 @@ const HashExplorerFinder = () => {
       if (response.data.success) {
         setTransactionData(response.data.data);
         setResult({ message: 'Transaction found!', type: 'success' });
-
-        // Also open OKLink
-        const oklinkUrl = `https://www.oklink.com/multi-search#key=${trimmedHash}`;
-        window.open(oklinkUrl, '_blank');
       }
     } catch (error) {
       console.error('Transaction lookup error:', error);
       setResult({
-        message: error.response?.data?.message || 'Failed to find transaction. Opening OKLink...',
+        message: error.response?.data?.message || 'Failed to find transaction',
         type: 'error'
       });
-
-      // Still open OKLink even if API fails
-      const oklinkUrl = `https://www.oklink.com/multi-search#key=${trimmedHash}`;
-      window.open(oklinkUrl, '_blank');
     } finally {
       setLoading(false);
     }
   };
+
+  // Supported networks list
+  const supportedNetworks = [
+    { name: 'Bitcoin', coins: ['BTC'] },
+    { name: 'Ethereum', coins: ['ETH', 'USDT', 'USDC', 'DAI', 'LINK', 'UNI', 'SHIB', 'APE', '...'] },
+    { name: 'BSC', coins: ['BNB', 'USDT', 'USDC', 'DAI', 'LINK', '...'] },
+    { name: 'Polygon', coins: ['MATIC', 'USDT', 'USDC', 'DAI', '...'] },
+    { name: 'Solana', coins: ['SOL', 'TRUMP'] },
+    { name: 'Tron', coins: ['TRX', 'USDT'] },
+    { name: 'XRP', coins: ['XRP'] },
+    { name: 'Litecoin', coins: ['LTC'] },
+    { name: 'Dogecoin', coins: ['DOGE'] },
+    { name: 'Bitcoin Cash', coins: ['BCH'] },
+    { name: 'EOS', coins: ['EOS'] }
+  ];
 
   return (
     <div className="min-h-screen bg-white dark:bg-black p-8 relative">
@@ -70,7 +79,7 @@ const HashExplorerFinder = () => {
                 Hash Explorer Finder
               </h2>
               <p className="mt-4 text-center text-sm text-gray-600 dark:text-neutral-400">
-                Enter any transaction hash to find and open the right blockchain explorer
+                Enter any transaction hash to find details across 50+ blockchain networks
               </p>
             </div>
 
@@ -115,16 +124,16 @@ const HashExplorerFinder = () => {
 
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-neutral-800">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-50 mb-3">
-                  Supported Blockchains
+                  Supported Networks (50+ Coins)
                 </h3>
-                <div className="flex flex-wrap gap-2">
-                  {['Ethereum', 'BSC', 'Polygon', 'Arbitrum', 'opBNB', 'Optimism', 'Avalanche', 'Base'].map((chain) => (
-                    <span
-                      key={chain}
-                      className="px-3 py-1 bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-neutral-50 rounded-full text-xs"
-                    >
-                      {chain}
-                    </span>
+                <div className="grid grid-cols-2 gap-3">
+                  {supportedNetworks.map((network) => (
+                    <div key={network.name} className="text-xs">
+                      <span className="font-semibold text-gray-900 dark:text-neutral-50">{network.name}</span>
+                      <span className="text-gray-600 dark:text-neutral-400 ml-2">
+                        {network.coins.join(', ')}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -155,8 +164,30 @@ const HashExplorerFinder = () => {
                   <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
                     <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Network</p>
                     <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-neutral-50 rounded-full text-sm font-medium">
-                      {transactionData.network}
+                      {transactionData.network} {transactionData.networkType && `(${transactionData.networkType})`}
                     </span>
+                  </div>
+
+                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Coin/Token</p>
+                    <div className="relative inline-block">
+                      <span
+                        className="text-sm font-medium text-gray-900 dark:text-neutral-50 cursor-pointer"
+                        onMouseEnter={() => transactionData.contractAddress && setShowContractTooltip(true)}
+                        onMouseLeave={() => setShowContractTooltip(false)}
+                      >
+                        {transactionData.coin}
+                        {transactionData.contractAddress && (
+                          <span className="ml-1 text-xs text-gray-500">ⓘ</span>
+                        )}
+                      </span>
+                      {transactionData.contractAddress && showContractTooltip && (
+                        <div className="absolute z-10 bottom-full left-0 mb-2 p-2 bg-gray-900 dark:bg-neutral-100 text-white dark:text-black text-xs rounded shadow-lg w-64 break-all">
+                          <p className="font-semibold mb-1">Contract Address:</p>
+                          <p className="font-mono">{transactionData.contractAddress}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
@@ -169,27 +200,54 @@ const HashExplorerFinder = () => {
                     <p className="text-sm font-mono text-gray-900 dark:text-neutral-50 break-all">{transactionData.to}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Token</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{transactionData.token}</p>
-                    </div>
-
-                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Amount</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{transactionData.amount}</p>
-                    </div>
+                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Amount</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">
+                      {transactionData.amount} {transactionData.coin}
+                    </p>
                   </div>
 
                   <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Time</p>
-                    <p className="text-sm text-gray-900 dark:text-neutral-50">{transactionData.time}</p>
+                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Date & Time</p>
+                    <p className="text-sm text-gray-900 dark:text-neutral-50">
+                      {new Date(transactionData.dateTime).toLocaleString()}
+                    </p>
                   </div>
 
                   <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
                     <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Transaction Fee</p>
-                    <p className="text-sm text-gray-900 dark:text-neutral-50">{transactionData.transactionFee} {transactionData.token}</p>
+                    <p className="text-sm text-gray-900 dark:text-neutral-50">{transactionData.fee}</p>
                   </div>
+
+                  {/* XRP Destination Tag */}
+                  {transactionData.destinationTag !== undefined && (
+                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
+                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Destination Tag (XRP)</p>
+                      <p className="text-sm text-gray-900 dark:text-neutral-50">
+                        {transactionData.destinationTag || <span className="text-red-500">Not Provided</span>}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* EOS Memo */}
+                  {transactionData.memo !== undefined && (
+                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
+                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Memo (EOS)</p>
+                      <p className="text-sm text-gray-900 dark:text-neutral-50">
+                        {transactionData.memo || <span className="text-red-500">Not Provided</span>}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Error Display for XRP/EOS */}
+                  {transactionData.error && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                      <p className="text-sm font-semibold text-red-700 dark:text-red-400">⚠️ {transactionData.error}</p>
+                      {transactionData.errorDetails && (
+                        <p className="text-xs text-red-600 dark:text-red-500 mt-1">{transactionData.errorDetails}</p>
+                      )}
+                    </div>
+                  )}
 
                   {transactionData.status && (
                     <div className="pb-3">
