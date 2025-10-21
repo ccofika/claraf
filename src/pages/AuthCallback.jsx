@@ -13,25 +13,31 @@ const AuthCallback = () => {
   const [token, setToken] = useState(null);
 
   useEffect(() => {
-    const tokenParam = searchParams.get('token');
+    const success = searchParams.get('success');
     const isFirstLoginParam = searchParams.get('isFirstLogin');
     const userIdParam = searchParams.get('userId');
 
-    if (!tokenParam) {
+    console.log('🔄 AuthCallback params:', { success, isFirstLoginParam, userIdParam });
+
+    // Check if authentication was successful
+    if (success !== 'true') {
+      console.error('❌ Authentication failed - no success param');
       navigate('/login?error=Authentication failed');
       return;
     }
 
-    setToken(tokenParam);
+    // SECURITY: Token is in httpOnly cookie, fetch it by calling /profile
+    // We don't pass tokens in URL to prevent exposure in browser history
     setUserId(userIdParam);
 
     if (isFirstLoginParam === 'true') {
+      console.log('🆕 First login - showing password setup');
       // Show password setup dialog
       setShowPasswordSetup(true);
     } else {
-      // User already has password, log them in
-      localStorage.setItem('token', tokenParam);
-      fetchUserProfile(tokenParam);
+      console.log('✅ Existing user - fetching profile with cookie auth');
+      // User already has password, fetch profile using cookie auth
+      fetchUserProfileWithCookie();
     }
   }, [searchParams, navigate]);
 
@@ -56,6 +62,48 @@ const AuthCallback = () => {
     }
   };
 
+  const fetchUserProfileWithCookie = async () => {
+    try {
+      const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      console.log('📡 Fetching user profile with cookie auth...');
+
+      const response = await axios.get(`${backendURL}/api/auth/profile`, {
+        withCredentials: true // Use cookies for authentication
+      });
+
+      console.log('✅ User profile fetched:', response.data);
+
+      // SECURITY: Backend returns token for Google OAuth users so they can use it in localStorage
+      // This allows compatibility with existing code that expects token in localStorage
+      if (response.data.token) {
+        console.log('🔑 Storing token in localStorage for future requests');
+        localStorage.setItem('token', response.data.token);
+        const { token, ...userData } = response.data;
+        setUser(userData);
+      } else {
+        setUser(response.data);
+      }
+
+      // Redirect to announcements workspace
+      const workspacesResponse = await axios.get(
+        `${backendURL}/api/workspaces`,
+        { withCredentials: true }
+      );
+
+      const announcementsWorkspace = workspacesResponse.data.find(ws => ws.type === 'announcements');
+
+      if (announcementsWorkspace) {
+        console.log('🏠 Redirecting to announcements workspace');
+        navigate(`/workspace/${announcementsWorkspace._id}`);
+      } else {
+        console.error('❌ Announcements workspace not found');
+        navigate('/login?error=Announcements workspace not found');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user profile:', error);
+      navigate('/login?error=Failed to fetch user profile');
+    }
+  };
   const fetchUserProfile = async (authToken) => {
     try {
       const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
