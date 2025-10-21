@@ -15,12 +15,49 @@ const KYC = () => {
   const socketRef = useRef(null);
 
   // Recipient email (kolega za testiranje)
-  const RECIPIENT_EMAIL = 'vasilijevitorovic@mebit.io';
+  const RECIPIENT_EMAIL = 'markokrsticic@mebit.io';
 
-  // Check Slack access on mount
+  // Check Slack access and load messages on mount
   useEffect(() => {
     checkSlackAccess();
+    loadMessages();
   }, []);
+
+  const loadMessages = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/slack/kyc-messages`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log('✅ Messages loaded from database:', response.data.messages.length);
+
+      // Transform database messages to frontend format
+      const transformedMessages = response.data.messages.map(msg => ({
+        id: msg._id,
+        text: msg.messageText,
+        status: msg.status,
+        sentAt: new Date(msg.sentAt),
+        threadTs: msg.slackThreadTs,
+        channel: msg.slackChannel,
+        recipient: {
+          id: msg.recipientSlackId,
+          name: msg.recipientName,
+          email: msg.recipientEmail
+        },
+        reply: msg.reply ? {
+          text: msg.reply.text,
+          user: msg.reply.slackUserId,
+          timestamp: new Date(msg.reply.timestamp)
+        } : null
+      }));
+
+      setMessages(transformedMessages);
+    } catch (err) {
+      console.error('❌ Error loading messages:', err);
+    }
+  };
 
   // Setup Socket.io connection
   useEffect(() => {
