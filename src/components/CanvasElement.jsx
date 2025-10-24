@@ -5,8 +5,9 @@ import TitleElement from './TitleElement';
 import DescriptionElement from './DescriptionElement';
 import MacroElement from './MacroElement';
 import ExampleElement from './ExampleElement';
+import WrapperElement from './WrapperElement';
 
-const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
+const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave, allElements = [], viewportScale = 1 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
     disabled: element.locked || !canEdit, // Disable dragging if user can't edit
@@ -80,6 +81,24 @@ const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpda
         onBookmarkCreated={onBookmarkCreated}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+      />
+    );
+  }
+
+  // Use WrapperElement for wrapper type
+  if (element.type === 'wrapper') {
+    return (
+      <WrapperElement
+        element={element}
+        canEdit={canEdit}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onSettingsClick={onSettingsClick}
+        isHighlighted={isHighlighted}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        allElements={allElements}
+        viewportScale={viewportScale}
       />
     );
   }

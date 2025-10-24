@@ -413,12 +413,18 @@ function DetailSidebar({
 
   const toggleCollapse = () => setIsCollapsed((s) => !s);
 
-  // Notify parent when collapsed state changes
+  // Notify parent when collapsed state or activeSection changes
   React.useEffect(() => {
     if (onCollapsedChange) {
-      onCollapsedChange(isCollapsed);
+      if (activeSection === 'workspaces') {
+        // When showing workspaces, use actual collapsed state
+        onCollapsedChange(isCollapsed);
+      } else {
+        // When showing other sections, notify that sidebar is effectively "collapsed" (hidden)
+        onCollapsedChange(true);
+      }
     }
-  }, [isCollapsed, onCollapsedChange]);
+  }, [activeSection, isCollapsed, onCollapsedChange]);
 
   const handleEditBookmark = (bookmarkId) => {
     const bookmark = bookmarks?.find(b => b._id === bookmarkId);
@@ -682,22 +688,25 @@ export default function AppSidebar({
           onSectionChange={onSectionChange}
           onOpenProfile={() => setIsProfileOpen(true)}
         />
-        <DetailSidebar
-          activeSection={activeSection}
-          currentWorkspace={currentWorkspace}
-          workspaces={workspaces}
-          bookmarks={bookmarks}
-          onAddWorkspace={onAddWorkspace}
-          onEditWorkspace={onEditWorkspace}
-          onDeleteWorkspace={onDeleteWorkspace}
-          onSettingsWorkspace={onSettingsWorkspace}
-          onWorkspaceClick={onWorkspaceClick}
-          onBookmarkClick={onBookmarkClick}
-          onBookmarkUpdate={onBookmarkUpdate}
-          onBookmarkDelete={onBookmarkDelete}
-          onCollapsedChange={onCollapsedChange}
-          onRefreshWorkspaces={onRefreshWorkspaces}
-        />
+        {/* Only show DetailSidebar when activeSection is 'workspaces' */}
+        {activeSection === 'workspaces' && (
+          <DetailSidebar
+            activeSection={activeSection}
+            currentWorkspace={currentWorkspace}
+            workspaces={workspaces}
+            bookmarks={bookmarks}
+            onAddWorkspace={onAddWorkspace}
+            onEditWorkspace={onEditWorkspace}
+            onDeleteWorkspace={onDeleteWorkspace}
+            onSettingsWorkspace={onSettingsWorkspace}
+            onWorkspaceClick={onWorkspaceClick}
+            onBookmarkClick={onBookmarkClick}
+            onBookmarkUpdate={onBookmarkUpdate}
+            onBookmarkDelete={onBookmarkDelete}
+            onCollapsedChange={onCollapsedChange}
+            onRefreshWorkspaces={onRefreshWorkspaces}
+          />
+        )}
       </div>
 
       <ProfileModal
