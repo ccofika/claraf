@@ -1,77 +1,69 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
-import { Send, CheckCircle, Clock, AlertCircle, Loader } from 'lucide-react';
+import {
+  Send,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Loader,
+  User,
+  MessageSquare,
+  Search,
+  History,
+  X,
+  ExternalLink
+} from 'lucide-react';
 
 const KYC = () => {
+  // Form state
+  const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
+
+  // UI state
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [slackConnected, setSlackConnected] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [existingThread, setExistingThread] = useState(null);
+  const [checkingThread, setCheckingThread] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Thread modal state
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [loadingThread, setLoadingThread] = useState(false);
 
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  // Recipient email (kolega za testiranje)
+  // Recipient email (za sada - kasnije će biti kanal)
   const RECIPIENT_EMAIL = 'vasilijevitorovic@mebit.io';
 
-  // Check Slack access and load messages on mount
+  // Load messages on mount
   useEffect(() => {
     checkSlackAccess();
     loadMessages();
   }, []);
-
-  const loadMessages = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/slack/kyc-messages`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      console.log('✅ Messages loaded from database:', response.data.messages.length);
-
-      // Transform database messages to frontend format
-      const transformedMessages = response.data.messages.map(msg => ({
-        id: msg._id,
-        text: msg.messageText,
-        status: msg.status,
-        sentAt: new Date(msg.sentAt),
-        threadTs: msg.slackThreadTs,
-        channel: msg.slackChannel,
-        recipient: {
-          id: msg.recipientSlackId,
-          name: msg.recipientName,
-          email: msg.recipientEmail
-        },
-        reply: msg.reply ? {
-          text: msg.reply.text,
-          user: msg.reply.slackUserId,
-          timestamp: new Date(msg.reply.timestamp)
-        } : null
-      }));
-
-      setMessages(transformedMessages);
-    } catch (err) {
-      console.error('❌ Error loading messages:', err);
-    }
-  };
 
   // Setup Socket.io connection
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    console.log('🔌 Connecting to Socket.io...');
     const socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
       auth: { token },
       transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
-      console.log('✅ Socket.io connected:', socket.id);
+      console.log('✅ Socket.io connected', {
+        socketId: socket.id,
+        connected: socket.connected,
+        transport: socket.io.engine.transport.name
+      });
 
       // Get userId from localStorage or extract from JWT token
       let userId = localStorage.getItem('userId');
@@ -101,7 +93,7 @@ const KYC = () => {
         socket.emit('authenticate', { userId });
         console.log('🔐 Authenticated with userId:', userId);
       } else {
-        console.warn('⚠️ No userId found - Socket.io authentication may fail');
+        console.warn('⚠️ No userId found in localStorage or token - Socket.io authentication may fail');
       }
     });
 
@@ -109,10 +101,17 @@ const KYC = () => {
       console.log('🔌 Socket.io disconnected');
     });
 
-    // Listen for thread replies
     socket.on('thread-reply', (data) => {
-      console.log('🔔 Thread reply received:', data);
+      console.log('🔔 Received thread-reply event:', {
+        threadTs: data.threadTs,
+        messageId: data.messageId,
+        replyText: data.reply?.text?.substring(0, 50)
+      });
       handleThreadReply(data);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket.io connection error:', error);
     });
 
     socketRef.current = socket;
@@ -122,10 +121,42 @@ const KYC = () => {
     };
   }, []);
 
-  // Auto-scroll to bottom when new message added
+  // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Check for existing thread when username changes
+  useEffect(() => {
+    const checkThread = async () => {
+      if (username.trim().length >= 3) {
+        setCheckingThread(true);
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(
+            `${process.env.REACT_APP_API_URL}/api/slack/check-thread/${username}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (response.data.exists) {
+            setExistingThread(response.data.thread);
+          } else {
+            setExistingThread(null);
+          }
+        } catch (err) {
+          console.error('Error checking thread:', err);
+          setExistingThread(null);
+        } finally {
+          setCheckingThread(false);
+        }
+      } else {
+        setExistingThread(null);
+      }
+    };
+
+    const timer = setTimeout(checkThread, 500);
+    return () => clearTimeout(timer);
+  }, [username]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,22 +171,63 @@ const KYC = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log('🔍 Slack access check:', response.data);
       setSlackConnected(response.data.hasAccess);
 
       if (!response.data.hasAccess) {
         setError(response.data.message);
       }
     } catch (err) {
-      console.error('❌ Error checking Slack access:', err);
+      console.error('Error checking Slack access:', err);
       setError('Failed to check Slack connection');
     } finally {
       setCheckingAccess(false);
     }
   };
 
+  const loadMessages = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/slack/kyc-messages`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const transformedMessages = response.data.messages.map(msg => ({
+        id: msg._id,
+        username: msg.username || 'Unknown',
+        text: msg.messageText,
+        status: msg.status,
+        sentAt: new Date(msg.sentAt),
+        threadTs: msg.slackThreadTs,
+        channel: msg.slackChannel,
+        recipient: {
+          id: msg.recipientSlackId,
+          name: msg.recipientName,
+          email: msg.recipientEmail
+        },
+        reply: msg.reply ? {
+          text: msg.reply.text,
+          user: msg.reply.slackUserId,
+          timestamp: new Date(msg.reply.timestamp)
+        } : null
+      }));
+
+      // Sort by sentAt ascending (oldest first, newest at bottom)
+      transformedMessages.sort((a, b) => a.sentAt - b.sentAt);
+
+      setMessages(transformedMessages);
+    } catch (err) {
+      console.error('Error loading messages:', err);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
+
+    if (!username.trim()) {
+      setError('Please enter a username');
+      return;
+    }
 
     if (!message.trim()) {
       setError('Please enter a message');
@@ -173,35 +245,47 @@ const KYC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/slack/send-dm`,
+        `${process.env.REACT_APP_API_URL}/api/slack/send-kyc-request`,
         {
+          username: username.trim(),
+          message: message.trim(),
           recipientEmail: RECIPIENT_EMAIL,
-          message: message.trim()
+          existingThreadTs: existingThread?.threadTs
         },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
 
-      console.log('✅ Message sent:', response.data);
-
-      // Add message to local state
       const newMessage = {
-        id: response.data.slack.ts,
+        id: response.data.messageId, // Use MongoDB _id for consistency
+        username: username.trim(),
         text: message.trim(),
         status: 'pending',
         sentAt: new Date(),
-        threadTs: response.data.slack.ts,
+        threadTs: response.data.slack.threadTs,
         channel: response.data.slack.channel,
         recipient: response.data.slack.recipient,
         reply: null
       };
 
+      console.log('✅ Message sent successfully:', {
+        id: newMessage.id,
+        username: newMessage.username,
+        threadTs: newMessage.threadTs,
+        channel: newMessage.channel,
+        wasExistingThread: !!existingThread
+      });
+
       setMessages(prev => [...prev, newMessage]);
+
+      // Clear form
       setMessage('');
+      setUsername('');
+      setExistingThread(null);
 
     } catch (err) {
-      console.error('❌ Error sending message:', err);
+      console.error('Error sending message:', err);
       setError(err.response?.data?.message || 'Failed to send message');
     } finally {
       setLoading(false);
@@ -209,99 +293,200 @@ const KYC = () => {
   };
 
   const handleThreadReply = (data) => {
-    console.log('🎯 Processing thread reply:', data);
+    console.log('🎯 Processing thread reply:', {
+      threadTs: data.threadTs,
+      messageId: data.messageId,
+      replyText: data.reply?.text
+    });
 
-    setMessages(prev => prev.map(msg => {
-      if (msg.threadTs === data.threadTs) {
-        console.log('✅ Matching message found, updating to resolved');
-        return {
-          ...msg,
-          status: 'resolved',
-          reply: {
-            text: data.reply.text,
-            user: data.reply.user,
-            timestamp: new Date(data.reply.timestamp)
-          }
-        };
+    setMessages(prev => {
+      console.log('📋 Current messages in state:', prev.map(m => ({
+        id: m.id,
+        username: m.username,
+        threadTs: m.threadTs,
+        status: m.status
+      })));
+
+      // Find all messages with matching threadTs
+      const matchingMessages = prev.filter(msg => {
+        const matches = msg.threadTs === data.threadTs;
+        console.log(`🔍 Comparing: msg.threadTs="${msg.threadTs}" vs data.threadTs="${data.threadTs}" => ${matches}`);
+        return matches;
+      });
+
+      console.log(`✅ Found ${matchingMessages.length} message(s) with threadTs ${data.threadTs}`);
+
+      if (matchingMessages.length === 0) {
+        console.warn('⚠️ No matching messages found! Thread reply will not update any cards.');
+        return prev; // No changes
       }
-      return msg;
-    }));
+
+      const updated = prev.map(msg => {
+        if (msg.threadTs === data.threadTs) {
+          console.log('✅ Updating message to answered:', {
+            id: msg.id,
+            username: msg.username,
+            previousStatus: msg.status,
+            newStatus: 'answered'
+          });
+
+          return {
+            ...msg,
+            status: 'answered',
+            reply: {
+              text: data.reply.text,
+              user: data.reply.user,
+              timestamp: new Date(data.reply.timestamp)
+            }
+          };
+        }
+        return msg;
+      });
+
+      const answeredCount = updated.filter(m => m.status === 'answered').length;
+      console.log(`📊 Update complete. ${answeredCount} total answered messages now.`);
+
+      return updated;
+    });
   };
 
-  const renderMessageCard = (msg) => {
-    const isPending = msg.status === 'pending';
-    const isResolved = msg.status === 'resolved';
+  const openThreadModal = async (msg) => {
+    console.log('🔍 Opening thread modal for message:', {
+      id: msg.id,
+      username: msg.username,
+      threadTs: msg.threadTs,
+      channel: msg.channel,
+      status: msg.status
+    });
 
-    return (
-      <div
-        key={msg.id}
-        className={`
-          p-4 rounded-lg border transition-all duration-500 ease-in-out
-          ${isResolved
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-            : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-          }
-          transform hover:scale-[1.01]
-        `}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            {isPending ? (
-              <Clock className="text-yellow-600 dark:text-yellow-400" size={18} />
-            ) : (
-              <CheckCircle className="text-green-600 dark:text-green-400" size={18} />
-            )}
-            <span className={`text-sm font-semibold ${
-              isPending
-                ? 'text-yellow-700 dark:text-yellow-300'
-                : 'text-green-700 dark:text-green-300'
-            }`}>
-              {isPending ? 'PENDING' : 'RESOLVED'}
-            </span>
-          </div>
-          <span className="text-xs text-gray-500 dark:text-neutral-400">
-            {new Date(msg.sentAt).toLocaleTimeString()}
-          </span>
-        </div>
+    setSelectedThread(msg);
+    setLoadingThread(true);
 
-        {/* Message Text */}
-        <div className="mb-2">
-          <p className="text-sm font-medium text-gray-600 dark:text-neutral-400 mb-1">Message:</p>
-          <p className="text-sm text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">
-            {msg.text}
-          </p>
-        </div>
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = `${process.env.REACT_APP_API_URL}/api/slack/thread/${msg.threadTs}`;
 
-        {/* Recipient Info */}
-        <div className="mb-2">
-          <p className="text-xs text-gray-500 dark:text-neutral-400">
-            Sent to: <span className="font-medium">{msg.recipient.name}</span> ({msg.recipient.email})
-          </p>
-        </div>
+      console.log('📡 Fetching thread messages from:', apiUrl);
 
-        {/* Reply (if resolved) */}
-        {isResolved && msg.reply && (
-          <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
-            <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">Reply:</p>
-            <p className="text-sm text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">
-              {msg.reply.text}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-              Replied at: {new Date(msg.reply.timestamp).toLocaleString()}
-            </p>
-          </div>
-        )}
-      </div>
-    );
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('✅ Thread messages received:', {
+        success: response.data.success,
+        messageCount: response.data.messages?.length || 0,
+        messages: response.data.messages
+      });
+
+      setThreadMessages(response.data.messages || []);
+
+      if (!response.data.messages || response.data.messages.length === 0) {
+        console.warn('⚠️ No messages returned from backend for thread:', msg.threadTs);
+      }
+    } catch (err) {
+      console.error('❌ Error loading thread:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setThreadMessages([]);
+
+      // Show error to user
+      setError(`Failed to load thread: ${err.response?.data?.message || err.message}`);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setLoadingThread(false);
+    }
+  };
+
+  const closeThreadModal = () => {
+    setSelectedThread(null);
+    setThreadMessages([]);
+  };
+
+  const handleMarkAsResolved = async (messageId, event) => {
+    // Stop propagation to prevent opening thread modal
+    event.stopPropagation();
+
+    try {
+      console.log('🗑️ Marking message as resolved:', messageId);
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/slack/kyc-messages/${messageId}/resolve`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        console.log('✅ Message marked as resolved successfully');
+
+        // Update local state
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, status: 'resolved' }
+            : msg
+        ));
+      }
+
+      // Handle legacy message deletion
+      if (response.data.deleted) {
+        console.log('🧹 Legacy message deleted, removing from list');
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+        setError('Legacy message removed. Please use the new format for future messages.');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err) {
+      console.error('❌ Error marking message as resolved:', err);
+
+      // Handle legacy message deletion response
+      if (err.response?.data?.deleted) {
+        console.log('🧹 Legacy message deleted, removing from list');
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+        setError(err.response.data.message || 'Legacy message removed.');
+        setTimeout(() => setError(''), 5000);
+      } else {
+        setError(err.response?.data?.message || 'Failed to mark message as resolved');
+        setTimeout(() => setError(''), 5000);
+      }
+    }
+  };
+
+  const filteredMessages = messages.filter(msg => {
+    // Resolved messages are ONLY shown when explicitly filtered for 'resolved'
+    if (msg.status === 'resolved' && filterStatus !== 'resolved') {
+      return false;
+    }
+
+    // If 'all' is selected, show pending and answered (resolved already filtered out above)
+    if (filterStatus === 'all') {
+      const matchesSearch = !searchQuery ||
+        msg.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        msg.text.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    }
+
+    // Otherwise, match the specific filter
+    const matchesFilter = msg.status === filterStatus;
+    const matchesSearch = !searchQuery ||
+      msg.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      msg.text.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const stats = {
+    total: messages.length,
+    pending: messages.filter(m => m.status === 'pending').length,
+    answered: messages.filter(m => m.status === 'answered').length,
+    resolved: messages.filter(m => m.status === 'resolved').length
   };
 
   if (checkingAccess) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-3">
-          <Loader className="animate-spin text-gray-600 dark:text-neutral-400" size={32} />
-          <p className="text-sm text-gray-600 dark:text-neutral-400">Checking Slack connection...</p>
+          <Loader className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Checking Slack connection...</p>
         </div>
       </div>
     );
@@ -309,15 +494,15 @@ const KYC = () => {
 
   if (!slackConnected) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="text-red-600 dark:text-red-400 flex-shrink-0" size={24} />
-            <div>
-              <h3 className="text-lg font-bold text-red-700 dark:text-red-300 mb-2">
-                Slack Not Connected
-              </h3>
-              <p className="text-sm text-red-600 dark:text-red-400 mb-4">
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-md w-full rounded-lg border bg-card p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="rounded-full bg-destructive/10 p-2 flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold mb-2">Slack Not Connected</h3>
+              <p className="text-sm text-muted-foreground mb-4">
                 {error || 'You need to connect your Slack account to use this feature.'}
               </p>
               <button
@@ -325,7 +510,7 @@ const KYC = () => {
                   localStorage.clear();
                   window.location.href = '/login';
                 }}
-                className="px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-md hover:bg-red-700 dark:hover:bg-red-600 transition-colors text-sm"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
               >
                 Log Out and Reconnect
               </button>
@@ -337,70 +522,398 @@ const KYC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <CheckCircle className="text-green-600 dark:text-green-400" size={28} />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-neutral-50">
-              KYC Management
-            </h1>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-neutral-400">
-            Send KYC requests and track responses via Slack
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card sticky top-0 z-10">
+        <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">KYC Management</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Accelerated verification requests
+              </p>
+            </div>
 
-        {/* Error Message */}
+            {/* Stats */}
+            <div className="flex gap-3 sm:gap-6 justify-around sm:justify-end">
+              <div className="text-center">
+                <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl sm:text-2xl font-bold text-amber-600">{stats.pending}</div>
+                <div className="text-xs text-muted-foreground">Pending</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.answered}</div>
+                <div className="text-xs text-muted-foreground">Answered</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl sm:text-2xl font-bold text-emerald-600">{stats.resolved}</div>
+                <div className="text-xs text-muted-foreground">Resolved</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* Error Alert */}
         {error && (
-          <div className="mb-4 px-4 py-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="text-red-600 dark:text-red-400 flex-shrink-0" size={18} />
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <div className="mb-4 sm:mb-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive flex-1 min-w-0 break-words">{error}</p>
             </div>
           </div>
         )}
 
-        {/* Message Input */}
-        <form onSubmit={handleSendMessage} className="mb-6">
-          <div className="flex gap-3">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your KYC request message here..."
-              className="flex-1 px-4 py-3 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 resize-none"
-              rows={3}
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !message.trim()}
-              className="px-6 py-3 bg-gray-900 dark:bg-neutral-50 text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-neutral-200 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 self-end"
-            >
-              {loading ? (
-                <Loader className="animate-spin" size={18} />
-              ) : (
-                <Send size={18} />
-              )}
-              Send
-            </button>
-          </div>
-        </form>
+        {/* Main Grid */}
+        <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
+          {/* Left Panel - Request Form */}
+          <div className="lg:col-span-2">
+            <div className="lg:sticky lg:top-24 rounded-lg border bg-card p-4 sm:p-6 shadow-sm">
+              <h2 className="text-lg font-semibold mb-4 sm:mb-6">New Request</h2>
 
-        {/* Messages List */}
-        <div className="space-y-4 max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
-          {messages.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-neutral-400">
-              <CheckCircle size={48} className="mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No messages yet. Send your first KYC request above!</p>
+              <form onSubmit={handleSendMessage} className="space-y-4 sm:space-y-5">
+                {/* Username Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter customer username"
+                      className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {/* Thread Detection */}
+                  {checkingThread && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader className="h-3 w-3 animate-spin" />
+                      Checking for existing conversation...
+                    </div>
+                  )}
+
+                  {existingThread && (
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
+                      <div className="flex items-start gap-2">
+                        <History className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                            Existing Thread Found
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                            This message will continue the existing conversation
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Message Textarea */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">
+                    Message
+                  </label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Describe the verification issue or request..."
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading || !message.trim() || !username.trim()}
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
+                >
+                  {loading ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Request
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
-          ) : (
-            messages.map(msg => renderMessageCard(msg))
-          )}
-          <div ref={messagesEndRef} />
+          </div>
+
+          {/* Right Panel - Messages Feed */}
+          <div className="lg:col-span-3">
+            {/* Filter Bar */}
+            <div className="mb-4 sm:mb-6 rounded-lg border bg-card p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by username or message..."
+                    className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-full sm:w-auto"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="answered">Answered</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Messages List */}
+            <div className="space-y-3 sm:space-y-4 max-h-[calc(100vh-320px)] sm:max-h-[calc(100vh-280px)] overflow-y-auto pr-1 sm:pr-2">
+              {filteredMessages.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-card p-8 sm:p-12 text-center">
+                  <MessageSquare className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3 sm:mb-4" />
+                  <h3 className="font-medium mb-2 text-sm sm:text-base">
+                    {searchQuery || filterStatus !== 'all'
+                      ? 'No messages found'
+                      : 'No messages yet'
+                    }
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    {searchQuery || filterStatus !== 'all'
+                      ? 'Try adjusting your filters'
+                      : 'Send your first KYC request to get started'
+                    }
+                  </p>
+                </div>
+              ) : (
+                filteredMessages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className="rounded-lg border bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-all relative group"
+                  >
+                    {/* X Button - absolute positioned in top-right */}
+                    <button
+                      onClick={(e) => handleMarkAsResolved(msg.id, e)}
+                      className="absolute top-3 right-3 rounded-full p-1.5 bg-background border border-input hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors opacity-0 group-hover:opacity-100 z-10"
+                      title="Mark as resolved"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Card content - clickable */}
+                    <div onClick={() => openThreadModal(msg)} className="cursor-pointer">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3 sm:mb-4 gap-3 pr-8">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                          <div className="rounded-full bg-primary/10 p-1.5 sm:p-2 flex-shrink-0">
+                            <User className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-sm sm:text-base truncate">{msg.username}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {msg.status === 'pending' && (
+                                <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950 px-2 py-0.5 sm:py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                  <Clock className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                  Pending
+                                </span>
+                              )}
+                              {msg.status === 'answered' && (
+                                <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-950 px-2 py-0.5 sm:py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+                                  <CheckCircle className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                  Answered
+                                </span>
+                              )}
+                              {msg.status === 'resolved' && (
+                                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 sm:py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                  <CheckCircle className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                  Resolved
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground flex-shrink-0">
+                          <div className="hidden sm:block">{new Date(msg.sentAt).toLocaleDateString()}</div>
+                          <div>{new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+
+                      {/* Message Text */}
+                      <div className="mb-3 sm:mb-4">
+                        <p className="text-sm leading-relaxed line-clamp-3">
+                          {msg.text}
+                        </p>
+                      </div>
+
+                      {/* Reply Preview */}
+                      {(msg.status === 'answered' || msg.status === 'resolved') && msg.reply && (
+                        <div className="pt-3 sm:pt-4 border-t">
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <div className="rounded-full bg-emerald-100 dark:bg-emerald-950 p-1 sm:p-1.5 flex-shrink-0">
+                              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                KYC Agent Response
+                              </p>
+                              <p className="text-sm leading-relaxed line-clamp-2">
+                                {msg.reply.text}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Click to view thread indicator */}
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Click to view full thread</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Thread Modal */}
+      {selectedThread && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div className="relative w-full max-w-3xl rounded-lg border bg-card shadow-lg">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b p-4 sm:p-6">
+                  <div className="min-w-0 flex-1 pr-4">
+                    <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 flex-shrink-0" />
+                      <span className="truncate">Thread for {selectedThread.username}</span>
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {new Date(selectedThread.sentAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={closeThreadModal}
+                    className="rounded-md p-2 hover:bg-accent transition-colors flex-shrink-0"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto">
+                  {loadingThread ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* All Thread Messages from Slack */}
+                      {threadMessages.length > 0 ? (
+                        threadMessages.map((threadMsg, idx) => {
+                          const isFromOurApp = threadMsg.isFromOurApp;
+                          const isInitial = threadMsg.isInitial || idx === 0;
+
+                          return (
+                            <div
+                              key={idx}
+                              className={`rounded-lg border p-4 ${
+                                isFromOurApp
+                                  ? 'bg-muted/50'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/20'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className={`rounded-full p-2 flex-shrink-0 ${
+                                  isFromOurApp
+                                    ? 'bg-primary/10'
+                                    : 'bg-emerald-100 dark:bg-emerald-950'
+                                }`}>
+                                  {isFromOurApp ? (
+                                    <User className="h-4 w-4 text-primary" />
+                                  ) : (
+                                    <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm">
+                                    {threadMsg.userName}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {new Date(threadMsg.timestamp).toLocaleString()}
+                                  </div>
+                                  <div className="mt-1">
+                                    {isInitial && (
+                                      <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-950 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 mr-2">
+                                        Initial Request
+                                      </span>
+                                    )}
+                                    {isFromOurApp ? (
+                                      <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                                        Customer Support
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                        KYC Agent
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                {threadMsg.text}
+                              </p>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        !loadingThread && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No messages in this thread</p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="border-t p-4 sm:p-6 flex justify-end">
+                  <button
+                    onClick={closeThreadModal}
+                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
