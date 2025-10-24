@@ -72,9 +72,36 @@ const KYC = () => {
 
     socket.on('connect', () => {
       console.log('✅ Socket.io connected:', socket.id);
-      const userId = localStorage.getItem('userId');
+
+      // Get userId from localStorage or extract from JWT token
+      let userId = localStorage.getItem('userId');
+
+      if (!userId) {
+        // Try to extract userId from JWT token
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            const payload = JSON.parse(jsonPayload);
+            userId = payload.id;
+            console.log('📝 Extracted userId from JWT token:', userId);
+            // Save it for next time
+            localStorage.setItem('userId', userId);
+          } catch (err) {
+            console.error('❌ Failed to extract userId from token:', err);
+          }
+        }
+      }
+
       if (userId) {
         socket.emit('authenticate', { userId });
+        console.log('🔐 Authenticated with userId:', userId);
+      } else {
+        console.warn('⚠️ No userId found - Socket.io authentication may fail');
       }
     });
 
