@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Settings } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -34,12 +34,122 @@ const WrapperElement = ({
   const wrapperRef = useRef(null);
   const resizeStartRef = useRef(null);
   const viewportScaleRef = useRef(viewportScale);
+  const positionRef = useRef(position);
+  const dimensionsRef = useRef(dimensions);
   const BORDER_ZONE = 10; // 10px border zone for dragging
 
-  // Update scale ref when it changes
+  // Update refs when they change
   useEffect(() => {
     viewportScaleRef.current = viewportScale;
   }, [viewportScale]);
+
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    dimensionsRef.current = dimensions;
+  }, [dimensions]);
+
+  // Handle resize move - memoized to ensure stable event listener reference
+  const handleResizeMove = useCallback((e) => {
+    if (!resizeStartRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const { startX, startY, startWidth, startHeight, startPosX, startPosY, direction } = resizeStartRef.current;
+
+    // Apply viewport scale to mouse delta to get canvas coordinates
+    const currentScale = viewportScaleRef.current;
+    const deltaX = (e.clientX - startX) / currentScale;
+    const deltaY = (e.clientY - startY) / currentScale;
+
+    console.log('📐 Resize move:', {
+      mousePos: { x: e.clientX, y: e.clientY },
+      delta: { x: deltaX, y: deltaY },
+      currentScale
+    });
+
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newPosX = startPosX;
+    let newPosY = startPosY;
+
+    // East: expand right
+    if (direction.includes('e')) {
+      newWidth = Math.max(200, startWidth + deltaX);
+    }
+
+    // West: expand left (move position and increase width)
+    if (direction.includes('w')) {
+      const widthChange = Math.min(deltaX, startWidth - 200); // Don't shrink below 200
+      newWidth = Math.max(200, startWidth - deltaX);
+      newPosX = startPosX + (startWidth - newWidth); // Move position to keep right edge fixed
+    }
+
+    // South: expand down
+    if (direction.includes('s')) {
+      newHeight = Math.max(150, startHeight + deltaY);
+    }
+
+    // North: expand up (move position and increase height)
+    if (direction.includes('n')) {
+      const heightChange = Math.min(deltaY, startHeight - 150); // Don't shrink below 150
+      newHeight = Math.max(150, startHeight - deltaY);
+      newPosY = startPosY + (startHeight - newHeight); // Move position to keep bottom edge fixed
+    }
+
+    console.log('📊 New dimensions:', { newWidth, newHeight, newPosX, newPosY });
+
+    setDimensions({ width: newWidth, height: newHeight });
+    setPosition({ x: newPosX, y: newPosY });
+
+    console.log('✅ State updated with new dimensions');
+  }, []); // Empty deps because we use refs for all dynamic values
+
+  // Handle resize end - memoized to ensure stable event listener reference
+  const handleResizeEnd = useCallback(() => {
+    console.log('🏁 Resize ended');
+
+    setIsResizing(false);
+    resizeStartRef.current = null;
+
+    // Re-enable canvas panning
+    const event = new CustomEvent('disablePanning', { detail: false });
+    window.dispatchEvent(event);
+
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+
+    // Use refs to get the latest values
+    const currentPosition = positionRef.current;
+    const currentDimensions = dimensionsRef.current;
+
+    // Calculate which elements are now inside the wrapper
+    const updatedWrapper = {
+      ...element,
+      position: { ...element.position, x: currentPosition.x, y: currentPosition.y },
+      dimensions: currentDimensions
+    };
+    const childElementIds = getElementsInsideWrapper(updatedWrapper, allElements);
+
+    console.log('📦 Wrapper updated:', {
+      position: currentPosition,
+      dimensions: currentDimensions,
+      childElements: childElementIds.length
+    });
+
+    // Save updated position, dimensions, and child elements
+    if (onUpdate) {
+      onUpdate({
+        ...updatedWrapper,
+        content: {
+          ...element.content,
+          childElements: childElementIds
+        }
+      });
+    }
+  }, [handleResizeMove, element, allElements, onUpdate]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
@@ -94,92 +204,6 @@ const WrapperElement = ({
     console.log('🎬 Event listeners attached - ready for resize');
   };
 
-  const handleResizeMove = (e) => {
-    if (!resizeStartRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const { startX, startY, startWidth, startHeight, startPosX, startPosY, direction } = resizeStartRef.current;
-
-    // Apply viewport scale to mouse delta to get canvas coordinates
-    const currentScale = viewportScaleRef.current;
-    const deltaX = (e.clientX - startX) / currentScale;
-    const deltaY = (e.clientY - startY) / currentScale;
-
-    console.log('📐 Resize move:', {
-      mousePos: { x: e.clientX, y: e.clientY },
-      delta: { x: deltaX, y: deltaY },
-      currentScale
-    });
-
-    let newWidth = startWidth;
-    let newHeight = startHeight;
-    let newPosX = startPosX;
-    let newPosY = startPosY;
-
-    // East: expand right
-    if (direction.includes('e')) {
-      newWidth = Math.max(200, startWidth + deltaX);
-    }
-
-    // West: expand left (move position and increase width)
-    if (direction.includes('w')) {
-      const widthChange = Math.min(deltaX, startWidth - 200); // Don't shrink below 200
-      newWidth = Math.max(200, startWidth - deltaX);
-      newPosX = startPosX + (startWidth - newWidth); // Move position to keep right edge fixed
-    }
-
-    // South: expand down
-    if (direction.includes('s')) {
-      newHeight = Math.max(150, startHeight + deltaY);
-    }
-
-    // North: expand up (move position and increase height)
-    if (direction.includes('n')) {
-      const heightChange = Math.min(deltaY, startHeight - 150); // Don't shrink below 150
-      newHeight = Math.max(150, startHeight - deltaY);
-      newPosY = startPosY + (startHeight - newHeight); // Move position to keep bottom edge fixed
-    }
-
-    console.log('📊 New dimensions:', { newWidth, newHeight, newPosX, newPosY });
-
-    setDimensions({ width: newWidth, height: newHeight });
-    setPosition({ x: newPosX, y: newPosY });
-
-    console.log('✅ State updated with new dimensions');
-  };
-
-  const handleResizeEnd = () => {
-    setIsResizing(false);
-    resizeStartRef.current = null;
-
-    // Re-enable canvas panning
-    const event = new CustomEvent('disablePanning', { detail: false });
-    window.dispatchEvent(event);
-
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-
-    // Calculate which elements are now inside the wrapper
-    const updatedWrapper = {
-      ...element,
-      position: { ...element.position, x: position.x, y: position.y },
-      dimensions: dimensions
-    };
-    const childElementIds = getElementsInsideWrapper(updatedWrapper, allElements);
-
-    // Save updated position, dimensions, and child elements
-    if (onUpdate) {
-      onUpdate({
-        ...updatedWrapper,
-        content: {
-          ...element.content,
-          childElements: childElementIds
-        }
-      });
-    }
-  };
-
   // Sync state with element props when they change externally (e.g., from drag)
   // BUT NOT during resize to avoid overwriting local state
   useEffect(() => {
@@ -209,13 +233,13 @@ const WrapperElement = ({
     setIsInBorderZone(inBorder);
   };
 
-  // Cleanup event listeners
+  // Cleanup event listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handleResizeMove);
       document.removeEventListener('mouseup', handleResizeEnd);
     };
-  }, []);
+  }, [handleResizeMove, handleResizeEnd]);
 
   const handleDelete = () => {
     setShowDeleteDialog(true);
@@ -330,44 +354,44 @@ const WrapperElement = ({
             <>
               {/* Corner handles - larger for easier grabbing */}
               <div
-                className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize hover:scale-125 transition-transform"
+                className="absolute -bottom-2 -right-2 w-6 h-6 bg-blue-500 rounded-full cursor-se-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'se')}
               />
               <div
-                className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full cursor-ne-resize hover:scale-125 transition-transform"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full cursor-ne-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'ne')}
               />
               <div
-                className="absolute -bottom-1 -left-1 w-4 h-4 bg-blue-500 rounded-full cursor-sw-resize hover:scale-125 transition-transform"
+                className="absolute -bottom-2 -left-2 w-6 h-6 bg-blue-500 rounded-full cursor-sw-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'sw')}
               />
               <div
-                className="absolute -top-1 -left-1 w-4 h-4 bg-blue-500 rounded-full cursor-nw-resize hover:scale-125 transition-transform"
+                className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full cursor-nw-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'nw')}
               />
 
               {/* Edge handles - wider for easier grabbing */}
               <div
-                className="absolute top-0 right-0 w-2 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+                className="absolute top-0 right-0 w-3 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'e')}
               />
               <div
-                className="absolute top-0 left-0 w-2 h-full cursor-w-resize hover:bg-blue-500/20 transition-colors"
+                className="absolute top-0 left-0 w-3 h-full cursor-w-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'w')}
               />
               <div
-                className="absolute bottom-0 left-0 w-full h-2 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+                className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 's')}
               />
               <div
-                className="absolute top-0 left-0 w-full h-2 cursor-n-resize hover:bg-blue-500/20 transition-colors"
+                className="absolute top-0 left-0 w-full h-3 cursor-n-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'n')}
               />
