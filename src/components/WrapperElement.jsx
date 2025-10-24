@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Settings } from 'lucide-react';
+import { X, List } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useTheme } from '../context/ThemeContext';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
+import WrapperElementList from './WrapperElementList';
 import { getElementsInsideWrapper } from '../utils/wrapperUtils';
 
 const WrapperElement = ({
@@ -21,6 +22,7 @@ const WrapperElement = ({
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showElementList, setShowElementList] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isInBorderZone, setIsInBorderZone] = useState(false);
   const [dimensions, setDimensions] = useState({
@@ -64,12 +66,6 @@ const WrapperElement = ({
     const deltaX = (e.clientX - startX) / currentScale;
     const deltaY = (e.clientY - startY) / currentScale;
 
-    console.log('📐 Resize move:', {
-      mousePos: { x: e.clientX, y: e.clientY },
-      delta: { x: deltaX, y: deltaY },
-      currentScale
-    });
-
     let newWidth = startWidth;
     let newHeight = startHeight;
     let newPosX = startPosX;
@@ -99,18 +95,12 @@ const WrapperElement = ({
       newPosY = startPosY + (startHeight - newHeight); // Move position to keep bottom edge fixed
     }
 
-    console.log('📊 New dimensions:', { newWidth, newHeight, newPosX, newPosY });
-
     setDimensions({ width: newWidth, height: newHeight });
     setPosition({ x: newPosX, y: newPosY });
-
-    console.log('✅ State updated with new dimensions');
   }, []); // Empty deps because we use refs for all dynamic values
 
   // Handle resize end - memoized to ensure stable event listener reference
   const handleResizeEnd = useCallback(() => {
-    console.log('🏁 Resize ended');
-
     setIsResizing(false);
     resizeStartRef.current = null;
 
@@ -132,12 +122,6 @@ const WrapperElement = ({
       dimensions: currentDimensions
     };
     const childElementIds = getElementsInsideWrapper(updatedWrapper, allElements);
-
-    console.log('📦 Wrapper updated:', {
-      position: currentPosition,
-      dimensions: currentDimensions,
-      childElements: childElementIds.length
-    });
 
     // Save updated position, dimensions, and child elements
     if (onUpdate) {
@@ -177,13 +161,6 @@ const WrapperElement = ({
     e.preventDefault();
     setIsResizing(true);
 
-    console.log('🎯 Resize started:', {
-      direction,
-      viewportScale,
-      startDimensions: dimensions,
-      startPosition: position
-    });
-
     resizeStartRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -200,8 +177,6 @@ const WrapperElement = ({
 
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('mouseup', handleResizeEnd);
-
-    console.log('🎬 Event listeners attached - ready for resize');
   };
 
   // Sync state with element props when they change externally (e.g., from drag)
@@ -231,6 +206,50 @@ const WrapperElement = ({
     );
 
     setIsInBorderZone(inBorder);
+  };
+
+  // Handle click on wrapper
+  const handleWrapperClick = (e) => {
+    if (!canEdit || isResizing) return;
+
+    // Check if we clicked on the wrapper background itself
+    const clickedOnWrapper = (e.target === e.currentTarget || e.target === wrapperRef.current);
+
+    if (!clickedOnWrapper) {
+      // Clicked on a button or handle, don't interfere
+      return;
+    }
+
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const inBorder = (
+      mouseX < BORDER_ZONE ||
+      mouseX > rect.width - BORDER_ZONE ||
+      mouseY < BORDER_ZONE ||
+      mouseY > rect.height - BORDER_ZONE
+    );
+
+    // If not highlighted and not in border zone - don't stop propagation, let canvas handle it
+    if (!isHighlighted && !inBorder) {
+      // Don't stop propagation - let click go through to canvas
+      return;
+    }
+
+    // If highlighted but clicked in center (not border) - deselect
+    if (isHighlighted && !inBorder) {
+      e.stopPropagation(); // Stop propagation to prevent canvas interaction
+      onMouseLeave?.();
+      return;
+    }
+
+    // If in border zone - stop propagation (we're interacting with wrapper)
+    if (inBorder) {
+      e.stopPropagation();
+    }
   };
 
   // Cleanup event listeners on unmount
@@ -263,6 +282,7 @@ const WrapperElement = ({
           setIsInBorderZone(false);
         }}
         onMouseMove={handleMouseMove}
+        onClick={handleWrapperClick}
         className={`
           group
           ${isHighlighted ? 'ring-2 ring-blue-500' : ''}
@@ -315,19 +335,19 @@ const WrapperElement = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSettingsClick?.(element);
+                  setShowElementList(true);
                 }}
                 className={`
                   p-1 rounded
                   ${isDarkMode
-                    ? 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-                    : 'bg-white hover:bg-gray-100 text-gray-700'
+                    ? 'bg-blue-900/50 hover:bg-blue-900/70 text-blue-300'
+                    : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
                   }
                   transition-colors
                 `}
-                title="Wrapper Settings"
+                title="Manage Elements"
               >
-                <Settings size={14} />
+                <List size={14} />
               </button>
               <button
                 onClick={(e) => {
@@ -421,6 +441,15 @@ const WrapperElement = ({
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={confirmDelete}
         elementType="wrapper"
+      />
+
+      {/* Element List Modal */}
+      <WrapperElementList
+        isOpen={showElementList}
+        onClose={() => setShowElementList(false)}
+        wrapper={element}
+        allElements={allElements}
+        onUpdate={onUpdate}
       />
     </>
   );
