@@ -9,6 +9,7 @@ import TextFormattingDock from './TextFormattingDock';
 import CanvasSearchBar from './CanvasSearchBar';
 import ViewModeDropdown from './ViewModeDropdown';
 import DynamicGrid from './DynamicGrid';
+import PostView from './PostView';
 import { useTheme } from '../context/ThemeContext';
 import { useTextFormatting } from '../context/TextFormattingContext';
 import { getElementsInsideWrapper } from '../utils/wrapperUtils';
@@ -705,6 +706,20 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       }
     }
   }, [canvasElements]);
+
+  // If in post-view mode, render PostView instead of canvas
+  if (viewMode === 'post-view') {
+    const wrappers = canvasElements.filter(el => el.type === 'wrapper');
+    return (
+      <PostView
+        wrappers={wrappers}
+        allElements={canvasElements}
+        currentWorkspace={{ _id: workspaceId }}
+        onModeChange={onViewModeChange}
+        canEditContent={canEditContent}
+      />
+    );
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden">
