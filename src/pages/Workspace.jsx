@@ -26,8 +26,9 @@ const Workspace = () => {
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('workspaces');
   const [bookmarks, setBookmarks] = useState([]);
-  const [isViewMode, setIsViewMode] = useState(false);
+  const [viewMode, setViewMode] = useState('view'); // 'edit', 'view', or 'post-view'
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [lastAccessedElement, setLastAccessedElement] = useState(null);
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -110,11 +111,12 @@ const Workspace = () => {
     fetchBookmarks();
   }, []);
 
-  // Fetch and load view mode preference for current workspace
+  // Fetch and load view mode preference and lastAccessedElement for current workspace
   useEffect(() => {
-    const fetchViewModePreference = async () => {
+    const fetchWorkspacePreferences = async () => {
       if (!workspaceId || !workspace?.permissions?.canEditContent) {
-        setIsViewMode(true); // Force view mode if can't edit
+        setViewMode('view'); // Force view mode if can't edit
+        setLastAccessedElement(null);
         return;
       }
 
@@ -124,14 +126,16 @@ const Workspace = () => {
           `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setIsViewMode(response.data.viewMode === 'view');
+        setViewMode(response.data.viewMode || 'view');
+        setLastAccessedElement(response.data.lastAccessedElement || null);
       } catch (err) {
-        console.error('Error fetching view mode preference:', err);
-        setIsViewMode(true); // Default to view mode on error (no preference saved yet)
+        console.error('Error fetching workspace preferences:', err);
+        setViewMode('view'); // Default to view mode on error
+        setLastAccessedElement(null);
       }
     };
 
-    fetchViewModePreference();
+    fetchWorkspacePreferences();
   }, [workspaceId, workspace?.permissions?.canEditContent]);
 
   const handleElementUpdate = async (updatedElement) => {
@@ -316,20 +320,34 @@ const Workspace = () => {
     setBookmarks(prevBookmarks => [...prevBookmarks, newBookmark]);
   }, []);
 
-  const handleTitleClick = useCallback((element) => {
+  const handleTitleClick = useCallback(async (element) => {
     // Zoom to the title element
     const event = new CustomEvent('zoomToElement', { detail: element });
     window.dispatchEvent(event);
-  }, []);
 
-  const handleViewModeToggle = async (newViewMode) => {
-    setIsViewMode(newViewMode);
+    // Save as last accessed element
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+        { elementId: element._id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setLastAccessedElement(element._id);
+      console.log('Saved last accessed element:', element._id);
+    } catch (err) {
+      console.error('Error saving last accessed element:', err);
+    }
+  }, [workspaceId]);
+
+  const handleViewModeChange = async (newViewMode) => {
+    setViewMode(newViewMode);
 
     try {
       const token = localStorage.getItem('token');
       await axios.put(
         `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
-        { viewMode: newViewMode ? 'view' : 'edit' },
+        { viewMode: newViewMode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) {
@@ -380,25 +398,64 @@ const Workspace = () => {
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
 
     if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
-      // Find the latest title element (sorted by createdAt descending)
-      const titleElements = elements
-        .filter(el => el.type === 'title')
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      let targetElement = null;
 
-      const latestTitle = titleElements[0];
+      // First, try to find the lastAccessedElement if it exists
+      if (lastAccessedElement) {
+        targetElement = elements.find(el => el._id === lastAccessedElement);
+        if (targetElement && targetElement.type === 'title') {
+          console.log('Zooming to last accessed title:', targetElement);
+        } else {
+          // lastAccessedElement doesn't exist or is not a title anymore
+          targetElement = null;
+        }
+      }
 
-      if (latestTitle) {
+      // If no lastAccessedElement or it doesn't exist, fall back to latest title
+      if (!targetElement) {
+        const titleElements = elements
+          .filter(el => el.type === 'title')
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        targetElement = titleElements[0];
+        console.log('Zooming to latest title (fallback):', targetElement);
+      }
+
+      if (targetElement) {
         // Mark that we've zoomed to prevent re-triggering
         hasZoomedToLatestTitle.current = true;
 
-        // Trigger zoom to latest title after a short delay to ensure canvas is ready
+        // Trigger instant zoom (no animation) for initial workspace load
         setTimeout(() => {
-          const event = new CustomEvent('zoomToElement', { detail: latestTitle });
+          const event = new CustomEvent('zoomToElement', {
+            detail: {
+              ...targetElement,
+              instant: true // No animation for initial load
+            }
+          });
           window.dispatchEvent(event);
-        }, 500);
+        }, 100); // Reduced delay since we're not animating
+
+        // Save as last accessed element if it's not already the one we loaded
+        if (!lastAccessedElement || lastAccessedElement !== targetElement._id) {
+          const saveLastAccessed = async () => {
+            try {
+              const token = localStorage.getItem('token');
+              await axios.put(
+                `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+                { elementId: targetElement._id },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              setLastAccessedElement(targetElement._id);
+              console.log('Auto-saved last accessed element:', targetElement._id);
+            } catch (err) {
+              console.error('Error auto-saving last accessed element:', err);
+            }
+          };
+          saveLastAccessed();
+        }
       }
     }
-  }, [canvas, elements, switchingWorkspace]);
+  }, [canvas, elements, switchingWorkspace, lastAccessedElement]);
 
   // Auto-redirect to announcements workspace if access is denied
   useEffect(() => {
@@ -464,8 +521,8 @@ const Workspace = () => {
                 onElementCreate={handleElementCreate}
                 onElementDelete={handleElementDelete}
                 canEditContent={workspace?.permissions?.canEditContent}
-                isViewMode={isViewMode}
-                onViewModeToggle={handleViewModeToggle}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
                 workspaces={workspaces}
                 onElementNavigate={handleElementNavigate}
                 onBookmarkCreated={handleBookmarkCreated}
