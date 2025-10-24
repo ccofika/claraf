@@ -307,22 +307,39 @@ const KYC = () => {
         status: m.status
       })));
 
-      // Find all messages with matching threadTs
-      const matchingMessages = prev.filter(msg => {
-        const matches = msg.threadTs === data.threadTs;
-        console.log(`🔍 Comparing: msg.threadTs="${msg.threadTs}" vs data.threadTs="${data.threadTs}" => ${matches}`);
-        return matches;
-      });
+      // Try to find by messageId first (most precise)
+      let targetMessage = prev.find(msg => msg.id === data.messageId);
 
-      console.log(`✅ Found ${matchingMessages.length} message(s) with threadTs ${data.threadTs}`);
+      if (targetMessage) {
+        console.log('✅ Found message by messageId:', {
+          id: targetMessage.id,
+          username: targetMessage.username,
+          status: targetMessage.status
+        });
+      } else {
+        console.log('⚠️ Message not found by messageId, trying threadTs...');
 
-      if (matchingMessages.length === 0) {
-        console.warn('⚠️ No matching messages found! Thread reply will not update any cards.');
-        return prev; // No changes
+        // Fallback: Find LATEST pending message with matching threadTs
+        const messagesInThread = prev.filter(msg => msg.threadTs === data.threadTs);
+        targetMessage = messagesInThread
+          .filter(msg => msg.status === 'pending')
+          .sort((a, b) => b.sentAt - a.sentAt)[0];
+
+        if (targetMessage) {
+          console.log('✅ Found LATEST pending message in thread:', {
+            id: targetMessage.id,
+            username: targetMessage.username,
+            status: targetMessage.status
+          });
+        } else {
+          console.warn('⚠️ No pending message found in thread! Thread reply will not update any cards.');
+          return prev;
+        }
       }
 
+      // Update the specific message
       const updated = prev.map(msg => {
-        if (msg.threadTs === data.threadTs) {
+        if (msg.id === targetMessage.id) {
           console.log('✅ Updating message to answered:', {
             id: msg.id,
             username: msg.username,
