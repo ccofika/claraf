@@ -508,6 +508,7 @@ const Workspace = () => {
           onSectionChange={setActiveSection}
           onCollapsedChange={setIsSidebarCollapsed}
           onRefreshWorkspaces={fetchAllWorkspaces}
+          viewMode={viewMode}
         />
 
         {/* Main Content */}
@@ -527,11 +528,14 @@ const Workspace = () => {
                 onElementNavigate={handleElementNavigate}
                 onBookmarkCreated={handleBookmarkCreated}
               />
-              <TitleNavigation
-                elements={elements}
-                onTitleClick={handleTitleClick}
-                isSidebarCollapsed={isSidebarCollapsed}
-              />
+              {/* Hide TitleNavigation in post-view mode */}
+              {viewMode !== 'post-view' && (
+                <TitleNavigation
+                  elements={elements}
+                  onTitleClick={handleTitleClick}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+              )}
             </>
           )}
           {activeSection === 'vip-calculator' && (

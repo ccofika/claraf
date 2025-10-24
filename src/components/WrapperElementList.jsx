@@ -81,9 +81,27 @@ const WrapperElementList = ({ isOpen, onClose, wrapper, allElements, onUpdate })
   // Get element content text for display
   function getElementContentText(element) {
     if (!element.content) return 'Empty';
-    if (element.content.text) return element.content.text;
+
+    // For title and description elements (use value field)
+    if (element.content.value) {
+      const stripped = element.content.value.replace(/<[^>]*>/g, ''); // Strip HTML
+      return stripped || 'Empty';
+    }
+
+    // For macro elements (use title field)
     if (element.content.title) return element.content.title;
+
+    // For text/card elements
+    if (element.content.text) return element.content.text;
+
+    // For link elements
     if (element.content.url) return element.content.url;
+
+    // For example elements
+    if (element.content.examples && element.content.examples.length > 0) {
+      return element.content.examples[0].title || 'Example';
+    }
+
     return element.type || 'Element';
   }
 

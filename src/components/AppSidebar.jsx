@@ -676,7 +676,8 @@ export default function AppSidebar({
   activeSection,
   onSectionChange,
   onCollapsedChange,
-  onRefreshWorkspaces
+  onRefreshWorkspaces,
+  viewMode
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -688,8 +689,8 @@ export default function AppSidebar({
           onSectionChange={onSectionChange}
           onOpenProfile={() => setIsProfileOpen(true)}
         />
-        {/* Only show DetailSidebar when activeSection is 'workspaces' */}
-        {activeSection === 'workspaces' && (
+        {/* Only show DetailSidebar when activeSection is 'workspaces' and not in post-view mode */}
+        {activeSection === 'workspaces' && viewMode !== 'post-view' && (
           <DetailSidebar
             activeSection={activeSection}
             currentWorkspace={currentWorkspace}
