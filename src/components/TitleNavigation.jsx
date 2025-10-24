@@ -48,7 +48,7 @@ const TitleNavigation = ({ elements = [], onTitleClick, isSidebarCollapsed = fal
 
   return (
     <div
-      className="fixed bottom-8 right-[200px] z-40"
+      className="fixed bottom-4 right-[150px] z-40"
       style={{
         left: `${leftMargin}px`,
       }}
@@ -57,12 +57,12 @@ const TitleNavigation = ({ elements = [], onTitleClick, isSidebarCollapsed = fal
       <div
         ref={scrollContainerRef}
         onWheel={handleWheel}
-        className="title-navigation-scroll flex gap-2 overflow-x-auto overflow-y-hidden cursor-default"
+        className="title-navigation-scroll flex gap-1 overflow-x-auto overflow-y-hidden cursor-default"
         style={{
           scrollbarWidth: 'thin',
-          maxWidth: `calc(100vw - ${leftMargin}px - 200px - 32px)`, // viewport - left margin - minimap+margin - padding
+          maxWidth: `calc(100vw - ${leftMargin}px - 150px - 32px)`, // viewport - left margin - minimap+margin - padding
           scrollBehavior: 'smooth',
-          paddingBottom: '6px',
+          paddingBottom: '3px',
         }}
       >
         {titleElements.map((element) => (
@@ -71,9 +71,9 @@ const TitleNavigation = ({ elements = [], onTitleClick, isSidebarCollapsed = fal
             onClick={() => handleTitleClick(element)}
             className="
               flex-shrink-0
-              px-3 py-1.5
-              rounded-lg
-              text-xs font-medium
+              px-1.5 py-1
+              rounded-md
+              text-[10px] font-medium
               text-white
               bg-white/25
               border border-white/30

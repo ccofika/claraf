@@ -12,9 +12,9 @@ const Minimap = ({
   const { theme } = useTheme();
 
   // Minimap dimensions
-  const MINIMAP_WIDTH = 200;
-  const MINIMAP_HEIGHT = 150;
-  const PADDING = 10;
+  const MINIMAP_WIDTH = 150;
+  const MINIMAP_HEIGHT = 112;
+  const PADDING = 7;
   const ELEMENT_SCALE_FACTOR = 0.6; // Scale down elements to 60% of their actual size on minimap
 
   // Calculate bounds of all elements
@@ -218,7 +218,7 @@ const Minimap = ({
       <div
         ref={minimapRef}
         className={`
-          relative rounded-2xl
+          relative rounded-xl
           bg-black/40 dark:bg-black/40 backdrop-blur-xl
           border border-white/10
           shadow-2xl
@@ -246,8 +246,8 @@ const Minimap = ({
             height={contentHeight}
             fill={theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'}
             stroke={theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}
-            strokeWidth="1"
-            rx="4"
+            strokeWidth="0.75"
+            rx="3"
           />
 
           {/* Elements or Empty State */}
@@ -275,8 +275,8 @@ const Minimap = ({
                   height={displayHeight}
                   fill={theme === 'dark' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}
                   stroke={theme === 'dark' ? 'rgba(59, 130, 246, 0.7)' : 'rgba(59, 130, 246, 0.6)'}
-                  strokeWidth="0.5"
-                  rx="1"
+                  strokeWidth="0.75"
+                  rx="1.5"
                 />
               );
             })
@@ -286,17 +286,17 @@ const Minimap = ({
               <circle
                 cx={MINIMAP_WIDTH / 2}
                 cy={MINIMAP_HEIGHT / 2}
-                r="3"
+                r="2"
                 fill={theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}
               />
               <circle
                 cx={MINIMAP_WIDTH / 2}
                 cy={MINIMAP_HEIGHT / 2}
-                r="8"
+                r="6"
                 fill="none"
                 stroke={theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}
-                strokeWidth="1"
-                strokeDasharray="2,2"
+                strokeWidth="0.75"
+                strokeDasharray="1.5,1.5"
               />
             </>
           )}
@@ -309,17 +309,17 @@ const Minimap = ({
             height={Math.min(viewportRect.height, MINIMAP_HEIGHT - PADDING * 2)}
             fill="rgba(59, 130, 246, 0.15)"
             stroke="rgba(59, 130, 246, 0.7)"
-            strokeWidth="1.5"
-            rx="3"
+            strokeWidth="1"
+            rx="2"
             className="pointer-events-none"
           />
         </svg>
 
         {/* Label and Element Count */}
-        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white/70 text-[10px] font-medium pointer-events-none">
+        <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-white/70 text-[9px] font-medium pointer-events-none">
           <span>Map</span>
           {elements && elements.length > 0 && (
-            <span className="bg-white/10 px-1.5 py-0.5 rounded">
+            <span className="bg-white/10 px-1.5 py-0.5 rounded text-[8px]">
               {elements.length}
             </span>
           )}

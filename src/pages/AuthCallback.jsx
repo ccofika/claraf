@@ -84,6 +84,12 @@ const AuthCallback = () => {
         setUser(response.data);
       }
 
+      // Store userId for Socket.io authentication
+      if (response.data._id) {
+        console.log('💾 Storing userId in localStorage:', response.data._id);
+        localStorage.setItem('userId', response.data._id);
+      }
+
       // Redirect to announcements workspace
       const workspacesResponse = await axios.get(
         `${backendURL}/api/workspaces`,
@@ -129,6 +135,12 @@ const AuthCallback = () => {
   const handlePasswordSetupComplete = async (data) => {
     // Store token and user data
     localStorage.setItem('token', data.token);
+
+    // Store userId for Socket.io authentication
+    if (data._id) {
+      localStorage.setItem('userId', data._id);
+    }
+
     setUser({
       _id: data._id,
       name: data.name,

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Type, FileText, Wrench, BookOpen } from 'lucide-react';
+import { Type, FileText, Wrench, BookOpen, Box } from 'lucide-react';
 
 const DockBar = ({ onItemClick }) => {
   const [hoveredItem, setHoveredItem] = useState(null);
 
   const dockItems = [
-    { id: 'title', icon: <Type size={20} />, label: 'Title' },
-    { id: 'description', icon: <FileText size={20} />, label: 'Description' },
-    { id: 'macro', icon: <Wrench size={20} />, label: 'Macro' },
-    { id: 'example', icon: <BookOpen size={20} />, label: 'Example' },
+    { id: 'title', icon: <Type size={15} />, label: 'Title' },
+    { id: 'description', icon: <FileText size={15} />, label: 'Description' },
+    { id: 'macro', icon: <Wrench size={15} />, label: 'Macro' },
+    { id: 'example', icon: <BookOpen size={15} />, label: 'Example' },
+    { id: 'wrapper', icon: <Box size={15} />, label: 'Wrapper' },
   ];
 
   return (
@@ -17,8 +18,8 @@ const DockBar = ({ onItemClick }) => {
         {/* Dock Container */}
         <div
           className={`
-            flex flex-col items-center gap-3 px-4 py-6
-            rounded-2xl
+            flex flex-col items-center gap-2 px-3 py-4
+            rounded-xl
             bg-black/40 dark:bg-black/40 backdrop-blur-xl
             border border-white/10
             shadow-2xl
@@ -36,7 +37,7 @@ const DockBar = ({ onItemClick }) => {
               <div
                 className={`
                   relative flex items-center justify-center
-                  w-11 h-11 rounded-lg
+                  w-8 h-8 rounded-lg
                   bg-white/5 backdrop-blur-[2px]
                   border border-white/10
                   transition-all duration-300 ease-out
@@ -68,8 +69,8 @@ const DockBar = ({ onItemClick }) => {
               {/* Tooltip */}
               <div
                 className={`
-                  absolute right-full top-1/2 transform -translate-y-1/2 mr-3
-                  px-2.5 py-1 rounded-md
+                  absolute right-full top-1/2 transform -translate-y-1/2 mr-2
+                  px-2 py-0.5 rounded-md
                   bg-black/70 backdrop-blur
                   text-white text-xs font-normal
                   border border-white/5
@@ -85,7 +86,7 @@ const DockBar = ({ onItemClick }) => {
               >
                 {item.label}
                 <div className="absolute left-full top-1/2 transform -translate-y-1/2">
-                  <div className="w-2 h-2 bg-black/70 rotate-45 border-r border-b border-white/5"></div>
+                  <div className="w-1.5 h-1.5 bg-black/70 rotate-45 border-r border-b border-white/5"></div>
                 </div>
               </div>
             </div>
@@ -96,8 +97,8 @@ const DockBar = ({ onItemClick }) => {
         <div className="absolute left-full top-0 bottom-0 w-16 overflow-hidden">
           <div
             className={`
-              flex flex-col items-center gap-3 px-4 py-6
-              rounded-2xl
+              flex flex-col items-center gap-2 px-3 py-4
+              rounded-xl
               bg-black/20 backdrop-blur-xl
               border border-white/5
               opacity-30
