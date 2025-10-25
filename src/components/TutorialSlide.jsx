@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 
-const TutorialSlide = ({ title, description, videoPlaceholder, Icon }) => {
+const TutorialSlide = ({ title, description, videoPlaceholder, Icon, videoSrc }) => {
   return (
     <div className="flex w-full h-full items-center justify-center gap-12 px-20 animate-in fade-in duration-700">
       {/* Description Panel - Floating (40% width) */}
@@ -31,9 +31,19 @@ const TutorialSlide = ({ title, description, videoPlaceholder, Icon }) => {
       </div>
 
       {/* Video Panel - Floating (60% width) - Square-ish aspect ratio */}
-      <div className="w-[60%] h-full flex items-center justify-center p-[5%] animate-in slide-in-from-right duration-700 delay-100">
+      <div className="w-[60%] h-full flex items-center justify-center animate-in slide-in-from-right duration-700 delay-100">
         <div className="w-full h-full flex items-center justify-center">
-          {videoPlaceholder ? (
+          {videoSrc ? (
+            // Display actual video - autoplay, loop, muted
+            <video
+              src={videoSrc}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-contain"
+            />
+          ) : videoPlaceholder ? (
             <div className="text-center space-y-6 flex flex-col items-center animate-in fade-in zoom-in-50 duration-600 delay-500">
               <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 transition-all duration-300 hover:bg-white/20 hover:scale-110 group">
                 <Play className="w-12 h-12 text-white/80 transition-all duration-300 group-hover:text-white group-hover:scale-110" fill="currentColor" />

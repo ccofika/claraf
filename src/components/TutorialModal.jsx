@@ -35,7 +35,8 @@ In this quick tutorial, you'll learn:
 • KYC & Slack Integration for managing customer inquiries
 
 Let's get started! This tutorial takes just 3-4 minutes and will help you master all the essential features.`,
-      videoPlaceholder: "Dashboard Overview"
+      videoPlaceholder: "Dashboard Overview",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761413433/clara-tutorial/clara-tutorial/slide-1.mp4"
     },
     {
       title: "Dashboard & Workspaces",
@@ -197,6 +198,7 @@ Need help or have questions? Check the Public Workspace for company announcement
           description={slides[currentSlide].description}
           videoPlaceholder={slides[currentSlide].videoPlaceholder}
           Icon={slides[currentSlide].icon}
+          videoSrc={slides[currentSlide].videoSrc}
         />
       </div>
 
