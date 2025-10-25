@@ -24,7 +24,6 @@ const WrapperElement = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showElementList, setShowElementList] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [isInBorderZone, setIsInBorderZone] = useState(false);
   const [dimensions, setDimensions] = useState({
     width: element.dimensions.width || 400,
     height: element.dimensions.height || 300
@@ -137,7 +136,7 @@ const WrapperElement = ({
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
-    disabled: !canEdit || isResizing || !isInBorderZone, // Only drag from border zone
+    disabled: true, // Dragging is now handled by border zone divs
   });
 
   const style = {
@@ -148,8 +147,7 @@ const WrapperElement = ({
     width: `${dimensions.width}px`,
     height: `${dimensions.height}px`,
     zIndex: element.position.z || 1,
-    cursor: isDragging ? 'grabbing' : (isInBorderZone && canEdit ? 'grab' : 'default'),
-    pointerEvents: 'auto',
+    pointerEvents: 'none', // Allow clicks to pass through to elements inside wrapper
     touchAction: isResizing ? 'none' : 'auto',
     userSelect: 'none',
   };
@@ -188,70 +186,6 @@ const WrapperElement = ({
     }
   }, [element.position.x, element.position.y, element.dimensions.width, element.dimensions.height, isResizing]);
 
-  // Detect if mouse is in border zone for dragging
-  const handleMouseMove = (e) => {
-    if (!canEdit || isResizing) return;
-
-    const rect = wrapperRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const inBorder = (
-      mouseX < BORDER_ZONE ||
-      mouseX > rect.width - BORDER_ZONE ||
-      mouseY < BORDER_ZONE ||
-      mouseY > rect.height - BORDER_ZONE
-    );
-
-    setIsInBorderZone(inBorder);
-  };
-
-  // Handle click on wrapper
-  const handleWrapperClick = (e) => {
-    if (!canEdit || isResizing) return;
-
-    // Check if we clicked on the wrapper background itself
-    const clickedOnWrapper = (e.target === e.currentTarget || e.target === wrapperRef.current);
-
-    if (!clickedOnWrapper) {
-      // Clicked on a button or handle, don't interfere
-      return;
-    }
-
-    const rect = wrapperRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const inBorder = (
-      mouseX < BORDER_ZONE ||
-      mouseX > rect.width - BORDER_ZONE ||
-      mouseY < BORDER_ZONE ||
-      mouseY > rect.height - BORDER_ZONE
-    );
-
-    // If not highlighted and not in border zone - don't stop propagation, let canvas handle it
-    if (!isHighlighted && !inBorder) {
-      // Don't stop propagation - let click go through to canvas
-      return;
-    }
-
-    // If highlighted but clicked in center (not border) - deselect
-    if (isHighlighted && !inBorder) {
-      e.stopPropagation(); // Stop propagation to prevent canvas interaction
-      onMouseLeave?.();
-      return;
-    }
-
-    // If in border zone - stop propagation (we're interacting with wrapper)
-    if (inBorder) {
-      e.stopPropagation();
-    }
-  };
-
   // Cleanup event listeners on unmount
   useEffect(() => {
     return () => {
@@ -274,15 +208,6 @@ const WrapperElement = ({
       <div
         ref={setNodeRef}
         style={style}
-        {...attributes}
-        {...listeners}
-        onMouseEnter={() => onMouseEnter?.(element._id)}
-        onMouseLeave={() => {
-          onMouseLeave?.();
-          setIsInBorderZone(false);
-        }}
-        onMouseMove={handleMouseMove}
-        onClick={handleWrapperClick}
         className={`
           group
           ${isHighlighted ? 'ring-2 ring-blue-500' : ''}
@@ -301,8 +226,7 @@ const WrapperElement = ({
               : 'border-blue-500/60'
             }
             ${isHighlighted || isDragging || isResizing ? 'border-blue-500 border-solid' : ''}
-            ${isInBorderZone && canEdit && !isResizing ? 'bg-blue-500/5' : 'bg-transparent'}
-            ${isResizing ? 'bg-blue-500/10' : ''}
+            ${isResizing ? 'bg-blue-500/10' : 'bg-transparent'}
           `}
           style={{
             opacity: isDragging ? 0.5 : 1,
@@ -331,6 +255,8 @@ const WrapperElement = ({
               transition-opacity duration-200
             `}
             style={{ pointerEvents: 'auto' }}
+            onMouseEnter={() => onMouseEnter?.(element._id)}
+            onMouseLeave={() => onMouseLeave?.()}
             >
               <button
                 onClick={(e) => {
@@ -377,21 +303,29 @@ const WrapperElement = ({
                 className="absolute -bottom-2 -right-2 w-6 h-6 bg-blue-500 rounded-full cursor-se-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'se')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full cursor-ne-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'ne')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute -bottom-2 -left-2 w-6 h-6 bg-blue-500 rounded-full cursor-sw-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'sw')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full cursor-nw-resize hover:scale-125 transition-transform"
                 style={{ pointerEvents: 'auto', zIndex: 10 }}
                 onMouseDown={(e) => handleResizeStart(e, 'nw')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
 
               {/* Edge handles - wider for easier grabbing */}
@@ -399,21 +333,87 @@ const WrapperElement = ({
                 className="absolute top-0 right-0 w-3 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'e')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute top-0 left-0 w-3 h-full cursor-w-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'w')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 's')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
               <div
                 className="absolute top-0 left-0 w-full h-3 cursor-n-resize hover:bg-blue-500/20 transition-colors"
                 style={{ pointerEvents: 'auto', zIndex: 9 }}
                 onMouseDown={(e) => handleResizeStart(e, 'n')}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
+              />
+            </>
+          )}
+
+          {/* Border zones for dragging - transparent interactive areas on edges */}
+          {canEdit && !isDragging && !isResizing && (
+            <>
+              {/* Top border zone */}
+              <div
+                className="absolute top-0 left-0 right-0 cursor-grab hover:bg-blue-500/5"
+                style={{
+                  height: `${BORDER_ZONE}px`,
+                  pointerEvents: 'auto',
+                  zIndex: 11
+                }}
+                {...attributes}
+                {...listeners}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
+              />
+              {/* Bottom border zone */}
+              <div
+                className="absolute bottom-0 left-0 right-0 cursor-grab hover:bg-blue-500/5"
+                style={{
+                  height: `${BORDER_ZONE}px`,
+                  pointerEvents: 'auto',
+                  zIndex: 11
+                }}
+                {...attributes}
+                {...listeners}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
+              />
+              {/* Left border zone */}
+              <div
+                className="absolute top-0 left-0 bottom-0 cursor-grab hover:bg-blue-500/5"
+                style={{
+                  width: `${BORDER_ZONE}px`,
+                  pointerEvents: 'auto',
+                  zIndex: 11
+                }}
+                {...attributes}
+                {...listeners}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
+              />
+              {/* Right border zone */}
+              <div
+                className="absolute top-0 right-0 bottom-0 cursor-grab hover:bg-blue-500/5"
+                style={{
+                  width: `${BORDER_ZONE}px`,
+                  pointerEvents: 'auto',
+                  zIndex: 11
+                }}
+                {...attributes}
+                {...listeners}
+                onMouseEnter={() => onMouseEnter?.(element._id)}
+                onMouseLeave={() => onMouseLeave?.()}
               />
             </>
           )}

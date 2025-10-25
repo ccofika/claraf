@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import InfiniteCanvas from '../components/InfiniteCanvas';
 import AppSidebar from '../components/AppSidebar';
 import HashExplorerFinder from './HashExplorerFinder';
@@ -13,10 +14,13 @@ import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
 import TitleNavigation from '../components/TitleNavigation';
+import TutorialModal from '../components/TutorialModal';
 
 const Workspace = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [canvas, setCanvas] = useState(null);
@@ -36,6 +40,7 @@ const Workspace = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [workspaceToEdit, setWorkspaceToEdit] = useState(null);
   const [workspaceToManage, setWorkspaceToManage] = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const fetchAllWorkspaces = useCallback(async () => {
     try {
@@ -110,6 +115,14 @@ const Workspace = () => {
 
     fetchBookmarks();
   }, []);
+
+  // Check if user should see tutorial
+  useEffect(() => {
+    // Show tutorial only if user hasn't completed it and workspace is loaded
+    if (user && !user.tutorialCompleted && !loading) {
+      setShowTutorial(true);
+    }
+  }, [user, loading]);
 
   // Fetch and load view mode preference and lastAccessedElement for current workspace
   useEffect(() => {
@@ -341,7 +354,15 @@ const Workspace = () => {
   }, [workspaceId]);
 
   const handleViewModeChange = async (newViewMode) => {
+    const previousMode = viewMode;
     setViewMode(newViewMode);
+
+    // Reset zoom flag when switching between post-view and other modes
+    // This allows auto-centering to trigger when entering view/edit mode from post-view
+    if ((previousMode === 'post-view' && newViewMode !== 'post-view') ||
+        (previousMode !== 'post-view' && newViewMode === 'post-view')) {
+      hasZoomedToLatestTitle.current = false;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -381,12 +402,32 @@ const Workspace = () => {
 
   // Auto-zoom to latest title element when workspace loads (unless there's pending navigation)
   const hasZoomedToLatestTitle = React.useRef(false);
+
+  // Reset flag on component mount (handles page refresh)
   React.useEffect(() => {
-    // Reset the flag when workspace changes
+    hasZoomedToLatestTitle.current = false;
+  }, []);
+
+  // Reset flag when workspace changes (handles workspace switching)
+  React.useEffect(() => {
     if (workspaceId) {
       hasZoomedToLatestTitle.current = false;
     }
   }, [workspaceId]);
+
+  // Reset flag when location changes (handles page navigation)
+  React.useEffect(() => {
+    hasZoomedToLatestTitle.current = false;
+    console.log('Location changed, resetting zoom flag:', location.pathname);
+  }, [location.key]);
+
+  // Reset flag when returning to workspaces section (handles KYC, VIP Calculator, etc navigation)
+  React.useEffect(() => {
+    if (activeSection === 'workspaces') {
+      hasZoomedToLatestTitle.current = false;
+      console.log('Returned to workspaces section, resetting zoom flag');
+    }
+  }, [activeSection]);
 
   React.useEffect(() => {
     // Only zoom if:
@@ -395,9 +436,10 @@ const Workspace = () => {
     // 3. Elements are loaded
     // 4. Haven't zoomed yet for this workspace
     // 5. Not currently switching workspaces
+    // 6. Currently viewing workspaces section (not KYC, VIP Calculator, etc)
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
 
-    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
+    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current && activeSection === 'workspaces') {
       let targetElement = null;
 
       // First, try to find the lastAccessedElement if it exists
@@ -455,7 +497,7 @@ const Workspace = () => {
         }
       }
     }
-  }, [canvas, elements, switchingWorkspace, lastAccessedElement]);
+  }, [canvas, elements, switchingWorkspace, lastAccessedElement, viewMode, workspaceId, location.key, activeSection]);
 
   // Auto-redirect to announcements workspace if access is denied
   useEffect(() => {
@@ -591,6 +633,12 @@ const Workspace = () => {
         }}
         workspace={workspaceToManage}
         onWorkspaceUpdated={handleWorkspaceUpdated}
+      />
+
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onDontShowAgain={() => setShowTutorial(false)}
       />
     </>
   );
