@@ -59,26 +59,18 @@ const KYC = () => {
     });
 
     socket.on('connect', () => {
-      console.log('✅ Socket.io connected', {
-        socketId: socket.id,
-        connected: socket.connected,
-        transport: socket.io.engine.transport.name
-      });
-
       // Get JWT token from localStorage
       const token = localStorage.getItem('token');
 
       if (token) {
         // Authenticate with JWT token (backend will verify and extract userId)
         socket.emit('authenticate', { token });
-        console.log('🔐 Authenticating with JWT token');
       } else {
         console.warn('⚠️ No token found in localStorage - Socket.io authentication will fail');
       }
     });
 
     socket.on('authenticated', (data) => {
-      console.log('✅ Socket authenticated successfully:', data);
     });
 
     socket.on('auth_error', (error) => {
@@ -86,15 +78,9 @@ const KYC = () => {
     });
 
     socket.on('disconnect', () => {
-      console.log('🔌 Socket.io disconnected');
     });
 
     socket.on('thread-reply', (data) => {
-      console.log('🔔 Received thread-reply event:', {
-        threadTs: data.threadTs,
-        messageId: data.messageId,
-        replyText: data.reply?.text?.substring(0, 50)
-      });
       handleThreadReply(data);
     });
 
@@ -257,14 +243,6 @@ const KYC = () => {
         reply: null
       };
 
-      console.log('✅ Message sent successfully:', {
-        id: newMessage.id,
-        username: newMessage.username,
-        threadTs: newMessage.threadTs,
-        channel: newMessage.channel,
-        wasExistingThread: !!existingThread
-      });
-
       setMessages(prev => [...prev, newMessage]);
 
       // Clear form
@@ -281,31 +259,13 @@ const KYC = () => {
   };
 
   const handleThreadReply = (data) => {
-    console.log('🎯 Processing thread reply:', {
-      threadTs: data.threadTs,
-      messageId: data.messageId,
-      replyText: data.reply?.text
-    });
-
     setMessages(prev => {
-      console.log('📋 Current messages in state:', prev.map(m => ({
-        id: m.id,
-        username: m.username,
-        threadTs: m.threadTs,
-        status: m.status
-      })));
-
       // Try to find by messageId first (most precise)
       let targetMessage = prev.find(msg => msg.id === data.messageId);
 
       if (targetMessage) {
-        console.log('✅ Found message by messageId:', {
-          id: targetMessage.id,
-          username: targetMessage.username,
-          status: targetMessage.status
-        });
+        // Found by messageId
       } else {
-        console.log('⚠️ Message not found by messageId, trying threadTs...');
 
         // Fallback: Find LATEST pending message with matching threadTs
         const messagesInThread = prev.filter(msg => msg.threadTs === data.threadTs);
@@ -314,11 +274,7 @@ const KYC = () => {
           .sort((a, b) => b.sentAt - a.sentAt)[0];
 
         if (targetMessage) {
-          console.log('✅ Found LATEST pending message in thread:', {
-            id: targetMessage.id,
-            username: targetMessage.username,
-            status: targetMessage.status
-          });
+          // Found by threadTs
         } else {
           console.warn('⚠️ No pending message found in thread! Thread reply will not update any cards.');
           return prev;
@@ -328,13 +284,6 @@ const KYC = () => {
       // Update the specific message
       const updated = prev.map(msg => {
         if (msg.id === targetMessage.id) {
-          console.log('✅ Updating message to answered:', {
-            id: msg.id,
-            username: msg.username,
-            previousStatus: msg.status,
-            newStatus: 'answered'
-          });
-
           return {
             ...msg,
             status: 'answered',
@@ -349,21 +298,12 @@ const KYC = () => {
       });
 
       const answeredCount = updated.filter(m => m.status === 'answered').length;
-      console.log(`📊 Update complete. ${answeredCount} total answered messages now.`);
 
       return updated;
     });
   };
 
   const openThreadModal = async (msg) => {
-    console.log('🔍 Opening thread modal for message:', {
-      id: msg.id,
-      username: msg.username,
-      threadTs: msg.threadTs,
-      channel: msg.channel,
-      status: msg.status
-    });
-
     setSelectedThread(msg);
     setLoadingThread(true);
 
@@ -371,16 +311,9 @@ const KYC = () => {
       const token = localStorage.getItem('token');
       const apiUrl = `${process.env.REACT_APP_API_URL}/api/slack/thread/${msg.threadTs}`;
 
-      console.log('📡 Fetching thread messages from:', apiUrl);
 
       const response = await axios.get(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('✅ Thread messages received:', {
-        success: response.data.success,
-        messageCount: response.data.messages?.length || 0,
-        messages: response.data.messages
       });
 
       setThreadMessages(response.data.messages || []);
@@ -414,7 +347,6 @@ const KYC = () => {
     event.stopPropagation();
 
     try {
-      console.log('🗑️ Marking message as resolved:', messageId);
 
       const token = localStorage.getItem('token');
       const response = await axios.post(
@@ -424,7 +356,6 @@ const KYC = () => {
       );
 
       if (response.data.success) {
-        console.log('✅ Message marked as resolved successfully');
 
         // Update local state
         setMessages(prev => prev.map(msg =>
@@ -436,7 +367,6 @@ const KYC = () => {
 
       // Handle legacy message deletion
       if (response.data.deleted) {
-        console.log('🧹 Legacy message deleted, removing from list');
         setMessages(prev => prev.filter(msg => msg.id !== messageId));
         setError('Legacy message removed. Please use the new format for future messages.');
         setTimeout(() => setError(''), 5000);
@@ -446,7 +376,6 @@ const KYC = () => {
 
       // Handle legacy message deletion response
       if (err.response?.data?.deleted) {
-        console.log('🧹 Legacy message deleted, removing from list');
         setMessages(prev => prev.filter(msg => msg.id !== messageId));
         setError(err.response.data.message || 'Legacy message removed.');
         setTimeout(() => setError(''), 5000);
@@ -508,16 +437,15 @@ const KYC = () => {
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold mb-2">Slack Not Connected</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {error || 'You need to connect your Slack account to use this feature.'}
+                Please go to your profile page to connect your Slack account and use this feature.
               </p>
               <button
                 onClick={() => {
-                  localStorage.clear();
-                  window.location.href = '/login';
+                  window.location.href = '/profile';
                 }}
                 className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
               >
-                Log Out and Reconnect
+                Go to Profile
               </button>
             </div>
           </div>

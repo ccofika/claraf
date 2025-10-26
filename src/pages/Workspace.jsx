@@ -347,7 +347,6 @@ const Workspace = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setLastAccessedElement(element._id);
-      console.log('Saved last accessed element:', element._id);
     } catch (err) {
       console.error('Error saving last accessed element:', err);
     }
@@ -418,14 +417,12 @@ const Workspace = () => {
   // Reset flag when location changes (handles page navigation)
   React.useEffect(() => {
     hasZoomedToLatestTitle.current = false;
-    console.log('Location changed, resetting zoom flag:', location.pathname);
   }, [location.key]);
 
   // Reset flag when returning to workspaces section (handles KYC, VIP Calculator, etc navigation)
   React.useEffect(() => {
     if (activeSection === 'workspaces') {
       hasZoomedToLatestTitle.current = false;
-      console.log('Returned to workspaces section, resetting zoom flag');
     }
   }, [activeSection]);
 
@@ -446,7 +443,6 @@ const Workspace = () => {
       if (lastAccessedElement) {
         targetElement = elements.find(el => el._id === lastAccessedElement);
         if (targetElement && targetElement.type === 'title') {
-          console.log('Zooming to last accessed title:', targetElement);
         } else {
           // lastAccessedElement doesn't exist or is not a title anymore
           targetElement = null;
@@ -459,7 +455,6 @@ const Workspace = () => {
           .filter(el => el.type === 'title')
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         targetElement = titleElements[0];
-        console.log('Zooming to latest title (fallback):', targetElement);
       }
 
       if (targetElement) {
@@ -488,7 +483,6 @@ const Workspace = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
               );
               setLastAccessedElement(targetElement._id);
-              console.log('Auto-saved last accessed element:', targetElement._id);
             } catch (err) {
               console.error('Error auto-saving last accessed element:', err);
             }

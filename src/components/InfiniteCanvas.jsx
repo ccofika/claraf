@@ -579,23 +579,15 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Listen for zoom to element events
   React.useEffect(() => {
     const handleZoomToElement = (event) => {
-      console.log('=== InfiniteCanvas handleZoomToElement START ===');
-      console.log('Event received:', event);
-      console.log('Event detail:', event.detail);
 
       const eventData = event.detail;
       if (!eventData) {
-        console.log('❌ No event data');
         return;
       }
       if (!transformWrapperRef.current) {
-        console.log('❌ No transformWrapperRef');
         return;
       }
 
-      console.log('✓ Event data and transformWrapperRef exist');
-      console.log('Event data:', eventData);
-      console.log('Canvas elements count:', canvasElements.length);
 
       // Extract instant flag (for no animation)
       const instant = eventData.instant || false;
@@ -603,21 +595,16 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       // Find the element in canvasElements if only _id is provided
       let targetElement = eventData;
       if (eventData._id && !eventData.position) {
-        console.log('Looking for element with _id:', eventData._id);
         targetElement = canvasElements.find(el => el._id === eventData._id);
-        console.log('Found element:', targetElement);
       }
 
       if (!targetElement) {
-        console.log('❌ Target element not found');
         return;
       }
       if (!targetElement.position) {
-        console.log('❌ Target element has no position');
         return;
       }
 
-      console.log('✓ Target element found with position:', targetElement.position);
 
       const targetScale = 0.375;
 
@@ -625,7 +612,6 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
       const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
 
-      console.log('Element center:', { x: elementCenterX, y: elementCenterY });
 
       // Calculate transform position to center the element
       let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
@@ -637,26 +623,20 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       targetX -= shiftRight; // Shift view right
       targetY -= shiftDown;  // Shift view down
 
-      console.log('Transform target (with shift):', { x: targetX, y: targetY, scale: targetScale });
 
       // Use duration 0 for instant (no animation), 500ms for smooth animation
       const duration = instant ? 0 : 500;
       transformWrapperRef.current.setTransform(targetX, targetY, targetScale, duration);
-      console.log(`✓ setTransform called with duration: ${duration}ms`);
 
       // Highlight element
       setHighlightedElement(targetElement._id);
-      console.log('✓ Element highlighted');
 
       // Remove highlight after 3 seconds
       setTimeout(() => setHighlightedElement(null), 3000);
-      console.log('=== InfiniteCanvas handleZoomToElement END ===');
     };
 
-    console.log('InfiniteCanvas: Adding zoomToElement event listener');
     window.addEventListener('zoomToElement', handleZoomToElement);
     return () => {
-      console.log('InfiniteCanvas: Removing zoomToElement event listener');
       window.removeEventListener('zoomToElement', handleZoomToElement);
     };
   }, [canvasElements]);

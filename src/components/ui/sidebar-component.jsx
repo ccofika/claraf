@@ -863,7 +863,6 @@ function MenuSection({
               item={item}
               isExpanded={isExpanded}
               onToggle={() => onToggleExpanded(itemKey)}
-              onItemClick={() => console.log(`Clicked ${item.label}`)}
               isCollapsed={isCollapsed} />
             {isExpanded && item.children && !isCollapsed && (
               <div className="flex flex-col gap-1 mb-2">
@@ -871,7 +870,6 @@ function MenuSection({
                   <SubMenuItem
                     key={`${itemKey}-${childIndex}`}
                     item={child}
-                    onItemClick={() => console.log(`Clicked ${child.label}`)} />
                 ))}
               </div>
             )}

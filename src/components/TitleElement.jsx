@@ -184,37 +184,21 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   };
 
   const handleElementLinkClick = (linkData) => {
-    console.log('=== TitleElement handleElementLinkClick START ===');
-    console.log('Link data:', linkData);
-    console.log('Current workspace:', workspaceId);
-    console.log('Target workspace:', linkData.workspaceId);
-    console.log('Are they equal?', linkData.workspaceId === workspaceId);
-    console.log('Comparison (strict):', linkData.workspaceId, '===', workspaceId);
 
     if (linkData.workspaceId === workspaceId) {
       // Same workspace - zoom to element
-      console.log('✓ Same workspace - dispatching zoomToElement event');
       const eventDetail = { _id: linkData.elementId };
-      console.log('Event detail:', eventDetail);
 
       const event = new CustomEvent('zoomToElement', {
         detail: eventDetail
       });
-      console.log('Created CustomEvent:', event);
-      console.log('Event type:', event.type);
-      console.log('Event detail:', event.detail);
 
       window.dispatchEvent(event);
-      console.log('✓ Event dispatched to window');
     } else {
       // Different workspace - navigate
-      console.log('✓ Different workspace - calling navigate()');
       const path = `/workspace/${linkData.workspaceId}?element=${linkData.elementId}`;
-      console.log('Navigation path:', path);
       navigate(path);
-      console.log('✓ Navigate called');
     }
-    console.log('=== TitleElement handleElementLinkClick END ===');
   };
 
   return (
@@ -395,7 +379,6 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                   }
                 }}
                 onClick={(e) => {
-                  console.log('Display div clicked', e.target);
 
                   if (!canEdit) {
                     e.stopPropagation();
@@ -415,7 +398,6 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                   }
 
                   if (linkElement) {
-                    console.log('Link clicked!', linkElement);
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -423,15 +405,10 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                     const elementId = linkElement.getAttribute('data-element-id');
                     const elementWorkspaceId = linkElement.getAttribute('data-workspace-id');
 
-                    console.log('Element ID:', elementId);
-                    console.log('Workspace ID:', elementWorkspaceId);
-                    console.log('Ctrl/Cmd key:', e.ctrlKey || e.metaKey);
 
                     if (elementId && elementWorkspaceId) {
                       // Element link - navigate only with Ctrl/Cmd + click
-                      console.log('This is an element link!');
                       if (e.ctrlKey || e.metaKey) {
-                        console.log('Ctrl/Cmd pressed - navigating to element');
                         handleElementLinkClick({
                           elementId,
                           workspaceId: elementWorkspaceId,
@@ -439,16 +416,12 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                           elementTitle: linkElement.getAttribute('data-element-title')
                         });
                       } else {
-                        console.log('Ctrl/Cmd not pressed - element link not activated');
                       }
                     } else {
                       // Regular hyperlink - only open with Ctrl/Cmd
-                      console.log('This is a regular hyperlink');
                       if (e.ctrlKey || e.metaKey) {
-                        console.log('Opening hyperlink in new tab');
                         window.open(linkElement.href, '_blank', 'noopener,noreferrer');
                       } else {
-                        console.log('Ctrl/Cmd not pressed - hyperlink not opened');
                       }
                     }
                   }
