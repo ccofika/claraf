@@ -24,88 +24,50 @@ const TutorialModal = ({ isOpen, onClose, onDontShowAgain }) => {
     {
       title: "Welcome to Clara!",
       icon: Sparkles,
-      description: `Clara is your all-in-one workspace designed to streamline customer support operations and boost team productivity.
-
-In this quick tutorial, you'll learn:
-• How to organize your work with Workspaces and Canvas
-• Using the infinite Canvas for notes and documentation
-• Quick Links for instant access to important resources
-• Hash Explorer for blockchain transaction lookup across 50+ networks
-• Affiliate Bonus Finder for searching bonuses from Google Sheets
-• KYC & Slack Integration for managing customer inquiries
-
-Let's get started! This tutorial takes just 3-4 minutes and will help you master all the essential features.`,
+      description: `Clara is your all-in-one workspace for customer support operations. Organize work with Workspaces, use Canvas for notes, Quick Links for resources, Hash Explorer for transactions, Affiliate Bonus Finder, and KYC & Slack integration.`,
       videoPlaceholder: "Dashboard Overview",
       videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761413433/clara-tutorial/clara-tutorial/slide-1.mp4"
     },
     {
       title: "Dashboard & Workspaces",
       icon: LayoutDashboard,
-      description: `Your dashboard displays two workspace types: Public Workspace for company-wide announcements (read-only), and My Workspaces for your private collections.
-
-Create unlimited personal workspaces to organize work by project, topic, or client type. Each workspace has its own infinite canvas where you can add notes, documents, and collaborate with team members.
-
-Click "Create Workspace" anytime to start a new workspace and keep your work organized efficiently.`,
+      description: `Dashboard displays Public Workspace for announcements (read-only) and My Workspaces for private collections. Create unlimited workspaces to organize work by project, topic, or client type.`,
       videoPlaceholder: "Creating Workspaces Demo"
     },
     {
       title: "Canvas - Your Digital Workspace",
       icon: Palette,
-      description: `Every workspace includes an infinite canvas where you can create and organize notes, documentation, and collaborative content with your team.
-
-Choose from three viewing modes: EDIT for adding and organizing elements • VIEW for read-only navigation with zoom and pan • POST-VIEW for clean, distraction-free presentations.
-
-Switch between modes using the toolbar in the top-right corner. Create titles, text boxes, and organize content freely on your canvas.`,
+      description: `Every workspace has an infinite canvas for notes and documentation. Choose from EDIT mode for organizing, VIEW for navigation, or POST-VIEW for presentations.`,
       videoPlaceholder: "Canvas Modes Demo"
     },
     {
       title: "Quick Links - Fast Access to Resources",
       icon: Link2,
-      description: `Keep all your important links organized in one convenient location with categorized collections that sync across all your sessions.
-
-Create custom categories like "Support Articles" or "VIP Resources", then add links with your preferred behavior: Copy to clipboard for quick sharing, or Open in new tab for immediate access.
-
-Perfect for frequently used support documentation, internal resources, customer-facing articles, and bonus calculators you use daily.`,
+      description: `Organize important links in categorized collections that sync across sessions. Links can copy to clipboard or open in new tab for quick access.`,
       videoPlaceholder: "Quick Links Demo"
     },
     {
       title: "Hash Explorer - Blockchain Transaction Lookup",
       icon: Search,
-      description: `Quickly lookup transaction details across more than 50 blockchain networks without switching between multiple block explorers.
-
-Supported networks include Bitcoin (BTC), Ethereum and all ERC-20 tokens (ETH, USDT, USDC, DAI), Binance Smart Chain, Polygon, Solana, Tron, XRP, Litecoin, Dogecoin, and many more.
-
-Simply paste the customer's transaction hash, click search, and view complete transaction details including status, amount, timestamp, and block explorer links instantly.`,
+      description: `Search transactions across 50+ blockchain networks without switching explorers. Supported: Bitcoin, Ethereum & ERC-20 tokens, BSC, Polygon, Solana, Tron, XRP, and many more.`,
       videoPlaceholder: "Hash Explorer Demo"
     },
     {
       title: "Affiliate Bonus Finder",
       icon: Gift,
-      description: `Access affiliate bonus information directly from your integrated Google Sheets database with real-time synchronization.
-
-Search by Affiliate Name (required) or add Campaign ID for more specific results. Results display DB (Deposit Bonus) in yellow cards and WB (Wager Bonus) in blue cards for easy identification.
-
-Use filter buttons to narrow results, select bonuses to compare side-by-side, and expand individual cards to view complete details including terms, conditions, and campaign specifics.`,
+      description: `Search affiliate bonuses directly from Google Sheets with real-time sync. Results show DB (Deposit Bonus) in yellow and WB (Wager Bonus) in blue cards.`,
       videoPlaceholder: "Affiliate Bonus Finder Demo"
     },
     {
       title: "KYC & Slack Integration",
       icon: MessageSquare,
-      description: `Manage customer KYC (Know Your Customer) inquiries directly through Slack integration with real-time status tracking and notifications via Socket.io.
-
-Enter the customer's username, compose your KYC inquiry message, and send it instantly. Track all messages with status indicators: Pending (awaiting response), Completed (response received), or Failed (connection issue).
-
-View complete thread history in the left panel, use filters to find specific statuses, search conversations by username, and click any thread to see the full conversation history. All communication is automatically logged and permanently searchable.`,
+      description: `Send KYC inquiries directly through Slack with real-time status tracking. Track messages with status: Pending, Completed, or Failed.`,
       videoPlaceholder: "KYC Slack Integration Demo"
     },
     {
       title: "You're All Set!",
       icon: CheckCircle,
-      description: `Congratulations! You now know how to organize your work with Workspaces and Canvas, use Quick Links for fast resource access, lookup blockchain transactions with Hash Explorer, search affiliate bonuses efficiently, and manage KYC inquiries through Slack integration.
-
-Best practices: Keep your workspaces organized with clear titles and structure, bookmark important canvas elements for quick access later, use Quick Links for frequently accessed resources, and switch between VIEW and EDIT modes as needed for different tasks.
-
-Need help or have questions? Check the Public Workspace for company announcements and helpful guides, or reach out to your team lead anytime. Happy working!`,
+      description: `You now know how to use Workspaces, Canvas, Quick Links, Hash Explorer, Affiliate Bonus Finder, and KYC integration. Check Public Workspace for guides or reach out to your team lead for help.`,
       videoPlaceholder: "Quick Recap Montage"
     }
   ];

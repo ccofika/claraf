@@ -24,7 +24,8 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-black">
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-lg">
         <div>
           <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-neutral-50">
@@ -112,6 +113,18 @@ const Register = () => {
             </Link>
           </div>
         </form>
+
+        {/* Footer Links */}
+        <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400 space-x-4">
+          <Link to="/privacy-policy" className="hover:text-gray-700 dark:hover:text-neutral-300 transition-colors">
+            Privacy Policy
+          </Link>
+          <span>•</span>
+          <Link to="/terms-of-service" className="hover:text-gray-700 dark:hover:text-neutral-300 transition-colors">
+            Terms of Service
+          </Link>
+        </div>
+      </div>
       </div>
     </div>
   );

@@ -23,8 +23,8 @@ const TutorialSlide = ({ title, description, videoPlaceholder, Icon, videoSrc })
             {title}
           </h2>
 
-          {/* Description - Floating - Staggered animation - 20% smaller - Enhanced animation */}
-          <div className="text-sm leading-relaxed text-white/90 whitespace-pre-line drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)] animate-in fade-in slide-in-from-bottom zoom-in-95 duration-700 delay-400">
+          {/* Description - Floating - Staggered animation - Larger responsive font */}
+          <div className="text-base sm:text-lg md:text-xl leading-relaxed text-white/90 whitespace-pre-line drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)] animate-in fade-in slide-in-from-bottom zoom-in-95 duration-700 delay-400">
             {description}
           </div>
         </div>

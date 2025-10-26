@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
@@ -61,8 +61,9 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-black">
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
         <div className="flex justify-center mb-8">
           <img src={theme === 'dark' ? logoWhite : logoBlack} alt="Logo" className="h-20" />
         </div>
@@ -147,7 +148,19 @@ const Login = () => {
             </button>
           </div>
         </form>
+
+        {/* Footer Links */}
+        <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400 space-x-4">
+          <Link to="/privacy-policy" className="hover:text-gray-700 dark:hover:text-neutral-300 transition-colors">
+            Privacy Policy
+          </Link>
+          <span>•</span>
+          <Link to="/terms-of-service" className="hover:text-gray-700 dark:hover:text-neutral-300 transition-colors">
+            Terms of Service
+          </Link>
         </div>
+        </div>
+      </div>
       </div>
     </div>
   );
