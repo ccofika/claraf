@@ -26,49 +26,56 @@ const TutorialModal = ({ isOpen, onClose, onDontShowAgain }) => {
       icon: Sparkles,
       description: `Clara is your all-in-one workspace for customer support operations. Organize work with Workspaces, use Canvas for notes, Quick Links for resources, Hash Explorer for transactions, Affiliate Bonus Finder, and KYC & Slack integration.`,
       videoPlaceholder: "Dashboard Overview",
-      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761413433/clara-tutorial/clara-tutorial/slide-1.mp4"
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489424/clara-tutorial/slide-1.mp4"
     },
     {
       title: "Dashboard & Workspaces",
       icon: LayoutDashboard,
       description: `Dashboard displays Public Workspace for announcements (read-only) and My Workspaces for private collections. Create unlimited workspaces to organize work by project, topic, or client type.`,
-      videoPlaceholder: "Creating Workspaces Demo"
+      videoPlaceholder: "Creating Workspaces Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489440/clara-tutorial/slide-2.mp4"
     },
     {
       title: "Canvas - Your Digital Workspace",
       icon: Palette,
       description: `Every workspace has an infinite canvas for notes and documentation. Choose from EDIT mode for organizing, VIEW for navigation, or POST-VIEW for presentations.`,
-      videoPlaceholder: "Canvas Modes Demo"
+      videoPlaceholder: "Canvas Modes Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489470/clara-tutorial/slide-3.mp4"
     },
     {
       title: "Quick Links - Fast Access to Resources",
       icon: Link2,
       description: `Organize important links in categorized collections that sync across sessions. Links can copy to clipboard or open in new tab for quick access.`,
-      videoPlaceholder: "Quick Links Demo"
+      videoPlaceholder: "Quick Links Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489475/clara-tutorial/slide-4.mp4"
     },
     {
       title: "Hash Explorer - Blockchain Transaction Lookup",
       icon: Search,
       description: `Search transactions across 50+ blockchain networks without switching explorers. Supported: Bitcoin, Ethereum & ERC-20 tokens, BSC, Polygon, Solana, Tron, XRP, and many more.`,
-      videoPlaceholder: "Hash Explorer Demo"
+      videoPlaceholder: "Hash Explorer Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489478/clara-tutorial/slide-5.mp4"
     },
     {
       title: "Affiliate Bonus Finder",
       icon: Gift,
       description: `Search affiliate bonuses directly from Google Sheets with real-time sync. Results show DB (Deposit Bonus) in yellow and WB (Wager Bonus) in blue cards.`,
-      videoPlaceholder: "Affiliate Bonus Finder Demo"
+      videoPlaceholder: "Affiliate Bonus Finder Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489488/clara-tutorial/slide-6.mp4"
     },
     {
       title: "KYC & Slack Integration",
       icon: MessageSquare,
       description: `Send KYC inquiries directly through Slack with real-time status tracking. Track messages with status: Pending, Completed, or Failed.`,
-      videoPlaceholder: "KYC Slack Integration Demo"
+      videoPlaceholder: "KYC Slack Integration Demo",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761489501/clara-tutorial/slide-7.mp4"
     },
     {
       title: "You're All Set!",
       icon: CheckCircle,
       description: `You now know how to use Workspaces, Canvas, Quick Links, Hash Explorer, Affiliate Bonus Finder, and KYC integration. Check Public Workspace for guides or reach out to your team lead for help.`,
-      videoPlaceholder: "Quick Recap Montage"
+      videoPlaceholder: "Quick Recap Montage",
+      videoSrc: "https://res.cloudinary.com/dvohh9tan/video/upload/v1761490197/clara-tutorial/slide-8.mp4"
     }
   ];
 
