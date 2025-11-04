@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useTheme } from '../context/ThemeContext';
-import logoBlack from '../assets/images/LOGO-MAIN-BLACK.png';
-import logoWhite from '../assets/images/LOGO-MAIN-WHITE.png';
+import { Card, CardContent } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
+import { Calculator, TrendingUp, Copy, Check, DollarSign, Award } from 'lucide-react';
 
 const VIPProgressCalculator = () => {
-  const { theme } = useTheme();
   const [percentage, setPercentage] = useState('');
   const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
   const [result, setResult] = useState(null);
@@ -85,175 +85,233 @@ const VIPProgressCalculator = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black p-8 relative">
-      {/* Logo in top left corner */}
-      <div className="absolute top-8 left-8 z-10">
-        <img src={theme === 'dark' ? logoWhite : logoBlack} alt="Logo" className="h-8" />
-      </div>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Calculator className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">VIP Progress Calculator</h1>
+            <p className="text-xs text-muted-foreground">Calculate how much you need to reach the next VIP level</p>
+          </div>
+        </div>
 
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-full max-w-7xl flex gap-6">
-          {/* Left Panel - Input */}
-          <div className="flex-1 space-y-8">
-            <div className="p-8 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-lg h-[calc(100vh-160px)] flex flex-col">
-            <div className="mb-8">
-              <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-neutral-50">
-                VIP Progress Calculator
-              </h2>
-              <p className="mt-4 text-center text-sm text-gray-600 dark:text-neutral-400">
-                Enter your VIP progress percentage to calculate how much you need to reach the next level
-              </p>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-160px)]">
+          {/* Left Panel - Input Form */}
+          <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    Calculate Progress
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Enter your current level and progress percentage
+                  </p>
+                </div>
 
-            {result?.error && (
-              <div className="px-4 py-3 rounded mb-6 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400">
-                {result.error}
-              </div>
-            )}
+                {result?.error && (
+                  <div className="px-3 py-2 rounded-lg text-xs bg-destructive/10 border border-destructive/20 text-destructive">
+                    {result.error}
+                  </div>
+                )}
 
-            <form className="space-y-6" onSubmit={handleCalculate}>
-              <div>
-                <label htmlFor="currentLevel" className="block text-sm font-medium text-gray-900 dark:text-neutral-50">
-                  Current VIP Level
-                </label>
-                <select
-                  id="currentLevel"
-                  name="currentLevel"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-                  value={currentLevelIndex}
-                  onChange={(e) => setCurrentLevelIndex(parseInt(e.target.value))}
-                >
-                  {vipLevels.slice(0, -1).map((level, index) => (
-                    <option key={index} value={index}>
-                      {level.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <form className="space-y-3" onSubmit={handleCalculate}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="currentLevel" className="text-xs font-medium text-foreground">
+                      Current VIP Level
+                    </Label>
+                    <select
+                      id="currentLevel"
+                      name="currentLevel"
+                      className="flex h-9 w-full rounded-md border border-input bg-card text-foreground px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={currentLevelIndex}
+                      onChange={(e) => setCurrentLevelIndex(parseInt(e.target.value))}
+                    >
+                      {vipLevels.slice(0, -1).map((level, index) => (
+                        <option key={index} value={index}>
+                          {level.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div>
-                <label htmlFor="percentage" className="block text-sm font-medium text-gray-900 dark:text-neutral-50">
-                  VIP Progress Percentage
-                </label>
-                <input
-                  id="percentage"
-                  name="percentage"
-                  type="text"
-                  required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-                  value={percentage}
-                  onChange={(e) => setPercentage(e.target.value)}
-                  placeholder="e.g., 45.67"
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="percentage" className="text-xs font-medium text-foreground">
+                      VIP Progress Percentage
+                    </Label>
+                    <input
+                      id="percentage"
+                      name="percentage"
+                      type="text"
+                      required
+                      className="flex h-9 w-full rounded-md border border-input bg-card text-foreground px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={percentage}
+                      onChange={(e) => setPercentage(e.target.value)}
+                      placeholder="e.g., 45.67"
+                    />
+                  </div>
 
-              <div>
-                <button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 dark:bg-neutral-50 dark:text-black hover:bg-gray-800 dark:hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                >
-                  Calculate
-                </button>
-              </div>
-            </form>
+                  <button
+                    type="submit"
+                    className="w-full inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
+                  >
+                    <Calculator className="w-4 h-4 mr-2" />
+                    Calculate Progress
+                  </button>
+                </form>
+              </CardContent>
+            </Card>
 
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-neutral-800">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-50 mb-3">
-                  VIP Levels
-                </h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+            {/* VIP Levels List */}
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-4 h-full flex flex-col">
+                <div className="space-y-1 mb-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Award className="w-4 h-4 text-primary" />
+                    VIP Levels
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    All available VIP tiers and requirements
+                  </p>
+                </div>
+                <div className="space-y-1.5 overflow-y-auto pr-2 flex-1">
                   {vipLevels.slice(1).map((level) => (
                     <div
                       key={level.name}
-                      className="flex justify-between items-center px-3 py-2 bg-gray-50 dark:bg-neutral-900 rounded text-xs"
+                      className="flex items-center justify-between px-2.5 py-2 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
                     >
-                      <span className="text-gray-900 dark:text-neutral-50 font-medium">{level.name}</span>
-                      <span className="text-gray-600 dark:text-neutral-400">{formatCurrency(level.wager)}</span>
+                      <span className="text-xs font-medium text-foreground">{level.name}</span>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {formatCurrency(level.wager)}
+                      </Badge>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Right Panel - Results & Macro */}
-          <div className="flex-1">
-            <div className="p-8 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-lg h-[calc(100vh-160px)] flex flex-col">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-neutral-50 mb-6">
-                Calculation Results
-              </h2>
-
-              {!result || result.error ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-600 dark:text-neutral-400">
-                  <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm">Enter your VIP percentage to see the calculation</p>
+          {/* Right Panel - Results */}
+          <div className="lg:col-span-2 overflow-y-auto">
+            <Card className="h-full">
+              <CardContent className="p-4">
+                <div className="space-y-1 mb-4">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-primary" />
+                    Calculation Results
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    View your progress details and remaining requirements
+                  </p>
                 </div>
-              ) : (
-                <div className="flex-1 flex flex-col justify-center">
-                  {/* Results Summary */}
+
+                {!result || result.error ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className="w-14 h-14 bg-muted/20 rounded-full flex items-center justify-center mb-3">
+                      <Calculator className="w-7 h-7 text-muted-foreground/70" />
+                    </div>
+                    <h3 className="text-base font-semibold text-foreground mb-1">No Calculation Yet</h3>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      Enter your current VIP level and progress percentage to see your detailed progress calculation
+                    </p>
+                  </div>
+                ) : (
                   <div className="space-y-4">
-                    {/* First Row - Current and Next Level */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                        <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Current Level</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-neutral-50 italic">{result.currentLevel}</p>
-                      </div>
+                    {/* Results Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Card className="border-2">
+                        <CardContent className="p-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-muted-foreground">Current Level</p>
+                            <p className="text-xl font-bold text-foreground italic">{result.currentLevel}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                      <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                        <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Next Level</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-neutral-50 italic">{result.nextLevel}</p>
-                      </div>
+                      <Card className="border-2 border-primary/20 bg-primary/5">
+                        <CardContent className="p-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-muted-foreground">Next Level</p>
+                            <p className="text-xl font-bold text-primary italic">{result.nextLevel}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
 
-                    {/* Second Row - Progress, Total Required, Amount Remaining */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                        <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Progress</p>
-                        <p className="text-sm text-gray-900 dark:text-neutral-50">{result.percentage}%</p>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <Card>
+                        <CardContent className="p-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-muted-foreground">Progress</p>
+                            <p className="text-lg font-semibold text-foreground">{result.percentage}%</p>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                      <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                        <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Total Required</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{formatCurrency(result.totalRequired)}</p>
-                      </div>
+                      <Card>
+                        <CardContent className="p-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-muted-foreground">Total Required</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCurrency(result.totalRequired)}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                      <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                        <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Amount Remaining</p>
-                        <p className="text-sm font-bold text-gray-900 dark:text-neutral-50">{formatCurrency(result.remaining)}</p>
-                      </div>
+                      <Card className="border-2 border-amber-500/20 bg-amber-500/5">
+                        <CardContent className="p-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-muted-foreground">Amount Remaining</p>
+                            <p className="text-lg font-bold text-amber-600 dark:text-amber-500">{formatCurrency(result.remaining)}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
+
+                    {/* Support Macro Section */}
+                    <Card className="border-2">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-semibold text-foreground">Support Macro</h3>
+                          <button
+                            onClick={handleCopyMacro}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                          >
+                            {copied ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                Copy Macro
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg text-xs text-foreground leading-relaxed space-y-2 max-h-64 overflow-y-auto">
+                          <p>Thank you for your patience.</p>
+                          <p>From what I can see, you're currently {result.percentage}% of the way toward your <em>{result.nextLevel}</em> VIP level.To move from <em>{result.currentLevel}</em> to <em>{result.nextLevel}</em>, you'll need to wager a total of {formatCurrency(result.totalRequired)}, meaning there's {formatCurrency(result.remaining)} left to go.</p>
+                          <p>Sports bets count three times more toward your wagering requirements. For example, to work out how many sports bets would get you to the next level, just divide the remaining amount by 3.If you're placing a mix of sports and casino bets, the best way to keep track of your progress is through your transaction history.</p>
+                          <p>We've also prepared a quick guide so you can calculate it yourself anytime:</p>
+                          <p>[ADD_ARTICLE]</p>
+                          <p>If you have any questions or just want an update along the way, we're here for you 24/7. Keep up the great progress!</p>
+                        </div>
+                        <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
+                            Note: Sports bets count 3x more towards VIP progress than casino bets.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-
-                  {/* Macro Message */}
-                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-neutral-800">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-50">Support Macro</h3>
-                      <button
-                        onClick={handleCopyMacro}
-                        className="px-3 py-1 text-xs font-medium rounded-md text-white bg-gray-900 dark:bg-neutral-50 dark:text-black hover:bg-gray-800 dark:hover:bg-neutral-200 transition-colors"
-                      >
-                        {copied ? 'Copied!' : 'Copy Macro'}
-                      </button>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-neutral-900 rounded-lg text-xs text-gray-900 dark:text-neutral-50 leading-relaxed space-y-3 max-h-96 overflow-y-auto">
-                      <p>Thank you for your patience.</p>
-                      <p>From what I can see, you're currently {result.percentage}% of the way toward your <em>{result.nextLevel}</em> VIP level.To move from <em>{result.currentLevel}</em> to <em>{result.nextLevel}</em>, you'll need to wager a total of {formatCurrency(result.totalRequired)}, meaning there's {formatCurrency(result.remaining)} left to go.</p>
-                      <p>Sports bets count three times more toward your wagering requirements. For example, to work out how many sports bets would get you to the next level, just divide the remaining amount by 3.If you're placing a mix of sports and casino bets, the best way to keep track of your progress is through your transaction history.</p>
-                      <p>We've also prepared a quick guide so you can calculate it yourself anytime:</p>
-                      <p>[ADD_ARTICLE]</p>
-                      <p>If you have any questions or just want an update along the way, we're here for you 24/7. Keep up the great progress!</p>
-                    </div>
-                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
-                        Note: Sports bets count 3x more towards VIP progress than casino bets.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

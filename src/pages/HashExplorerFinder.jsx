@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useTheme } from '../context/ThemeContext';
-import logoBlack from '../assets/images/LOGO-MAIN-BLACK.png';
-import logoWhite from '../assets/images/LOGO-MAIN-WHITE.png';
+import { Card, CardContent } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
+import { Search, Network, FileText, Calendar, DollarSign, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 
 const HashExplorerFinder = () => {
-  const { theme } = useTheme();
   const [hash, setHash] = useState('');
   const [result, setResult] = useState({ message: '', type: '' });
   const [transactionData, setTransactionData] = useState(null);
@@ -63,207 +63,313 @@ const HashExplorerFinder = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black p-8 relative">
-      {/* Logo in top left corner */}
-      <div className="absolute top-8 left-8 z-10">
-        <img src={theme === 'dark' ? logoWhite : logoBlack} alt="Logo" className="h-8" />
-      </div>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Search className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Hash Explorer Finder</h1>
+            <p className="text-xs text-muted-foreground">Search transaction details across 50+ blockchain networks</p>
+          </div>
+        </div>
 
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-full max-w-7xl flex gap-6">
-          {/* Left Panel - Input */}
-          <div className="flex-1 space-y-8">
-            <div className="p-8 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-lg">
-            <div className="mb-8">
-              <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-neutral-50">
-                Hash Explorer Finder
-              </h2>
-              <p className="mt-4 text-center text-sm text-gray-600 dark:text-neutral-400">
-                Enter any transaction hash to find details across 50+ blockchain networks
-              </p>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-160px)]">
+          {/* Left Panel - Input Form */}
+          <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    Search Transaction
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Enter any blockchain transaction hash
+                  </p>
+                </div>
 
-            {result.message && (
-              <div className={`
-                px-4 py-3 rounded mb-6 text-sm
-                ${result.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' : ''}
-                ${result.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' : ''}
-                ${result.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400' : ''}
-              `}>
-                {result.message}
-              </div>
-            )}
+                {result.message && (
+                  <div className={`px-3 py-2 rounded-lg text-xs ${
+                    result.type === 'error' ? 'bg-destructive/10 border border-destructive/20 text-destructive' : ''
+                  }${
+                    result.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' : ''
+                  }${
+                    result.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400' : ''
+                  }`}>
+                    {result.message}
+                  </div>
+                )}
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="hash" className="block text-sm font-medium text-gray-900 dark:text-neutral-50">
-                  Transaction Hash
-                </label>
-                <input
-                  id="hash"
-                  name="hash"
-                  type="text"
-                  required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 font-mono text-sm"
-                  value={hash}
-                  onChange={(e) => setHash(e.target.value)}
-                  placeholder="0x1234... or any transaction hash"
-                />
-              </div>
+                <form className="space-y-3" onSubmit={handleSubmit}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="hash" className="text-xs font-medium text-foreground">
+                      Transaction Hash
+                    </Label>
+                    <input
+                      id="hash"
+                      name="hash"
+                      type="text"
+                      required
+                      className="flex h-9 w-full rounded-md border border-input bg-card text-foreground px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={hash}
+                      onChange={(e) => setHash(e.target.value)}
+                      placeholder="0x1234... or any transaction hash"
+                    />
+                  </div>
 
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 dark:bg-neutral-50 dark:text-black hover:bg-gray-800 dark:hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Searching...' : 'Find Transaction'}
-                </button>
-              </div>
-            </form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4 mr-2" />
+                        Find Transaction
+                      </>
+                    )}
+                  </button>
+                </form>
+              </CardContent>
+            </Card>
 
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-neutral-800">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-50 mb-3">
-                  Supported Networks (50+ Coins)
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
+            {/* Supported Networks */}
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-4 h-full flex flex-col">
+                <div className="space-y-1 mb-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Network className="w-4 h-4 text-primary" />
+                    Supported Networks
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    50+ coins across major blockchains
+                  </p>
+                </div>
+                <div className="space-y-2 overflow-y-auto pr-2 flex-1">
                   {supportedNetworks.map((network) => (
-                    <div key={network.name} className="text-xs">
-                      <span className="font-semibold text-gray-900 dark:text-neutral-50">{network.name}</span>
-                      <span className="text-gray-600 dark:text-neutral-400 ml-2">
+                    <div
+                      key={network.name}
+                      className="p-2.5 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-foreground">{network.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {network.coins.length} coins
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
                         {network.coins.join(', ')}
-                      </span>
+                      </p>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Panel - Transaction Details */}
-          <div className="flex-1">
-            <div className="p-8 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-lg h-full">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-neutral-50 mb-6">
-                Transaction Details
-              </h2>
-
-              {!transactionData ? (
-                <div className="flex flex-col items-center justify-center h-[400px] text-gray-600 dark:text-neutral-400">
-                  <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-sm">Enter a transaction hash to view details</p>
+          <div className="lg:col-span-2 overflow-y-auto">
+            <Card className="h-full">
+              <CardContent className="p-4">
+                <div className="space-y-1 mb-4">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    Transaction Details
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Complete transaction information
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Hash</p>
-                    <p className="text-sm font-mono text-gray-900 dark:text-neutral-50 break-all">{transactionData.hash}</p>
-                  </div>
 
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Network</p>
-                    <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-neutral-50 rounded-full text-sm font-medium">
-                      {transactionData.network} {transactionData.networkType && `(${transactionData.networkType})`}
-                    </span>
+                {!transactionData ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className="w-14 h-14 bg-muted/20 rounded-full flex items-center justify-center mb-3">
+                      <Search className="w-7 h-7 text-muted-foreground/70" />
+                    </div>
+                    <h3 className="text-base font-semibold text-foreground mb-1">No Transaction Found</h3>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      Enter a transaction hash to search across 50+ blockchain networks and view complete details
+                    </p>
                   </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Transaction Hash */}
+                    <Card className="border-2">
+                      <CardContent className="p-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Transaction Hash</p>
+                        <p className="text-xs font-mono text-foreground break-all leading-relaxed">{transactionData.hash}</p>
+                      </CardContent>
+                    </Card>
 
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Coin/Token</p>
-                    <div className="relative inline-block">
-                      <span
-                        className="text-sm font-medium text-gray-900 dark:text-neutral-50 cursor-pointer"
-                        onMouseEnter={() => transactionData.contractAddress && setShowContractTooltip(true)}
-                        onMouseLeave={() => setShowContractTooltip(false)}
-                      >
-                        {transactionData.coin}
-                        {transactionData.contractAddress && (
-                          <span className="ml-1 text-xs text-gray-500">ⓘ</span>
-                        )}
-                      </span>
-                      {transactionData.contractAddress && showContractTooltip && (
-                        <div className="absolute z-10 bottom-full left-0 mb-2 p-2 bg-gray-900 dark:bg-neutral-100 text-white dark:text-black text-xs rounded shadow-lg w-64 break-all">
-                          <p className="font-semibold mb-1">Contract Address:</p>
-                          <p className="font-mono">{transactionData.contractAddress}</p>
+                    {/* Network & Coin */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <Card>
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-2">
+                            <Network className="w-4 h-4 text-primary mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Network</p>
+                              <Badge variant="outline" className="text-xs">
+                                {transactionData.network} {transactionData.networkType && `(${transactionData.networkType})`}
+                              </Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-2">
+                            <DollarSign className="w-4 h-4 text-primary mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Coin/Token</p>
+                              <div className="relative inline-block">
+                                <span
+                                  className="text-sm font-semibold text-foreground cursor-pointer"
+                                  onMouseEnter={() => transactionData.contractAddress && setShowContractTooltip(true)}
+                                  onMouseLeave={() => setShowContractTooltip(false)}
+                                >
+                                  {transactionData.coin}
+                                  {transactionData.contractAddress && (
+                                    <span className="ml-1 text-xs text-muted-foreground">ⓘ</span>
+                                  )}
+                                </span>
+                                {transactionData.contractAddress && showContractTooltip && (
+                                  <div className="absolute z-10 bottom-full left-0 mb-2 p-2 bg-popover border border-border text-popover-foreground text-xs rounded-md shadow-lg w-64 break-all">
+                                    <p className="font-semibold mb-1">Contract Address:</p>
+                                    <p className="font-mono">{transactionData.contractAddress}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* From & To Addresses */}
+                    <Card className="border-2">
+                      <CardContent className="p-3 space-y-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <p className="text-xs font-medium text-muted-foreground">From Address</p>
+                          </div>
+                          <p className="text-xs font-mono text-foreground break-all bg-muted/50 p-2 rounded">{transactionData.from}</p>
                         </div>
-                      )}
+
+                        <div className="flex justify-center">
+                          <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <p className="text-xs font-medium text-muted-foreground">To Address</p>
+                          </div>
+                          <p className="text-xs font-mono text-foreground break-all bg-muted/50 p-2 rounded">{transactionData.to}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Amount, Date & Fee */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <Card>
+                        <CardContent className="p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Amount</p>
+                          <p className="text-sm font-bold text-foreground">
+                            {transactionData.amount} {transactionData.coin}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-primary mt-0.5" />
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Date & Time</p>
+                              <p className="text-xs text-foreground">
+                                {new Date(transactionData.dateTime).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Fee</p>
+                          <p className="text-sm font-semibold text-foreground">{transactionData.fee}</p>
+                        </CardContent>
+                      </Card>
                     </div>
+
+                    {/* XRP Destination Tag */}
+                    {transactionData.destinationTag !== undefined && (
+                      <Card>
+                        <CardContent className="p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Destination Tag (XRP)</p>
+                          <p className="text-sm text-foreground">
+                            {transactionData.destinationTag || <span className="text-destructive font-semibold">Not Provided</span>}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* EOS Memo */}
+                    {transactionData.memo !== undefined && (
+                      <Card>
+                        <CardContent className="p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Memo (EOS)</p>
+                          <p className="text-sm text-foreground">
+                            {transactionData.memo || <span className="text-destructive font-semibold">Not Provided</span>}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Error Display */}
+                    {transactionData.error && (
+                      <Card className="border-2 border-destructive/20 bg-destructive/5">
+                        <CardContent className="p-3">
+                          <p className="text-sm font-semibold text-destructive">⚠️ {transactionData.error}</p>
+                          {transactionData.errorDetails && (
+                            <p className="text-xs text-destructive/80 mt-1">{transactionData.errorDetails}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Status */}
+                    {transactionData.status && (
+                      <Card>
+                        <CardContent className="p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Status</p>
+                          <Badge
+                            variant="outline"
+                            className={`${
+                              transactionData.status === 'success'
+                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+                                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                            } flex items-center gap-1.5 w-fit px-3 py-1`}
+                          >
+                            {transactionData.status === 'success' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            <span className="capitalize font-medium">{transactionData.status}</span>
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
-
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">From Address</p>
-                    <p className="text-sm font-mono text-gray-900 dark:text-neutral-50 break-all">{transactionData.from}</p>
-                  </div>
-
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">To Address</p>
-                    <p className="text-sm font-mono text-gray-900 dark:text-neutral-50 break-all">{transactionData.to}</p>
-                  </div>
-
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Amount</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">
-                      {transactionData.amount} {transactionData.coin}
-                    </p>
-                  </div>
-
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Date & Time</p>
-                    <p className="text-sm text-gray-900 dark:text-neutral-50">
-                      {new Date(transactionData.dateTime).toLocaleString()}
-                    </p>
-                  </div>
-
-                  <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                    <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Transaction Fee</p>
-                    <p className="text-sm text-gray-900 dark:text-neutral-50">{transactionData.fee}</p>
-                  </div>
-
-                  {/* XRP Destination Tag */}
-                  {transactionData.destinationTag !== undefined && (
-                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Destination Tag (XRP)</p>
-                      <p className="text-sm text-gray-900 dark:text-neutral-50">
-                        {transactionData.destinationTag || <span className="text-red-500">Not Provided</span>}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* EOS Memo */}
-                  {transactionData.memo !== undefined && (
-                    <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Memo (EOS)</p>
-                      <p className="text-sm text-gray-900 dark:text-neutral-50">
-                        {transactionData.memo || <span className="text-red-500">Not Provided</span>}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Error Display for XRP/EOS */}
-                  {transactionData.error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                      <p className="text-sm font-semibold text-red-700 dark:text-red-400">⚠️ {transactionData.error}</p>
-                      {transactionData.errorDetails && (
-                        <p className="text-xs text-red-600 dark:text-red-500 mt-1">{transactionData.errorDetails}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {transactionData.status && (
-                    <div className="pb-3">
-                      <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Status</p>
-                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                        transactionData.status === 'success'
-                          ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                          : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                      }`}>
-                        {transactionData.status}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

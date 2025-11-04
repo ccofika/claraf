@@ -10,6 +10,7 @@ import QuickLinks from './QuickLinks';
 import DeveloperDashboard from './DeveloperDashboard';
 import AffiliateBonusFinder from './AffiliateBonusFinder';
 import KYC from './KYC';
+import QAManager from './QAManager';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
@@ -591,6 +592,9 @@ const Workspace = () => {
           )}
           {activeSection === 'developer-dashboard' && (
             <DeveloperDashboard />
+          )}
+          {activeSection === 'qa-manager' && (
+            <QAManager />
           )}
         </div>
 

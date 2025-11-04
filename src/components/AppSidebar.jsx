@@ -22,6 +22,7 @@ import {
   ChartLine,
   Gift,
   CheckmarkFilled,
+  Task,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -82,9 +83,31 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     });
   }
 
+  // Add QA Manager for specific emails only
+  const qaAllowedEmails = [
+    'filipkozomara@mebit.io',
+    'vasilijevitorovic@mebit.io',
+    'nevena@mebit.io',
+    'mladenjorganovic@mebit.io'
+  ];
+  const hasQAAccess = user?.email && qaAllowedEmails.includes(user.email);
+  if (hasQAAccess) {
+    navItems.push({
+      id: 'qa-manager',
+      icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />,
+      label: 'QA Manager',
+      isExternal: true // Flag to indicate this navigates externally
+    });
+  }
+
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleNavItemClick = (item) => {
+    // All items use section change now
+    onSectionChange(item.id);
   };
 
   return (
@@ -95,7 +118,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
           <IconNavButton
             key={item.id}
             isActive={activeSection === item.id}
-            onClick={() => onSectionChange(item.id)}
+            onClick={() => handleNavItemClick(item)}
           >
             {item.icon}
           </IconNavButton>

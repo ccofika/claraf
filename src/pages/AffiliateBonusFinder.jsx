@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Gift, AlertCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Gift, AlertCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Copy, Check, Filter, Sparkles } from 'lucide-react';
+import { Card, CardContent } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
 
 const AffiliateBonusFinder = () => {
   const [affiliateName, setAffiliateName] = useState('');
@@ -248,50 +251,52 @@ If you have any other questions in the meantime, feel free to ask.`
     const isSelected = selectedDB === cardId;
 
     return (
-      <div key={cardId} className={`border rounded-md overflow-hidden bg-white dark:bg-black transition-all ${
+      <Card key={cardId} className={`transition-all ${
         isSelected
-          ? 'border-gray-900 dark:border-neutral-50 shadow-md'
-          : 'border-gray-200 dark:border-neutral-800'
+          ? 'border-2 border-primary shadow-md'
+          : 'border'
       }`}>
         {/* Card Header - Always Visible */}
         <div className="flex items-center">
           {/* Selection Checkbox */}
-          <div className="p-3 border-r border-gray-200 dark:border-neutral-800">
+          <div className="p-2 border-r border-border">
             <input
               type="checkbox"
               checked={isSelected}
               onChange={() => handleSelectCard(cardId, 'DB')}
-              className="w-4 h-4 cursor-pointer"
+              className="w-3.5 h-3.5 cursor-pointer"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
 
           {/* Card Content */}
           <div
-            className="flex-1 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-900 transition-colors"
+            className="flex-1 p-2 cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => toggleCard(cardId)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1">
-                <Gift className="text-gray-600 dark:text-neutral-400" size={16} />
+                <Gift className="text-primary" size={14} />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-neutral-50">
+                  <h3 className="text-xs font-semibold text-foreground">
                     Deposit Bonus (DB)
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-neutral-400">
-                    {result.affiliateName} • {result.bonusStatus || 'N/A'}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                    <span>{result.affiliateName}</span>
+                    <span>•</span>
+                    <span>{result.bonusStatus || 'N/A'}</span>
                     {result.bonus && (
-                      <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-neutral-800 rounded text-xs">
+                      <Badge variant="outline" className="text-xs px-1.5 py-0">
                         Campaign: {result.bonus}
-                      </span>
+                      </Badge>
                     )}
-                  </p>
+                  </div>
                 </div>
               </div>
               {isExpanded ? (
-                <ChevronUp className="text-gray-500 dark:text-neutral-400" size={16} />
+                <ChevronUp className="text-muted-foreground" size={14} />
               ) : (
-                <ChevronDown className="text-gray-500 dark:text-neutral-400" size={16} />
+                <ChevronDown className="text-muted-foreground" size={14} />
               )}
             </div>
           </div>
@@ -299,98 +304,98 @@ If you have any other questions in the meantime, feel free to ask.`
 
         {/* Card Body - Expandable */}
         {isExpanded && (
-          <div className="px-3 pb-3 border-t border-gray-200 dark:border-neutral-800 pt-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Bonus Status</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.bonusStatus || 'N/A'}</p>
+          <div className="px-2 pb-2 border-t border-border pt-2">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="pb-2 border-b border-border">
+                <p className="text-muted-foreground mb-0.5">Bonus Status</p>
+                <p className="font-medium text-foreground">{result.bonusStatus || 'N/A'}</p>
               </div>
 
-              <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Affiliate Name</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.affiliateName}</p>
+              <div className="pb-2 border-b border-border">
+                <p className="text-muted-foreground mb-0.5">Affiliate Name</p>
+                <p className="font-medium text-foreground">{result.affiliateName}</p>
               </div>
 
               {result.bonus && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Bonus</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.bonus}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Bonus</p>
+                  <p className="font-medium text-foreground">{result.bonus}</p>
                 </div>
               )}
 
               {result.percentage && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Percentage</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.percentage}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Percentage</p>
+                  <p className="font-medium text-foreground">{result.percentage}</p>
                 </div>
               )}
 
               {result.wager && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Wager</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.wager}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Wager</p>
+                  <p className="font-medium text-foreground">{result.wager}</p>
                 </div>
               )}
 
               {result.minDeposit && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Min Deposit</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.minDeposit}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Min Deposit</p>
+                  <p className="font-medium text-foreground">{result.minDeposit}</p>
                 </div>
               )}
 
               {result.maxDeposit && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Max Deposit</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.maxDeposit}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Max Deposit</p>
+                  <p className="font-medium text-foreground">{result.maxDeposit}</p>
                 </div>
               )}
 
               {result.managedBy && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Managed By</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.managedBy}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Managed By</p>
+                  <p className="font-medium text-foreground">{result.managedBy}</p>
                 </div>
               )}
 
               {result.language && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Language</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.language}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Language</p>
+                  <p className="font-medium text-foreground">{result.language}</p>
                 </div>
               )}
 
               {result.kycRequirement && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">KYC Requirement</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.kycRequirement}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">KYC Requirement</p>
+                  <p className="font-medium text-foreground">{result.kycRequirement}</p>
                 </div>
               )}
 
               {result.platformMethod && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Platform/Method of Contact</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.platformMethod}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Platform/Method</p>
+                  <p className="font-medium text-foreground">{result.platformMethod}</p>
                 </div>
               )}
 
               {result.contactInstructions && (
-                <div className="col-span-2 pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Contact Instructions</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">{result.contactInstructions}</p>
+                <div className="col-span-2 pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Contact Instructions</p>
+                  <p className="font-medium text-foreground whitespace-pre-wrap">{result.contactInstructions}</p>
                 </div>
               )}
 
               {result.importantNote && (
-                <div className="col-span-2 pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Important Note</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">{result.importantNote}</p>
+                <div className="col-span-2 pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Important Note</p>
+                  <p className="font-medium text-foreground whitespace-pre-wrap">{result.importantNote}</p>
                 </div>
               )}
             </div>
           </div>
         )}
-      </div>
+      </Card>
     );
   };
 
@@ -400,50 +405,52 @@ If you have any other questions in the meantime, feel free to ask.`
     const isSelected = selectedWB === cardId;
 
     return (
-      <div key={cardId} className={`border rounded-md overflow-hidden bg-white dark:bg-black transition-all ${
+      <Card key={cardId} className={`transition-all ${
         isSelected
-          ? 'border-gray-900 dark:border-neutral-50 shadow-md'
-          : 'border-gray-200 dark:border-neutral-800'
+          ? 'border-2 border-primary shadow-md'
+          : 'border'
       }`}>
         {/* Card Header - Always Visible */}
         <div className="flex items-center">
           {/* Selection Checkbox */}
-          <div className="p-3 border-r border-gray-200 dark:border-neutral-800">
+          <div className="p-2 border-r border-border">
             <input
               type="checkbox"
               checked={isSelected}
               onChange={() => handleSelectCard(cardId, 'WB')}
-              className="w-4 h-4 cursor-pointer"
+              className="w-3.5 h-3.5 cursor-pointer"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
 
           {/* Card Content */}
           <div
-            className="flex-1 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-900 transition-colors"
+            className="flex-1 p-2 cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => toggleCard(cardId)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1">
-                <Gift className="text-gray-600 dark:text-neutral-400" size={16} />
+                <Sparkles className="text-primary" size={14} />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-neutral-50">
+                  <h3 className="text-xs font-semibold text-foreground">
                     Welcome Bonus (WB)
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-neutral-400">
-                    {result.affiliateName} • {result.bonusStatus || 'N/A'}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                    <span>{result.affiliateName}</span>
+                    <span>•</span>
+                    <span>{result.bonusStatus || 'N/A'}</span>
                     {result.campaignSpecific && (
-                      <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-neutral-800 rounded text-xs">
+                      <Badge variant="outline" className="text-xs px-1.5 py-0">
                         Campaign: {result.campaignSpecific}
-                      </span>
+                      </Badge>
                     )}
-                  </p>
+                  </div>
                 </div>
               </div>
               {isExpanded ? (
-                <ChevronUp className="text-gray-500 dark:text-neutral-400" size={16} />
+                <ChevronUp className="text-muted-foreground" size={14} />
               ) : (
-                <ChevronDown className="text-gray-500 dark:text-neutral-400" size={16} />
+                <ChevronDown className="text-muted-foreground" size={14} />
               )}
             </div>
           </div>
@@ -451,356 +458,381 @@ If you have any other questions in the meantime, feel free to ask.`
 
         {/* Card Body - Expandable */}
         {isExpanded && (
-          <div className="px-3 pb-3 border-t border-gray-200 dark:border-neutral-800 pt-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Bonus Status</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.bonusStatus || 'N/A'}</p>
+          <div className="px-2 pb-2 border-t border-border pt-2">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="pb-2 border-b border-border">
+                <p className="text-muted-foreground mb-0.5">Bonus Status</p>
+                <p className="font-medium text-foreground">{result.bonusStatus || 'N/A'}</p>
               </div>
 
-              <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Affiliate Name</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.affiliateName}</p>
+              <div className="pb-2 border-b border-border">
+                <p className="text-muted-foreground mb-0.5">Affiliate Name</p>
+                <p className="font-medium text-foreground">{result.affiliateName}</p>
               </div>
 
               {result.campaignSpecific && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Campaign-Specific</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.campaignSpecific}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Campaign-Specific</p>
+                  <p className="font-medium text-foreground">{result.campaignSpecific}</p>
                 </div>
               )}
 
               {result.offer && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Offer</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.offer}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Offer</p>
+                  <p className="font-medium text-foreground">{result.offer}</p>
                 </div>
               )}
 
               {result.amount && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Amount</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.amount}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Amount</p>
+                  <p className="font-medium text-foreground">{result.amount}</p>
                 </div>
               )}
 
               {result.currency && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Currency If Applicable</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.currency}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Currency</p>
+                  <p className="font-medium text-foreground">{result.currency}</p>
                 </div>
               )}
 
               {result.days && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Days If Applicable</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.days}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Days</p>
+                  <p className="font-medium text-foreground">{result.days}</p>
                 </div>
               )}
 
               {result.depositRequirements && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Deposit Requirements</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.depositRequirements}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Deposit Requirements</p>
+                  <p className="font-medium text-foreground">{result.depositRequirements}</p>
                 </div>
               )}
 
               {result.minimumWager && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Minimum Wager</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.minimumWager}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Minimum Wager</p>
+                  <p className="font-medium text-foreground">{result.minimumWager}</p>
                 </div>
               )}
 
               {result.wagerRequirement && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Wager Requirement</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.wagerRequirement}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Wager Requirement</p>
+                  <p className="font-medium text-foreground">{result.wagerRequirement}</p>
                 </div>
               )}
 
               {result.managedBy && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Managed By</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.managedBy}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Managed By</p>
+                  <p className="font-medium text-foreground">{result.managedBy}</p>
                 </div>
               )}
 
               {result.language && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Language</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.language}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Language</p>
+                  <p className="font-medium text-foreground">{result.language}</p>
                 </div>
               )}
 
               {result.kycRequirement && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">KYC Requirement</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.kycRequirement}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">KYC Requirement</p>
+                  <p className="font-medium text-foreground">{result.kycRequirement}</p>
                 </div>
               )}
 
               {result.platformMethod && (
-                <div className="pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Platform/Method of Contact</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50">{result.platformMethod}</p>
+                <div className="pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Platform/Method</p>
+                  <p className="font-medium text-foreground">{result.platformMethod}</p>
                 </div>
               )}
 
               {result.contactInstructions && (
-                <div className="col-span-2 pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Contact Instructions</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">{result.contactInstructions}</p>
+                <div className="col-span-2 pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Contact Instructions</p>
+                  <p className="font-medium text-foreground whitespace-pre-wrap">{result.contactInstructions}</p>
                 </div>
               )}
 
               {result.importantNotes && (
-                <div className="col-span-2 pb-3 border-b border-gray-200 dark:border-neutral-800">
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mb-1">Important Notes</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">{result.importantNotes}</p>
+                <div className="col-span-2 pb-2 border-b border-border">
+                  <p className="text-muted-foreground mb-0.5">Important Notes</p>
+                  <p className="font-medium text-foreground whitespace-pre-wrap">{result.importantNotes}</p>
                 </div>
               )}
             </div>
           </div>
         )}
-      </div>
+      </Card>
     );
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header Section - Centered and Compact */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-neutral-50 mb-1">
-            Affiliate Bonus Finder
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-neutral-400">
-            Search for affiliate bonuses from the Stake.com database
-          </p>
-        </div>
-
-        {/* Search Section - Centered and Compact */}
-        <div className="max-w-4xl mx-auto mb-6">
-          {error && (
-            <div className="px-4 py-2 rounded mb-4 text-sm flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {infoMessage && (
-            <div className="px-4 py-2 rounded mb-4 text-sm flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-              <span>{infoMessage}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSearch} className="space-y-3">
-            {/* Affiliate Name Input */}
-            <div>
-              <input
-                id="affiliateName"
-                name="affiliateName"
-                type="text"
-                required
-                className="block w-full px-3 py-2 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-                value={affiliateName}
-                onChange={(e) => setAffiliateName(e.target.value)}
-                placeholder="Enter affiliate name"
-              />
-            </div>
-
-            {/* Campaign ID Input and Buttons in Same Row */}
-            <div className="flex gap-3">
-              <input
-                id="campaignId"
-                name="campaignId"
-                type="text"
-                className="w-1/2 px-3 py-2 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-black text-gray-900 dark:text-neutral-50 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                placeholder="Campaign ID (optional)"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-1/4 px-3 py-2 bg-gray-900 dark:bg-neutral-50 text-white dark:text-black rounded-md hover:bg-gray-800 dark:hover:bg-neutral-200 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-              >
-                <Search size={16} />
-                {loading ? 'Searching...' : 'Search'}
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="w-1/4 px-3 py-2 border border-gray-200 dark:border-neutral-800 text-gray-900 dark:text-neutral-50 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-800 font-medium transition-colors text-sm"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Content Grid - Two Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Search Results */}
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-3">
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Gift className="w-5 h-5 text-primary" />
+          </div>
           <div>
-            <div className="bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-neutral-50">
-                  Search Results
-                </h2>
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Affiliate Bonus Finder</h1>
+            <p className="text-xs text-muted-foreground">Search affiliate bonuses from Stake.com database</p>
+          </div>
+        </div>
 
-                {results.length > 0 && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setFilter('all')}
-                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                        filter === 'all'
-                          ? 'bg-gray-900 dark:bg-neutral-50 text-white dark:text-black'
-                          : 'bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-neutral-50 hover:bg-gray-200 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setFilter('db')}
-                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                        filter === 'db'
-                          ? 'bg-gray-900 dark:bg-neutral-50 text-white dark:text-black'
-                          : 'bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-neutral-50 hover:bg-gray-200 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      DB
-                    </button>
-                    <button
-                      onClick={() => setFilter('wb')}
-                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                        filter === 'wb'
-                          ? 'bg-gray-900 dark:bg-neutral-50 text-white dark:text-black'
-                          : 'bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-neutral-50 hover:bg-gray-200 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      WB
-                    </button>
-                  </div>
-                )}
+        {/* Search Section */}
+        <Card>
+          <CardContent className="p-3">
+            {error && (
+              <div className="px-2 py-1.5 rounded-lg mb-2 text-xs flex items-start gap-1.5 bg-destructive/10 border border-destructive/20 text-destructive">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {infoMessage && (
+              <div className="px-2 py-1.5 rounded-lg mb-2 text-xs flex items-start gap-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                <span>{infoMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSearch} className="space-y-2">
+              <div className="space-y-1">
+                <Label htmlFor="affiliateName" className="text-xs font-medium text-foreground">
+                  Affiliate Name
+                </Label>
+                <input
+                  id="affiliateName"
+                  name="affiliateName"
+                  type="text"
+                  required
+                  className="flex h-8 w-full rounded-md border border-input bg-card text-foreground px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={affiliateName}
+                  onChange={(e) => setAffiliateName(e.target.value)}
+                  placeholder="Enter affiliate name"
+                />
               </div>
 
-              {results.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-600 dark:text-neutral-400">
-                  <Gift size={48} className="mb-3 opacity-50" />
-                  <p className="text-sm">Enter an affiliate name to search for bonuses</p>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="campaignId" className="text-xs font-medium text-foreground">
+                    Campaign ID (Optional)
+                  </Label>
+                  <input
+                    id="campaignId"
+                    name="campaignId"
+                    type="text"
+                    className="flex h-8 w-full rounded-md border border-input bg-card text-foreground px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    value={campaignId}
+                    onChange={(e) => setCampaignId(e.target.value)}
+                    placeholder="Campaign ID"
+                  />
                 </div>
-              ) : (
-                <div className="overflow-y-auto space-y-3 pr-2" style={{ maxHeight: 'calc(100vh - 360px)' }}>
-                  {getFilteredResults().map((result, index) =>
-                    result.source === 'DB' ? renderDBResult(result, index) : renderWBResult(result, index)
+                <div className="flex items-end gap-1.5">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex items-center justify-center rounded-md bg-primary px-3 h-8 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-1.5"
+                  >
+                    <Search size={12} />
+                    {loading ? 'Searching...' : 'Search'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-8 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Content Grid - Two Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 overflow-hidden" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+          {/* Left Column - Search Results */}
+          <div className="flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+            <Card className="flex-1 overflow-hidden flex flex-col">
+              <CardContent className="p-2 flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-primary" />
+                    <h2 className="text-xs font-semibold text-foreground">Search Results</h2>
+                  </div>
+
+                  {results.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Filter className="w-3 h-3 text-muted-foreground" />
+                      <button
+                        onClick={() => setFilter('all')}
+                        className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                          filter === 'all'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setFilter('db')}
+                        className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                          filter === 'db'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        DB
+                      </button>
+                      <button
+                        onClick={() => setFilter('wb')}
+                        className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                          filter === 'wb'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        WB
+                      </button>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+
+                {results.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center flex-1 py-6">
+                    <div className="w-12 h-12 bg-muted/20 rounded-full flex items-center justify-center mb-2">
+                      <Gift className="w-6 h-6 text-muted-foreground/70" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground mb-1">No Results</h3>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      Enter an affiliate name to search for bonuses
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-y-auto space-y-1.5 pr-1 pb-3 flex-1 min-h-0">
+                    {getFilteredResults().map((result, index) =>
+                      result.source === 'DB' ? renderDBResult(result, index) : renderWBResult(result, index)
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column - Step by Step */}
-          <div>
-            <div className="bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-neutral-800 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-4">
-                {/* Previous Step Button */}
-                <button
-                  onClick={goToPrevStep}
-                  disabled={currentStep === 0}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                    currentStep === 0
-                      ? 'text-gray-400 dark:text-neutral-600 cursor-not-allowed'
-                      : 'text-gray-900 dark:text-neutral-50 hover:bg-gray-100 dark:hover:bg-neutral-800'
-                  }`}
-                  title={currentStep > 0 ? steps[currentStep - 1].title : ''}
-                >
-                  <ChevronLeft size={16} />
-                  {currentStep > 0 && (
-                    <span className="hidden sm:inline truncate max-w-[80px]">
-                      {steps[currentStep - 1].title}
-                    </span>
-                  )}
-                </button>
-
-                {/* Current Step Title */}
-                <div className="flex-1 text-center px-2">
-                  <h2 className="text-base font-bold text-gray-900 dark:text-neutral-50">
-                    Step {currentStep + 1} - {steps[currentStep].title}
-                  </h2>
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mt-1">
-                    {steps[currentStep].description}
-                  </p>
-                </div>
-
-                {/* Next Step Button */}
-                <button
-                  onClick={goToNextStep}
-                  disabled={currentStep === steps.length - 1}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                    currentStep === steps.length - 1
-                      ? 'text-gray-400 dark:text-neutral-600 cursor-not-allowed'
-                      : 'text-gray-900 dark:text-neutral-50 hover:bg-gray-100 dark:hover:bg-neutral-800'
-                  }`}
-                  title={currentStep < steps.length - 1 ? steps[currentStep + 1].title : ''}
-                >
-                  {currentStep < steps.length - 1 && (
-                    <span className="hidden sm:inline truncate max-w-[80px]">
-                      {steps[currentStep + 1].title}
-                    </span>
-                  )}
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-
-              {/* Rich Text Content Box */}
-              <div className="overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 360px)' }}>
-                <div className="border border-gray-200 dark:border-neutral-800 rounded-md p-4 bg-gray-50 dark:bg-neutral-900 font-mono text-xs text-gray-900 dark:text-neutral-50 whitespace-pre-wrap">
-                  {renderRichText(steps[currentStep].content)}
-                </div>
-
-                {/* Copy Button */}
-                <div className="mt-4 flex justify-end">
+          <div className="flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+            <Card className="flex-1 overflow-hidden flex flex-col">
+              <CardContent className="p-2 flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                  {/* Previous Step Button */}
                   <button
-                    onClick={handleCopyContent}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-neutral-50 text-white dark:text-black rounded-md hover:bg-gray-800 dark:hover:bg-neutral-200 transition-colors text-sm"
+                    onClick={goToPrevStep}
+                    disabled={currentStep === 0}
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded transition-colors ${
+                      currentStep === 0
+                        ? 'text-muted-foreground/50 cursor-not-allowed'
+                        : 'text-foreground hover:bg-muted'
+                    }`}
+                    title={currentStep > 0 ? steps[currentStep - 1].title : ''}
                   >
-                    {copied ? (
-                      <>
-                        <Check size={16} />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={16} />
-                        Copy Content
-                      </>
+                    <ChevronLeft size={12} />
+                    {currentStep > 0 && (
+                      <span className="hidden sm:inline truncate max-w-[60px]">
+                        {steps[currentStep - 1].title}
+                      </span>
                     )}
+                  </button>
+
+                  {/* Current Step Title */}
+                  <div className="flex-1 text-center px-1">
+                    <div className="flex items-center justify-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-primary" />
+                      <h2 className="text-xs font-semibold text-foreground">
+                        Step {currentStep + 1}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {steps[currentStep].title}
+                    </p>
+                  </div>
+
+                  {/* Next Step Button */}
+                  <button
+                    onClick={goToNextStep}
+                    disabled={currentStep === steps.length - 1}
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded transition-colors ${
+                      currentStep === steps.length - 1
+                        ? 'text-muted-foreground/50 cursor-not-allowed'
+                        : 'text-foreground hover:bg-muted'
+                    }`}
+                    title={currentStep < steps.length - 1 ? steps[currentStep + 1].title : ''}
+                  >
+                    {currentStep < steps.length - 1 && (
+                      <span className="hidden sm:inline truncate max-w-[60px]">
+                        {steps[currentStep + 1].title}
+                      </span>
+                    )}
+                    <ChevronRight size={12} />
                   </button>
                 </div>
 
-                {/* Selected Bonuses Info */}
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-300 mb-2">
-                    Selected Bonuses:
-                  </h4>
-                  <div className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
-                    {selectedBonusData.db ? (
-                      <div>✓ DB: {selectedBonusData.db.affiliateName} - {selectedBonusData.db.bonusStatus}</div>
-                    ) : (
-                      <div className="text-blue-600 dark:text-blue-500">○ No DB bonus selected</div>
-                    )}
-                    {selectedBonusData.wb ? (
-                      <div>✓ WB: {selectedBonusData.wb.affiliateName} - {selectedBonusData.wb.bonusStatus}</div>
-                    ) : (
-                      <div className="text-blue-600 dark:text-blue-500">○ No WB bonus selected</div>
-                    )}
+                {/* Rich Text Content Box */}
+                <div className="overflow-y-auto pr-1 pb-3 flex-1 min-h-0 space-y-2">
+                  <div className="border border-border rounded-lg p-2 bg-muted/50 font-mono text-xs text-foreground whitespace-pre-wrap">
+                    {renderRichText(steps[currentStep].content)}
+                  </div>
+
+                  {/* Copy Button */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleCopyContent}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-xs font-medium"
+                    >
+                      {copied ? (
+                        <>
+                          <Check size={12} />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={12} />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Selected Bonuses Info */}
+                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-300 mb-1">
+                      Selected Bonuses:
+                    </h4>
+                    <div className="text-xs text-blue-800 dark:text-blue-400 space-y-0.5">
+                      {selectedBonusData.db ? (
+                        <div>✓ DB: {selectedBonusData.db.affiliateName}</div>
+                      ) : (
+                        <div className="text-blue-600 dark:text-blue-500">○ No DB selected</div>
+                      )}
+                      {selectedBonusData.wb ? (
+                        <div>✓ WB: {selectedBonusData.wb.affiliateName}</div>
+                      ) : (
+                        <div className="text-blue-600 dark:text-blue-500">○ No WB selected</div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
