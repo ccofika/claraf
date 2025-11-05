@@ -101,16 +101,6 @@ const TextFormattingDock = ({ currentWorkspaceId }) => {
       const clonedRange = range.cloneRange();
       setSavedSelection(clonedRange);
       setActiveElementLink(currentElementLink);
-
-      console.log('Saved selection for element link:', {
-        text: range.toString(),
-        hasElementLink: !!currentElementLink,
-        elementLinkData: currentElementLink,
-        startContainer: range.startContainer,
-        startOffset: range.startOffset,
-        endContainer: range.endContainer,
-        endOffset: range.endOffset
-      });
     } else {
       console.warn('No selection available');
       return;
@@ -120,7 +110,6 @@ const TextFormattingDock = ({ currentWorkspaceId }) => {
   };
 
   const handleRemoveElementLink = () => {
-    console.log('Removing element link for:', activeElementLink);
 
     // Close modal and reset state first
     setShowElementLinkModal(false);
@@ -138,11 +127,6 @@ const TextFormattingDock = ({ currentWorkspaceId }) => {
           const restoredRange = savedSelection.cloneRange();
           selection.addRange(restoredRange);
 
-          console.log('Restored selection for link removal:', {
-            text: restoredRange.toString(),
-            elementLink: activeElementLink
-          });
-
           // Set element link to null to remove it
           setElementLink(null);
         } catch (error) {
@@ -157,7 +141,6 @@ const TextFormattingDock = ({ currentWorkspaceId }) => {
   };
 
   const handleElementLinkSelect = (linkData) => {
-    console.log('Element link selected:', linkData);
 
     // Close modal first
     setShowElementLinkModal(false);
@@ -174,15 +157,6 @@ const TextFormattingDock = ({ currentWorkspaceId }) => {
           // Restore the saved selection
           const restoredRange = savedSelection.cloneRange();
           selection.addRange(restoredRange);
-
-          console.log('Restored selection:', restoredRange.toString());
-          console.log('Range details:', {
-            startContainer: restoredRange.startContainer,
-            startOffset: restoredRange.startOffset,
-            endContainer: restoredRange.endContainer,
-            endOffset: restoredRange.endOffset,
-            collapsed: restoredRange.collapsed
-          });
 
           // Apply the element link with the restored selection
           setElementLink(linkData);

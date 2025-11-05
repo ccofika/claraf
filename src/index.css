@@ -165,28 +165,49 @@
   color: #6b7280;
 }
 
-/* Hyperlink Styles - for both edit and display mode */
-a {
+/* React Router Link Override - prevent default blue/purple colors */
+a[class*="inline-flex"],
+a[class*="text-gray"],
+a[class*="text-neutral"],
+a[class*="text-muted"] {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+a[class*="inline-flex"]:visited,
+a[class*="text-gray"]:visited,
+a[class*="text-neutral"]:visited,
+a[class*="text-muted"]:visited {
+  color: inherit !important;
+}
+
+/* Hyperlink Styles - for content links in canvas/editor only */
+[contenteditable] a,
+.canvas-content a {
   color: #3b82f6; /* blue-500 */
   text-decoration: underline;
   cursor: pointer;
   position: relative;
 }
 
-a:hover {
+[contenteditable] a:hover,
+.canvas-content a:hover {
   color: #2563eb; /* blue-600 */
 }
 
-.dark a {
+.dark [contenteditable] a,
+.dark .canvas-content a {
   color: #60a5fa; /* blue-400 for dark mode */
 }
 
-.dark a:hover {
+.dark [contenteditable] a:hover,
+.dark .canvas-content a:hover {
   color: #3b82f6; /* blue-500 for dark mode hover */
 }
 
-/* Hyperlink Tooltip - for all links */
-a:hover::after {
+/* Hyperlink Tooltip - for content links only */
+[contenteditable] a:hover::after,
+.canvas-content a:hover::after {
   content: 'Open with Ctrl + Left Click';
   position: absolute;
   bottom: 100%;
@@ -203,7 +224,8 @@ a:hover::after {
   margin-bottom: 4px;
 }
 
-.dark a:hover::after {
+.dark [contenteditable] a:hover::after,
+.dark .canvas-content a:hover::after {
   background: rgba(255, 255, 255, 0.9);
   color: black;
 }

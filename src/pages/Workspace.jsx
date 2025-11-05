@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import InfiniteCanvas from '../components/InfiniteCanvas';
 import AppSidebar from '../components/AppSidebar';
 import HashExplorerFinder from './HashExplorerFinder';
@@ -8,14 +9,19 @@ import VIPProgressCalculator from './VIPProgressCalculator';
 import QuickLinks from './QuickLinks';
 import DeveloperDashboard from './DeveloperDashboard';
 import AffiliateBonusFinder from './AffiliateBonusFinder';
+import KYC from './KYC';
+import QAManager from './QAManager';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
 import TitleNavigation from '../components/TitleNavigation';
+import TutorialModal from '../components/TutorialModal';
 
 const Workspace = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [canvas, setCanvas] = useState(null);
@@ -25,8 +31,9 @@ const Workspace = () => {
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('workspaces');
   const [bookmarks, setBookmarks] = useState([]);
-  const [isViewMode, setIsViewMode] = useState(false);
+  const [viewMode, setViewMode] = useState('view'); // 'edit', 'view', or 'post-view'
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [lastAccessedElement, setLastAccessedElement] = useState(null);
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -34,6 +41,7 @@ const Workspace = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [workspaceToEdit, setWorkspaceToEdit] = useState(null);
   const [workspaceToManage, setWorkspaceToManage] = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const fetchAllWorkspaces = useCallback(async () => {
     try {
@@ -109,11 +117,20 @@ const Workspace = () => {
     fetchBookmarks();
   }, []);
 
-  // Fetch and load view mode preference for current workspace
+  // Check if user should see tutorial
   useEffect(() => {
-    const fetchViewModePreference = async () => {
+    // Show tutorial only if user hasn't completed it and workspace is loaded
+    if (user && !user.tutorialCompleted && !loading) {
+      setShowTutorial(true);
+    }
+  }, [user, loading]);
+
+  // Fetch and load view mode preference and lastAccessedElement for current workspace
+  useEffect(() => {
+    const fetchWorkspacePreferences = async () => {
       if (!workspaceId || !workspace?.permissions?.canEditContent) {
-        setIsViewMode(true); // Force view mode if can't edit
+        setViewMode('view'); // Force view mode if can't edit
+        setLastAccessedElement(null);
         return;
       }
 
@@ -123,14 +140,16 @@ const Workspace = () => {
           `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setIsViewMode(response.data.viewMode === 'view');
+        setViewMode(response.data.viewMode || 'view');
+        setLastAccessedElement(response.data.lastAccessedElement || null);
       } catch (err) {
-        console.error('Error fetching view mode preference:', err);
-        setIsViewMode(true); // Default to view mode on error (no preference saved yet)
+        console.error('Error fetching workspace preferences:', err);
+        setViewMode('view'); // Default to view mode on error
+        setLastAccessedElement(null);
       }
     };
 
-    fetchViewModePreference();
+    fetchWorkspacePreferences();
   }, [workspaceId, workspace?.permissions?.canEditContent]);
 
   const handleElementUpdate = async (updatedElement) => {
@@ -315,20 +334,41 @@ const Workspace = () => {
     setBookmarks(prevBookmarks => [...prevBookmarks, newBookmark]);
   }, []);
 
-  const handleTitleClick = useCallback((element) => {
+  const handleTitleClick = useCallback(async (element) => {
     // Zoom to the title element
     const event = new CustomEvent('zoomToElement', { detail: element });
     window.dispatchEvent(event);
-  }, []);
 
-  const handleViewModeToggle = async (newViewMode) => {
-    setIsViewMode(newViewMode);
+    // Save as last accessed element
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+        { elementId: element._id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setLastAccessedElement(element._id);
+    } catch (err) {
+      console.error('Error saving last accessed element:', err);
+    }
+  }, [workspaceId]);
+
+  const handleViewModeChange = async (newViewMode) => {
+    const previousMode = viewMode;
+    setViewMode(newViewMode);
+
+    // Reset zoom flag when switching between post-view and other modes
+    // This allows auto-centering to trigger when entering view/edit mode from post-view
+    if ((previousMode === 'post-view' && newViewMode !== 'post-view') ||
+        (previousMode !== 'post-view' && newViewMode === 'post-view')) {
+      hasZoomedToLatestTitle.current = false;
+    }
 
     try {
       const token = localStorage.getItem('token');
       await axios.put(
         `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
-        { viewMode: newViewMode ? 'view' : 'edit' },
+        { viewMode: newViewMode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) {
@@ -362,12 +402,30 @@ const Workspace = () => {
 
   // Auto-zoom to latest title element when workspace loads (unless there's pending navigation)
   const hasZoomedToLatestTitle = React.useRef(false);
+
+  // Reset flag on component mount (handles page refresh)
   React.useEffect(() => {
-    // Reset the flag when workspace changes
+    hasZoomedToLatestTitle.current = false;
+  }, []);
+
+  // Reset flag when workspace changes (handles workspace switching)
+  React.useEffect(() => {
     if (workspaceId) {
       hasZoomedToLatestTitle.current = false;
     }
   }, [workspaceId]);
+
+  // Reset flag when location changes (handles page navigation)
+  React.useEffect(() => {
+    hasZoomedToLatestTitle.current = false;
+  }, [location.key]);
+
+  // Reset flag when returning to workspaces section (handles KYC, VIP Calculator, etc navigation)
+  React.useEffect(() => {
+    if (activeSection === 'workspaces') {
+      hasZoomedToLatestTitle.current = false;
+    }
+  }, [activeSection]);
 
   React.useEffect(() => {
     // Only zoom if:
@@ -376,28 +434,65 @@ const Workspace = () => {
     // 3. Elements are loaded
     // 4. Haven't zoomed yet for this workspace
     // 5. Not currently switching workspaces
+    // 6. Currently viewing workspaces section (not KYC, VIP Calculator, etc)
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
 
-    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
-      // Find the latest title element (sorted by createdAt descending)
-      const titleElements = elements
-        .filter(el => el.type === 'title')
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current && activeSection === 'workspaces') {
+      let targetElement = null;
 
-      const latestTitle = titleElements[0];
+      // First, try to find the lastAccessedElement if it exists
+      if (lastAccessedElement) {
+        targetElement = elements.find(el => el._id === lastAccessedElement);
+        if (targetElement && targetElement.type === 'title') {
+        } else {
+          // lastAccessedElement doesn't exist or is not a title anymore
+          targetElement = null;
+        }
+      }
 
-      if (latestTitle) {
+      // If no lastAccessedElement or it doesn't exist, fall back to latest title
+      if (!targetElement) {
+        const titleElements = elements
+          .filter(el => el.type === 'title')
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        targetElement = titleElements[0];
+      }
+
+      if (targetElement) {
         // Mark that we've zoomed to prevent re-triggering
         hasZoomedToLatestTitle.current = true;
 
-        // Trigger zoom to latest title after a short delay to ensure canvas is ready
+        // Trigger instant zoom (no animation) for initial workspace load
         setTimeout(() => {
-          const event = new CustomEvent('zoomToElement', { detail: latestTitle });
+          const event = new CustomEvent('zoomToElement', {
+            detail: {
+              ...targetElement,
+              instant: true // No animation for initial load
+            }
+          });
           window.dispatchEvent(event);
-        }, 500);
+        }, 100); // Reduced delay since we're not animating
+
+        // Save as last accessed element if it's not already the one we loaded
+        if (!lastAccessedElement || lastAccessedElement !== targetElement._id) {
+          const saveLastAccessed = async () => {
+            try {
+              const token = localStorage.getItem('token');
+              await axios.put(
+                `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+                { elementId: targetElement._id },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              setLastAccessedElement(targetElement._id);
+            } catch (err) {
+              console.error('Error auto-saving last accessed element:', err);
+            }
+          };
+          saveLastAccessed();
+        }
       }
     }
-  }, [canvas, elements, switchingWorkspace]);
+  }, [canvas, elements, switchingWorkspace, lastAccessedElement, viewMode, workspaceId, location.key, activeSection]);
 
   // Auto-redirect to announcements workspace if access is denied
   useEffect(() => {
@@ -450,6 +545,7 @@ const Workspace = () => {
           onSectionChange={setActiveSection}
           onCollapsedChange={setIsSidebarCollapsed}
           onRefreshWorkspaces={fetchAllWorkspaces}
+          viewMode={viewMode}
         />
 
         {/* Main Content */}
@@ -463,17 +559,20 @@ const Workspace = () => {
                 onElementCreate={handleElementCreate}
                 onElementDelete={handleElementDelete}
                 canEditContent={workspace?.permissions?.canEditContent}
-                isViewMode={isViewMode}
-                onViewModeToggle={handleViewModeToggle}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
                 workspaces={workspaces}
                 onElementNavigate={handleElementNavigate}
                 onBookmarkCreated={handleBookmarkCreated}
               />
-              <TitleNavigation
-                elements={elements}
-                onTitleClick={handleTitleClick}
-                isSidebarCollapsed={isSidebarCollapsed}
-              />
+              {/* Hide TitleNavigation in post-view mode */}
+              {viewMode !== 'post-view' && (
+                <TitleNavigation
+                  elements={elements}
+                  onTitleClick={handleTitleClick}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+              )}
             </>
           )}
           {activeSection === 'vip-calculator' && (
@@ -488,8 +587,14 @@ const Workspace = () => {
           {activeSection === 'affiliate-bonus-finder' && (
             <AffiliateBonusFinder />
           )}
+          {activeSection === 'kyc' && (
+            <KYC />
+          )}
           {activeSection === 'developer-dashboard' && (
             <DeveloperDashboard />
+          )}
+          {activeSection === 'qa-manager' && (
+            <QAManager />
           )}
         </div>
 
@@ -526,6 +631,12 @@ const Workspace = () => {
         }}
         workspace={workspaceToManage}
         onWorkspaceUpdated={handleWorkspaceUpdated}
+      />
+
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onDontShowAgain={() => setShowTutorial(false)}
       />
     </>
   );

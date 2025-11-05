@@ -7,12 +7,14 @@ import Minimap from './Minimap';
 import ElementSettingsModal from './ElementSettingsModal';
 import TextFormattingDock from './TextFormattingDock';
 import CanvasSearchBar from './CanvasSearchBar';
-import ViewModeSwitch from './ViewModeSwitch';
+import ViewModeDropdown from './ViewModeDropdown';
 import DynamicGrid from './DynamicGrid';
+import PostView from './PostView';
 import { useTheme } from '../context/ThemeContext';
 import { useTextFormatting } from '../context/TextFormattingContext';
+import { getElementsInsideWrapper } from '../utils/wrapperUtils';
 
-const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, canEditContent = true, isViewMode = false, onViewModeToggle, workspaces = [], onElementNavigate, onBookmarkCreated }) => {
+const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated }) => {
   const [canvasElements, setCanvasElements] = useState(elements);
   const transformWrapperRef = useRef(null);
   const { theme } = useTheme();
@@ -26,8 +28,8 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   const rafRef = useRef(null);
   const frozenCanvasBoundsRef = useRef(null);
 
-  // Determine if user is actually in edit mode (has permission AND not in view mode)
-  const isInEditMode = canEditContent && !isViewMode;
+  // Determine if user is actually in edit mode (has permission AND in edit mode)
+  const isInEditMode = canEditContent && viewMode === 'edit';
   const [isDraggingElement, setIsDraggingElement] = React.useState(false);
   const [activeId, setActiveId] = React.useState(null);
   const [viewport, setViewport] = useState({
@@ -127,6 +129,17 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
   // Track previous workspace ID to detect workspace changes
   const prevWorkspaceId = React.useRef(workspaceId);
+  const [isPanningDisabled, setIsPanningDisabled] = React.useState(false);
+
+  // Listen for disable panning events from wrapper resize
+  React.useEffect(() => {
+    const handleDisablePanning = (event) => {
+      setIsPanningDisabled(event.detail);
+    };
+
+    window.addEventListener('disablePanning', handleDisablePanning);
+    return () => window.removeEventListener('disablePanning', handleDisablePanning);
+  }, []);
 
   // Reset viewport when switching workspaces
   React.useEffect(() => {
@@ -155,13 +168,19 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
   // Virtualization: Only render elements visible in viewport (disabled during panning to prevent flicker)
   const visibleElements = useMemo(() => {
-    // Disable virtualization while panning to prevent flickering
-    if (isPanning) return canvasElements;
+    // First, filter out wrapper elements if not in edit mode
+    let filteredElements = canvasElements;
+    if (!isInEditMode) {
+      filteredElements = canvasElements.filter(element => element.type !== 'wrapper');
+    }
 
-    if (!viewport.scale || canvasElements.length === 0) return canvasElements;
+    // Disable virtualization while panning to prevent flickering
+    if (isPanning) return filteredElements;
+
+    if (!viewport.scale || filteredElements.length === 0) return filteredElements;
 
     // If there are fewer than 50 elements, don't virtualize (no performance benefit)
-    if (canvasElements.length < 50) return canvasElements;
+    if (filteredElements.length < 50) return filteredElements;
 
     // Use larger padding for smoother experience
     const padding = 2000; // Increased padding to reduce pop-in
@@ -174,7 +193,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     const viewportBottom = viewportTop + (viewport.height / scale) + (padding * 2);
 
     // Filter elements that intersect with viewport
-    return canvasElements.filter(element => {
+    return filteredElements.filter(element => {
       if (!element.position || !element.dimensions) return true; // Always render if no position/dimensions
 
       const elementLeft = element.position.x;
@@ -190,7 +209,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         elementTop > viewportBottom
       );
     });
-  }, [canvasElements, viewport.x, viewport.y, viewport.scale, viewport.width, viewport.height, isPanning]);
+  }, [canvasElements, viewport.x, viewport.y, viewport.scale, viewport.width, viewport.height, isPanning, isInEditMode]);
 
   // Handle viewport updates from transform changes with RAF for smooth updates
   const handleTransformChange = useCallback((ref) => {
@@ -292,6 +311,11 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         }],
         currentExampleIndex: 0,
         isExpanded: false
+      };
+    } else if (itemId === 'wrapper') {
+      dimensions = { width: 600, height: 400 };
+      content = {
+        childElements: [] // Will be populated automatically based on element positions
       };
     }
 
@@ -442,12 +466,26 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       )
     );
 
+    // If dragged element is a wrapper, update its childElements
+    let updatedElement = {
+      ...draggedElement,
+      position: newPosition,
+    };
+
+    if (draggedElement.type === 'wrapper') {
+      const childElementIds = getElementsInsideWrapper(updatedElement, canvasElements);
+      updatedElement = {
+        ...updatedElement,
+        content: {
+          ...updatedElement.content,
+          childElements: childElementIds
+        }
+      };
+    }
+
     // Notify parent component about the update
     if (onElementUpdate) {
-      onElementUpdate({
-        ...draggedElement,
-        position: newPosition,
-      });
+      onElementUpdate(updatedElement);
     }
   }, [canvasElements, onElementUpdate, isInEditMode, viewport.scale]);
 
@@ -462,7 +500,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     } else {
       // Element is in current workspace - zoom to it
       if (transformWrapperRef.current && element.position) {
-        const targetScale = 1.5;
+        const targetScale = 0.375;
 
         // Calculate element center position
         const elementCenterX = element.position.x + (element.dimensions?.width || 0) / 2;
@@ -470,8 +508,14 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
         // Calculate transform position to center the element
         // Formula: -elementPos * scale + viewportCenter
-        const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
-        const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+        let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+        let targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+
+        // Shift view right and down
+        const shiftRight = window.innerWidth * 0.25;  // 25% desno
+        const shiftDown = window.innerHeight * 0.075; // 7.5% dole
+        targetX -= shiftRight;
+        targetY -= shiftDown;
 
         transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
       }
@@ -535,73 +579,64 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Listen for zoom to element events
   React.useEffect(() => {
     const handleZoomToElement = (event) => {
-      console.log('=== InfiniteCanvas handleZoomToElement START ===');
-      console.log('Event received:', event);
-      console.log('Event detail:', event.detail);
 
       const eventData = event.detail;
       if (!eventData) {
-        console.log('❌ No event data');
         return;
       }
       if (!transformWrapperRef.current) {
-        console.log('❌ No transformWrapperRef');
         return;
       }
 
-      console.log('✓ Event data and transformWrapperRef exist');
-      console.log('Event data:', eventData);
-      console.log('Canvas elements count:', canvasElements.length);
+
+      // Extract instant flag (for no animation)
+      const instant = eventData.instant || false;
 
       // Find the element in canvasElements if only _id is provided
       let targetElement = eventData;
       if (eventData._id && !eventData.position) {
-        console.log('Looking for element with _id:', eventData._id);
         targetElement = canvasElements.find(el => el._id === eventData._id);
-        console.log('Found element:', targetElement);
       }
 
       if (!targetElement) {
-        console.log('❌ Target element not found');
         return;
       }
       if (!targetElement.position) {
-        console.log('❌ Target element has no position');
         return;
       }
 
-      console.log('✓ Target element found with position:', targetElement.position);
 
-      const targetScale = 1.5;
+      const targetScale = 0.375;
 
       // Calculate element center position
       const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
       const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
 
-      console.log('Element center:', { x: elementCenterX, y: elementCenterY });
 
       // Calculate transform position to center the element
-      const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
-      const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+      let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+      let targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
 
-      console.log('Transform target:', { x: targetX, y: targetY, scale: targetScale });
+      // Shift view right and down
+      const shiftRight = window.innerWidth * 0.25;  // 25% desno
+      const shiftDown = window.innerHeight * 0.075; // 7.5% dole
+      targetX -= shiftRight; // Shift view right
+      targetY -= shiftDown;  // Shift view down
 
-      transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
-      console.log('✓ setTransform called');
+
+      // Use duration 0 for instant (no animation), 500ms for smooth animation
+      const duration = instant ? 0 : 500;
+      transformWrapperRef.current.setTransform(targetX, targetY, targetScale, duration);
 
       // Highlight element
       setHighlightedElement(targetElement._id);
-      console.log('✓ Element highlighted');
 
       // Remove highlight after 3 seconds
       setTimeout(() => setHighlightedElement(null), 3000);
-      console.log('=== InfiniteCanvas handleZoomToElement END ===');
     };
 
-    console.log('InfiniteCanvas: Adding zoomToElement event listener');
     window.addEventListener('zoomToElement', handleZoomToElement);
     return () => {
-      console.log('InfiniteCanvas: Removing zoomToElement event listener');
       window.removeEventListener('zoomToElement', handleZoomToElement);
     };
   }, [canvasElements]);
@@ -616,15 +651,21 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       if (targetElement && targetElement.position) {
         // Wait for canvas to be ready, then zoom to element
         setTimeout(() => {
-          const targetScale = 1.5;
+          const targetScale = 0.375;
 
           // Calculate element center position
           const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
           const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
 
           // Calculate transform position to center the element
-          const targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
-          const targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+          let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+          let targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+
+          // Shift view right and down
+          const shiftRight = window.innerWidth * 0.25;  // 25% desno
+          const shiftDown = window.innerHeight * 0.075; // 7.5% dole
+          targetX -= shiftRight;
+          targetY -= shiftDown;
 
           // Set transform
           if (transformWrapperRef.current) {
@@ -646,17 +687,30 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     }
   }, [canvasElements]);
 
+  // If in post-view mode, render PostView instead of canvas
+  if (viewMode === 'post-view') {
+    const wrappers = canvasElements.filter(el => el.type === 'wrapper');
+    return (
+      <PostView
+        wrappers={wrappers}
+        allElements={canvasElements}
+        currentWorkspace={{ _id: workspaceId }}
+        onModeChange={onViewModeChange}
+        canEditContent={canEditContent}
+      />
+    );
+  }
+
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* View Mode Switch - shown only if user has edit permission */}
-      {canEditContent && (
-        <div className="absolute top-6 right-6 z-50">
-          <ViewModeSwitch
-            isViewMode={isViewMode}
-            onToggle={onViewModeToggle}
-          />
-        </div>
-      )}
+      {/* View Mode Dropdown - always shown, but edit option only visible if user has edit permission */}
+      <div className="absolute top-6 right-6 z-50">
+        <ViewModeDropdown
+          currentMode={viewMode}
+          onModeChange={onViewModeChange}
+          canEditContent={canEditContent}
+        />
+      </div>
 
       {/* Only show DockBar if user can edit AND is in edit mode */}
       {isInEditMode && <DockBar onItemClick={handleDockItemClick} />}
@@ -705,7 +759,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         initialPositionX={0}
         initialPositionY={0}
         panning={{
-          disabled: isDraggingElement || (isHoveringElement && !isInEditMode),
+          disabled: isDraggingElement || (isHoveringElement && !isInEditMode) || isPanningDisabled,
           excluded: ['input', 'textarea', 'button', 'svg', 'path', 'a'],
           excludedClass: 'canvas-draggable-element'
         }}
@@ -775,6 +829,8 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                         onBookmarkCreated={onBookmarkCreated}
                         onMouseEnter={handleElementMouseEnter}
                         onMouseLeave={handleElementMouseLeave}
+                        allElements={canvasElements}
+                        viewportScale={viewport.scale || 1}
                       />
                     ))}
                   </DndContext>

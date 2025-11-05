@@ -405,7 +405,6 @@ const RichTextEditor = ({
       // Element Link
       if (JSON.stringify(newFormatting.elementLink) !== JSON.stringify(prevFormat.elementLink)) {
         if (newFormatting.elementLink) {
-          console.log('Creating element link with data:', newFormatting.elementLink);
 
           // Get fresh selection
           const currentSelection = window.getSelection();
@@ -414,15 +413,6 @@ const RichTextEditor = ({
             return;
           }
           const freshRange = currentSelection.getRangeAt(0);
-
-          console.log('Current range:', {
-            toString: freshRange.toString(),
-            startContainer: freshRange.startContainer,
-            startOffset: freshRange.startOffset,
-            endContainer: freshRange.endContainer,
-            endOffset: freshRange.endOffset,
-            collapsed: freshRange.collapsed
-          });
 
           // Check if current selection already has a link (any type)
           const container = freshRange.commonAncestorContainer;
@@ -444,7 +434,6 @@ const RichTextEditor = ({
             // Re-get the range after unlink
             if (currentSelection.rangeCount > 0) {
               const updatedRange = currentSelection.getRangeAt(0);
-              console.log('Range after unlink:', updatedRange.toString());
             }
           }
 
@@ -457,7 +446,6 @@ const RichTextEditor = ({
 
           // Create element link
           const selectedContent = finalRange.extractContents();
-          console.log('Extracted content:', selectedContent.textContent);
 
           const link = document.createElement('a');
           link.href = 'javascript:void(0)';
@@ -472,8 +460,6 @@ const RichTextEditor = ({
           link.appendChild(selectedContent);
           finalRange.insertNode(link);
 
-          console.log('Element link created:', link.outerHTML);
-          console.log('Link text content:', link.textContent);
 
           // Restore selection on the link
           const newRange = document.createRange();
@@ -509,7 +495,6 @@ const RichTextEditor = ({
               currentSelection.removeAllRanges();
               currentSelection.addRange(newRange);
 
-              console.log('Element link removed and styles cleared');
             }
           }
         }
@@ -554,7 +539,6 @@ const RichTextEditor = ({
         e.stopPropagation();
       }}
       onClick={(e) => {
-        console.log('RichTextEditor onClick triggered', { target: e.target, ctrlKey: e.ctrlKey, metaKey: e.metaKey });
 
         // Handle link clicks - find closest anchor element
         let target = e.target;
@@ -562,13 +546,6 @@ const RichTextEditor = ({
         // Walk up the DOM to find an anchor tag
         while (target && target !== editorRef.current) {
           if (target.tagName === 'A') {
-            console.log('Found anchor tag:', {
-              elementId: target.getAttribute('data-element-id'),
-              workspaceId: target.getAttribute('data-workspace-id'),
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey
-            });
-
             e.preventDefault();
             e.stopPropagation();
 
@@ -579,13 +556,6 @@ const RichTextEditor = ({
             if (elementId && elementWorkspaceId) {
               // Element link - navigate only with Ctrl/Cmd + click
               if ((e.ctrlKey || e.metaKey) && onElementLinkClick) {
-                console.log('Calling onElementLinkClick with:', {
-                  elementId,
-                  workspaceId: elementWorkspaceId,
-                  elementType: target.getAttribute('data-element-type'),
-                  elementTitle: target.getAttribute('data-element-title')
-                });
-
                 onElementLinkClick({
                   elementId,
                   workspaceId: elementWorkspaceId,

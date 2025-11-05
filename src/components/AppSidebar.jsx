@@ -21,6 +21,8 @@ import {
   Settings,
   ChartLine,
   Gift,
+  CheckmarkFilled,
+  Task,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -68,6 +70,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     { id: 'hash-explorer', icon: <SearchIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Hash Explorer Finder' },
     { id: 'quick-links', icon: <LinkIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Quick Links' },
     { id: 'affiliate-bonus-finder', icon: <Gift size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Affiliate Bonus Finder' },
+    { id: 'kyc', icon: <CheckmarkFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Management' },
   ];
 
   // Add developer dashboard for admin/developer roles only
@@ -80,9 +83,31 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     });
   }
 
+  // Add QA Manager for specific emails only
+  const qaAllowedEmails = [
+    'filipkozomara@mebit.io',
+    'vasilijevitorovic@mebit.io',
+    'nevena@mebit.io',
+    'mladenjorganovic@mebit.io'
+  ];
+  const hasQAAccess = user?.email && qaAllowedEmails.includes(user.email);
+  if (hasQAAccess) {
+    navItems.push({
+      id: 'qa-manager',
+      icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />,
+      label: 'QA Manager',
+      isExternal: true // Flag to indicate this navigates externally
+    });
+  }
+
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleNavItemClick = (item) => {
+    // All items use section change now
+    onSectionChange(item.id);
   };
 
   return (
@@ -93,7 +118,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
           <IconNavButton
             key={item.id}
             isActive={activeSection === item.id}
-            onClick={() => onSectionChange(item.id)}
+            onClick={() => handleNavItemClick(item)}
           >
             {item.icon}
           </IconNavButton>
@@ -411,12 +436,18 @@ function DetailSidebar({
 
   const toggleCollapse = () => setIsCollapsed((s) => !s);
 
-  // Notify parent when collapsed state changes
+  // Notify parent when collapsed state or activeSection changes
   React.useEffect(() => {
     if (onCollapsedChange) {
-      onCollapsedChange(isCollapsed);
+      if (activeSection === 'workspaces') {
+        // When showing workspaces, use actual collapsed state
+        onCollapsedChange(isCollapsed);
+      } else {
+        // When showing other sections, notify that sidebar is effectively "collapsed" (hidden)
+        onCollapsedChange(true);
+      }
     }
-  }, [isCollapsed, onCollapsedChange]);
+  }, [activeSection, isCollapsed, onCollapsedChange]);
 
   const handleEditBookmark = (bookmarkId) => {
     const bookmark = bookmarks?.find(b => b._id === bookmarkId);
@@ -668,7 +699,8 @@ export default function AppSidebar({
   activeSection,
   onSectionChange,
   onCollapsedChange,
-  onRefreshWorkspaces
+  onRefreshWorkspaces,
+  viewMode
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -680,22 +712,25 @@ export default function AppSidebar({
           onSectionChange={onSectionChange}
           onOpenProfile={() => setIsProfileOpen(true)}
         />
-        <DetailSidebar
-          activeSection={activeSection}
-          currentWorkspace={currentWorkspace}
-          workspaces={workspaces}
-          bookmarks={bookmarks}
-          onAddWorkspace={onAddWorkspace}
-          onEditWorkspace={onEditWorkspace}
-          onDeleteWorkspace={onDeleteWorkspace}
-          onSettingsWorkspace={onSettingsWorkspace}
-          onWorkspaceClick={onWorkspaceClick}
-          onBookmarkClick={onBookmarkClick}
-          onBookmarkUpdate={onBookmarkUpdate}
-          onBookmarkDelete={onBookmarkDelete}
-          onCollapsedChange={onCollapsedChange}
-          onRefreshWorkspaces={onRefreshWorkspaces}
-        />
+        {/* Only show DetailSidebar when activeSection is 'workspaces' and not in post-view mode */}
+        {activeSection === 'workspaces' && viewMode !== 'post-view' && (
+          <DetailSidebar
+            activeSection={activeSection}
+            currentWorkspace={currentWorkspace}
+            workspaces={workspaces}
+            bookmarks={bookmarks}
+            onAddWorkspace={onAddWorkspace}
+            onEditWorkspace={onEditWorkspace}
+            onDeleteWorkspace={onDeleteWorkspace}
+            onSettingsWorkspace={onSettingsWorkspace}
+            onWorkspaceClick={onWorkspaceClick}
+            onBookmarkClick={onBookmarkClick}
+            onBookmarkUpdate={onBookmarkUpdate}
+            onBookmarkDelete={onBookmarkDelete}
+            onCollapsedChange={onCollapsedChange}
+            onRefreshWorkspaces={onRefreshWorkspaces}
+          />
+        )}
       </div>
 
       <ProfileModal

@@ -142,6 +142,12 @@ export const AuthProvider = ({ children }) => {
       );
       const { token, ...userData } = response.data;
       localStorage.setItem('token', token);
+
+      // Store userId for Socket.io authentication
+      if (userData._id) {
+        localStorage.setItem('userId', userData._id);
+      }
+
       setToken(token);
       setUser(userData);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -163,6 +169,12 @@ export const AuthProvider = ({ children }) => {
       );
       const { token, ...userData } = response.data;
       localStorage.setItem('token', token);
+
+      // Store userId for Socket.io authentication
+      if (userData._id) {
+        localStorage.setItem('userId', userData._id);
+      }
+
       setToken(token);
       setUser(userData);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -188,6 +200,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       // Clear local state regardless of backend call success
       localStorage.removeItem('token');
+      localStorage.removeItem('userId'); // Clear userId for Socket.io
       setToken(null);
       setUser(null);
       delete axios.defaults.headers.common['Authorization'];

@@ -58,13 +58,32 @@ const Dashboard = () => {
     }
   };
 
+  // Check if user has access to QA Manager
+  const hasQAAccess = () => {
+    const allowedEmails = [
+      'filipkozomara@mebit.io',
+      'vasilijevitorovic@mebit.io',
+      'nevena@mebit.io',
+      'mladenjorganovic@mebit.io'
+    ];
+    return user?.email && allowedEmails.includes(user.email);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
+            <div className="flex items-center gap-6">
               <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+              {hasQAAccess() && (
+                <button
+                  onClick={() => navigate('/qa-manager')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  QA Manager
+                </button>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-muted-foreground">
