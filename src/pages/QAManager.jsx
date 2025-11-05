@@ -14,6 +14,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+import CustomDatePicker from '../components/ui/CustomDatePicker';
 
 const QAManager = () => {
   const { user } = useAuth();
@@ -920,31 +921,27 @@ const QAManager = () => {
                     </select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="filterDateFrom" className="text-sm font-medium text-card-foreground mb-2 block">
-                      Date From
-                    </Label>
-                    <Input
-                      id="filterDateFrom"
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                      className="w-full text-sm"
-                    />
-                  </div>
+                  <CustomDatePicker
+                    id="filterDateFrom"
+                    label="Date From"
+                    value={filters.dateFrom}
+                    onChange={(value) => setFilters({ ...filters, dateFrom: value })}
+                    placeholder="From date"
+                    showIcon={true}
+                    className="text-sm"
+                    maxDate={filters.dateTo ? new Date(filters.dateTo) : null}
+                  />
 
-                  <div>
-                    <Label htmlFor="filterDateTo" className="text-sm font-medium text-card-foreground mb-2 block">
-                      Date To
-                    </Label>
-                    <Input
-                      id="filterDateTo"
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                      className="w-full text-sm"
-                    />
-                  </div>
+                  <CustomDatePicker
+                    id="filterDateTo"
+                    label="Date To"
+                    value={filters.dateTo}
+                    onChange={(value) => setFilters({ ...filters, dateTo: value })}
+                    placeholder="To date"
+                    showIcon={true}
+                    className="text-sm"
+                    minDate={filters.dateFrom ? new Date(filters.dateFrom) : null}
+                  />
                 </div>
               )}
             </div>
@@ -1252,31 +1249,27 @@ const QAManager = () => {
                     </select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="filterDateFromArchive" className="text-sm font-medium text-card-foreground mb-2 block">
-                      Date From
-                    </Label>
-                    <Input
-                      id="filterDateFromArchive"
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                      className="w-full text-sm"
-                    />
-                  </div>
+                  <CustomDatePicker
+                    id="filterDateFromArchive"
+                    label="Date From"
+                    value={filters.dateFrom}
+                    onChange={(value) => setFilters({ ...filters, dateFrom: value })}
+                    placeholder="From date"
+                    showIcon={true}
+                    className="text-sm"
+                    maxDate={filters.dateTo ? new Date(filters.dateTo) : null}
+                  />
 
-                  <div>
-                    <Label htmlFor="filterDateToArchive" className="text-sm font-medium text-card-foreground mb-2 block">
-                      Date To
-                    </Label>
-                    <Input
-                      id="filterDateToArchive"
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                      className="w-full text-sm"
-                    />
-                  </div>
+                  <CustomDatePicker
+                    id="filterDateToArchive"
+                    label="Date To"
+                    value={filters.dateTo}
+                    onChange={(value) => setFilters({ ...filters, dateTo: value })}
+                    placeholder="To date"
+                    showIcon={true}
+                    className="text-sm"
+                    minDate={filters.dateFrom ? new Date(filters.dateFrom) : null}
+                  />
                 </div>
               )}
             </div>
@@ -1378,11 +1371,8 @@ const QAManager = () => {
       name: '',
       position: '',
       team: '',
-      goalMinDate: '',
-      goalMaxDate: '',
       periodStart: '',
-      periodEnd: '',
-      isActive: true
+      periodEnd: ''
     });
 
     useEffect(() => {
@@ -1391,22 +1381,16 @@ const QAManager = () => {
           name: agentDialog.data.name || '',
           position: agentDialog.data.position || '',
           team: agentDialog.data.team || '',
-          goalMinDate: agentDialog.data.goalMinDate ? new Date(agentDialog.data.goalMinDate).toISOString().split('T')[0] : '',
-          goalMaxDate: agentDialog.data.goalMaxDate ? new Date(agentDialog.data.goalMaxDate).toISOString().split('T')[0] : '',
           periodStart: agentDialog.data.periodStart ? new Date(agentDialog.data.periodStart).toISOString().split('T')[0] : '',
-          periodEnd: agentDialog.data.periodEnd ? new Date(agentDialog.data.periodEnd).toISOString().split('T')[0] : '',
-          isActive: agentDialog.data.isActive !== undefined ? agentDialog.data.isActive : true
+          periodEnd: agentDialog.data.periodEnd ? new Date(agentDialog.data.periodEnd).toISOString().split('T')[0] : ''
         });
       } else {
         setFormData({
           name: '',
           position: '',
           team: '',
-          goalMinDate: '',
-          goalMaxDate: '',
           periodStart: '',
-          periodEnd: '',
-          isActive: true
+          periodEnd: ''
         });
       }
     }, [agentDialog.data]);
@@ -1470,71 +1454,42 @@ const QAManager = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="goalMinDate" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Goal Min Date
-                </Label>
-                <Input
-                  id="goalMinDate"
-                  type="date"
-                  value={formData.goalMinDate}
-                  onChange={(e) => setFormData({ ...formData, goalMinDate: e.target.value })}
-                  className="w-full"
-                />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-card-foreground">Evaluation Period (Optional)</span>
               </div>
-              <div>
-                <Label htmlFor="goalMaxDate" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Goal Max Date
-                </Label>
-                <Input
-                  id="goalMaxDate"
-                  type="date"
-                  value={formData.goalMaxDate}
-                  onChange={(e) => setFormData({ ...formData, goalMaxDate: e.target.value })}
-                  className="w-full"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="periodStart" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Period Start
-                </Label>
-                <Input
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CustomDatePicker
                   id="periodStart"
-                  type="date"
+                  label="Start Date"
                   value={formData.periodStart}
-                  onChange={(e) => setFormData({ ...formData, periodStart: e.target.value })}
-                  className="w-full"
+                  onChange={(value) => setFormData({ ...formData, periodStart: value })}
+                  placeholder="Select start date"
+                  showIcon={false}
+                  maxDate={formData.periodEnd ? new Date(formData.periodEnd) : null}
                 />
-              </div>
-              <div>
-                <Label htmlFor="periodEnd" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Period End
-                </Label>
-                <Input
-                  id="periodEnd"
-                  type="date"
-                  value={formData.periodEnd}
-                  onChange={(e) => setFormData({ ...formData, periodEnd: e.target.value })}
-                  className="w-full"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-input rounded focus:ring-blue-500"
-              />
-              <Label htmlFor="isActive" className="text-sm font-medium text-card-foreground cursor-pointer">
-                Active Agent
-              </Label>
+                <CustomDatePicker
+                  id="periodEnd"
+                  label="End Date"
+                  value={formData.periodEnd}
+                  onChange={(value) => setFormData({ ...formData, periodEnd: value })}
+                  placeholder="Select end date"
+                  showIcon={false}
+                  minDate={formData.periodStart ? new Date(formData.periodStart) : null}
+                />
+              </div>
+
+              {formData.periodStart && formData.periodEnd && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 px-3 py-2 rounded-lg">
+                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                  <span>
+                    Duration: {Math.ceil((new Date(formData.periodEnd) - new Date(formData.periodStart)) / (1000 * 60 * 60 * 24))} days
+                  </span>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="flex items-center gap-3 pt-4 border-t">
@@ -1662,18 +1617,14 @@ const QAManager = () => {
               />
             </div>
 
-            <div>
-              <Label htmlFor="ticketDate" className="text-sm font-medium text-card-foreground mb-2 block">
-                Date Entered
-              </Label>
-              <Input
-                id="ticketDate"
-                type="date"
-                value={formData.dateEntered}
-                onChange={(e) => setFormData({ ...formData, dateEntered: e.target.value })}
-                className="w-full"
-              />
-            </div>
+            <CustomDatePicker
+              id="ticketDate"
+              label="Date Entered"
+              value={formData.dateEntered}
+              onChange={(value) => setFormData({ ...formData, dateEntered: value })}
+              placeholder="Select date"
+              showIcon={true}
+            />
 
             <div>
               <Label htmlFor="ticketNotes" className="text-sm font-medium text-card-foreground mb-2 block">
