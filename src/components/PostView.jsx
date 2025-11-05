@@ -349,15 +349,26 @@ const PostView = ({ wrappers = [], allElements = [], currentWorkspace, onModeCha
     );
   };
 
+  // Empty State Component
+  const EmptyState = ({ icon: Icon, title, description }) => (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mb-4">
+        <Icon className="w-8 h-8 text-muted-foreground/70" />
+      </div>
+      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">{description}</p>
+    </div>
+  );
+
   if (sortedWrappers.length === 0) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="text-center max-w-md mx-auto px-6">
-          <div className="mb-4 text-muted-foreground/40">
-            <Send className="w-16 h-16 mx-auto" />
-          </div>
-          <p className="text-2xl font-semibold text-foreground mb-3">No Posts Available</p>
-          <p className="text-base text-muted-foreground leading-relaxed">Create a wrapper in edit mode to start viewing your posts here.</p>
+      <div className="min-h-screen bg-background p-8">
+        <div className="max-w-7xl mx-auto">
+          <EmptyState
+            icon={Send}
+            title="No Posts Available"
+            description="Create a wrapper in edit mode to start viewing your posts here."
+          />
         </div>
       </div>
     );
@@ -365,205 +376,209 @@ const PostView = ({ wrappers = [], allElements = [], currentWorkspace, onModeCha
 
   if (!currentWrapper) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="text-center max-w-md mx-auto px-6">
-          <div className="mb-4 text-muted-foreground/40">
-            <Search className="w-16 h-16 mx-auto" />
-          </div>
-          <p className="text-2xl font-semibold text-foreground mb-3">Wrapper Not Found</p>
-          <p className="text-base text-muted-foreground leading-relaxed">The wrapper you're looking for doesn't exist.</p>
+      <div className="min-h-screen bg-background p-8">
+        <div className="max-w-7xl mx-auto">
+          <EmptyState
+            icon={Search}
+            title="Wrapper Not Found"
+            description="The wrapper you're looking for doesn't exist."
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-background flex flex-col">
-      {/* Header with Title - Sticky and Enhanced */}
-      <div className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur-sm shadow-sm px-6 py-5">
-        <div className="flex items-center justify-between gap-6">
-          {/* Left: Navigation + Title */}
-          <div className="flex items-center gap-5 flex-1 min-w-0">
-            {/* Navigation Arrows */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={goToPrevious}
-                disabled={currentWrapperIndex >= sortedWrappers.length - 1}
-                className="p-2.5 rounded-lg border border-input bg-background hover:bg-accent hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-200 shadow-sm"
-                title="Previous post (← Arrow Key)"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={goToNext}
-                disabled={currentWrapperIndex === 0}
-                className="p-2.5 rounded-lg border border-input bg-background hover:bg-accent hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-200 shadow-sm"
-                title="Next post (→ Arrow Key)"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold truncate text-foreground" data-searchable>
-                {wrapperElements.title?.content?.value
-                  ? stripHtml(wrapperElements.title.content.value)
-                  : 'Untitled Post'}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Post {currentWrapperIndex + 1} of {sortedWrappers.length}
-              </p>
-            </div>
-          </div>
-
-          {/* Right: Search + Mode Dropdown */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search in post..."
-                title="Search in post (Ctrl/Cmd + F)"
-                className={`flex h-10 rounded-lg border border-input bg-background pl-10 pr-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all ${
-                  searchResults.length > 0 ? 'w-80 pr-28' : 'w-64'
-                }`}
-              />
-              {searchResults.length > 0 && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-background px-2 rounded-md z-20 border border-border">
-                  <span className="text-xs text-foreground mr-1 font-semibold whitespace-nowrap">
-                    {currentSearchIndex + 1}/{searchResults.length}
-                  </span>
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-[1800px] mx-auto space-y-6">
+        {/* Header Card */}
+        <div className="bg-card border border-border rounded-lg shadow-sm">
+          <div className="p-6">
+            <div className="flex items-center justify-between gap-6">
+              {/* Left: Navigation + Title */}
+              <div className="flex items-center gap-5 flex-1 min-w-0">
+                {/* Navigation Arrows */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={goToPrevSearchResult}
-                    className="p-1.5 rounded-md bg-muted hover:bg-accent transition-colors"
-                    title="Previous result"
+                    onClick={goToPrevious}
+                    disabled={currentWrapperIndex >= sortedWrappers.length - 1}
+                    className="p-2.5 rounded-lg border border-input bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Previous post (← Arrow Key)"
                   >
-                    <ChevronUp className="h-3.5 w-3.5 text-foreground" />
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={goToNextSearchResult}
-                    className="p-1.5 rounded-md bg-muted hover:bg-accent transition-colors"
-                    title="Next result"
+                    onClick={goToNext}
+                    disabled={currentWrapperIndex === 0}
+                    className="p-2.5 rounded-lg border border-input bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Next post (→ Arrow Key)"
                   >
-                    <ChevronDown className="h-3.5 w-3.5 text-foreground" />
+                    <ChevronRight className="h-5 w-5" />
                   </button>
                 </div>
-              )}
-            </div>
 
-            {/* Mode Dropdown */}
-            <ViewModeDropdown
-              currentMode="post-view"
-              onModeChange={onModeChange}
-              canEditContent={canEditContent}
-            />
+                {/* Title */}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold truncate text-foreground" data-searchable>
+                    {wrapperElements.title?.content?.value
+                      ? stripHtml(wrapperElements.title.content.value)
+                      : 'Untitled Post'}
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Post {currentWrapperIndex + 1} of {sortedWrappers.length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: Search + Mode Dropdown */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search in post..."
+                    title="Search in post (Ctrl/Cmd + F)"
+                    className={`flex h-10 rounded-lg border border-input bg-background pl-10 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all ${
+                      searchResults.length > 0 ? 'w-80 pr-28' : 'w-64'
+                    }`}
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-background px-2 rounded-md z-20 border border-border">
+                      <span className="text-xs text-foreground mr-1 font-semibold whitespace-nowrap">
+                        {currentSearchIndex + 1}/{searchResults.length}
+                      </span>
+                      <button
+                        onClick={goToPrevSearchResult}
+                        className="p-1.5 rounded-md bg-muted hover:bg-accent transition-colors"
+                        title="Previous result"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5 text-foreground" />
+                      </button>
+                      <button
+                        onClick={goToNextSearchResult}
+                        className="p-1.5 rounded-md bg-muted hover:bg-accent transition-colors"
+                        title="Next result"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5 text-foreground" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mode Dropdown */}
+                <ViewModeDropdown
+                  currentMode="post-view"
+                  onModeChange={onModeChange}
+                  canEditContent={canEditContent}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Keyboard Shortcuts Hint */}
+          <div className="border-t border-border bg-muted/30 px-6 py-3">
+            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">←</kbd>
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">→</kbd>
+                Navigate posts
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">Ctrl</kbd>
+                <span>+</span>
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">F</kbd>
+                Search
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">Ctrl</kbd>
+                <span>+</span>
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border border-border">G</kbd>
+                Next result
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Keyboard Shortcuts Hint */}
-      <div className="border-t border-border/30 bg-muted/10 px-6 py-2">
-        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">←</kbd>
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">→</kbd>
-            Navigate posts
-          </span>
-          <span className="flex items-center gap-1.5">
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">Ctrl</kbd>
-            <span>+</span>
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">F</kbd>
-            Search
-          </span>
-          <span className="flex items-center gap-1.5">
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">Ctrl</kbd>
-            <span>+</span>
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono border border-border">G</kbd>
-            Next result
-          </span>
-        </div>
-      </div>
-
-      {/* Three Column Layout */}
-      <div className="flex-1 flex overflow-hidden bg-muted/20">
-        {/* Description Column */}
-        <div className="w-1/3 border-r border-border/50 overflow-y-auto scroll-smooth">
-          <div className="px-8 py-8">
-            <div className="max-w-2xl mx-auto">
-              <div className="mb-6 pb-4 border-b-2 border-primary/20">
+        {/* Three Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Description Column */}
+          <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="p-6">
+              <div className="mb-6 pb-4 border-b">
                 <h2 className="text-xl font-bold tracking-tight text-foreground">
                   Description
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">Background and context</p>
               </div>
-              {wrapperElements.descriptions.length > 0 ? (
-                <div className="space-y-0">
-                  {wrapperElements.descriptions.map((el, idx) => (
-                    <React.Fragment key={el._id}>
-                      {idx > 0 && <div className="border-t border-border/40 my-8" />}
-                      {renderDescription(el)}
-                    </React.Fragment>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic text-center py-8">No description elements</p>
-              )}
+              <div className="max-h-[calc(100vh-400px)] overflow-y-auto scroll-smooth pr-2">
+                {wrapperElements.descriptions.length > 0 ? (
+                  <div className="space-y-0">
+                    {wrapperElements.descriptions.map((el, idx) => (
+                      <React.Fragment key={el._id}>
+                        {idx > 0 && <div className="border-t border-border/40 my-8" />}
+                        {renderDescription(el)}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic text-center py-8">No description elements</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Macro Column */}
-        <div className="w-1/3 border-r border-border/50 overflow-y-auto scroll-smooth bg-card/30">
-          <div className="px-8 py-8">
-            <div className="max-w-2xl mx-auto">
-              <div className="mb-6 pb-4 border-b-2 border-primary/20">
+          {/* Macro Column */}
+          <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="p-6">
+              <div className="mb-6 pb-4 border-b">
                 <h2 className="text-xl font-bold tracking-tight text-foreground">
                   Macro
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">Key concepts and instructions</p>
               </div>
-              {wrapperElements.macros.length > 0 ? (
-                <div className="space-y-0">
-                  {wrapperElements.macros.map((el, idx) => (
-                    <React.Fragment key={el._id}>
-                      {idx > 0 && <div className="border-t border-border/40 my-8" />}
-                      {renderMacro(el)}
-                    </React.Fragment>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic text-center py-8">No macro elements</p>
-              )}
+              <div className="max-h-[calc(100vh-400px)] overflow-y-auto scroll-smooth pr-2">
+                {wrapperElements.macros.length > 0 ? (
+                  <div className="space-y-0">
+                    {wrapperElements.macros.map((el, idx) => (
+                      <React.Fragment key={el._id}>
+                        {idx > 0 && <div className="border-t border-border/40 my-8" />}
+                        {renderMacro(el)}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic text-center py-8">No macro elements</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Example Column */}
-        <div className="w-1/3 overflow-y-auto scroll-smooth">
-          <div className="px-8 py-8">
-            <div className="max-w-2xl mx-auto">
-              <div className="mb-6 pb-4 border-b-2 border-primary/20">
+          {/* Example Column */}
+          <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="p-6">
+              <div className="mb-6 pb-4 border-b">
                 <h2 className="text-xl font-bold tracking-tight text-foreground">
                   Example
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">Practical demonstrations</p>
               </div>
-              {wrapperElements.examples.length > 0 ? (
-                <div className="space-y-0">
-                  {wrapperElements.examples.map((el, idx) => (
-                    <React.Fragment key={el._id}>
-                      {idx > 0 && <div className="border-t border-border/40 my-8" />}
-                      {renderExample(el)}
-                    </React.Fragment>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic text-center py-8">No example elements</p>
-              )}
+              <div className="max-h-[calc(100vh-400px)] overflow-y-auto scroll-smooth pr-2">
+                {wrapperElements.examples.length > 0 ? (
+                  <div className="space-y-0">
+                    {wrapperElements.examples.map((el, idx) => (
+                      <React.Fragment key={el._id}>
+                        {idx > 0 && <div className="border-t border-border/40 my-8" />}
+                        {renderExample(el)}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic text-center py-8">No example elements</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

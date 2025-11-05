@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, Search, X,
   Calendar, Users, CheckCircle, Clock, AlertCircle, TrendingUp, Target,
-  Activity, FileText, MoreVertical, Eye, ChevronDown, ChevronUp, ArrowUpDown
+  Activity, FileText, MoreVertical, Eye, ChevronDown, ChevronUp, ArrowUpDown,
+  MessageSquare
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
@@ -44,6 +45,8 @@ const QAManager = () => {
   const [agentDialog, setAgentDialog] = useState({ open: false, mode: 'create', data: null });
   const [ticketDialog, setTicketDialog] = useState({ open: false, mode: 'create', data: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null, name: '' });
+  const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
+  const [feedbackDialog, setFeedbackDialog] = useState({ open: false, ticket: null });
 
   // Selection state
   const [selectedTickets, setSelectedTickets] = useState([]);
@@ -123,7 +126,8 @@ const QAManager = () => {
         `${API_URL}/api/qa/tickets?${params.toString()}`,
         getAuthHeaders()
       );
-      setTickets(response.data);
+      // Backend returns { tickets: [...], pagination: {...} }
+      setTickets(response.data.tickets || response.data);
     } catch (err) {
       console.error('Error fetching tickets:', err);
       toast.error('Failed to load tickets');
@@ -173,7 +177,9 @@ const QAManager = () => {
   const handleCreateTicket = async (formData) => {
     try {
       const response = await axios.post(`${API_URL}/api/qa/tickets`, formData, getAuthHeaders());
-      setTickets([response.data, ...tickets]);
+      // Ensure tickets is always an array
+      const currentTickets = Array.isArray(tickets) ? tickets : [];
+      setTickets([response.data, ...currentTickets]);
       setTicketDialog({ open: false, mode: 'create', data: null });
       toast.success('Ticket created successfully');
     } catch (err) {
@@ -185,7 +191,9 @@ const QAManager = () => {
   const handleUpdateTicket = async (id, formData) => {
     try {
       const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, formData, getAuthHeaders());
-      setTickets(tickets.map(t => t._id === id ? response.data : t));
+      // Ensure tickets is always an array
+      const currentTickets = Array.isArray(tickets) ? tickets : [];
+      setTickets(currentTickets.map(t => t._id === id ? response.data : t));
       setTicketDialog({ open: false, mode: 'create', data: null });
       toast.success('Ticket updated successfully');
     } catch (err) {
@@ -244,17 +252,78 @@ const QAManager = () => {
     }
   };
 
+  const handleGradeTicket = async (id, qualityScorePercent) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/qa/tickets/${id}/grade`,
+        { qualityScorePercent },
+        getAuthHeaders()
+      );
+      // Update the ticket in the list
+      const currentTickets = Array.isArray(tickets) ? tickets : [];
+      setTickets(currentTickets.map(t => t._id === id ? response.data : t));
+      setGradeDialog({ open: false, ticket: null });
+      toast.success('Ticket graded successfully');
+    } catch (err) {
+      console.error('Error grading ticket:', err);
+      toast.error(err.response?.data?.message || 'Failed to grade ticket');
+    }
+  };
+
+  const handleUpdateFeedback = async (id, feedback) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/qa/tickets/${id}`,
+        { feedback },
+        getAuthHeaders()
+      );
+      // Update the ticket in the list
+      const currentTickets = Array.isArray(tickets) ? tickets : [];
+      setTickets(currentTickets.map(t => t._id === id ? response.data : t));
+      setFeedbackDialog({ open: false, ticket: null });
+      toast.success('Feedback saved successfully');
+    } catch (err) {
+      console.error('Error updating feedback:', err);
+      toast.error(err.response?.data?.message || 'Failed to save feedback');
+    }
+  };
+
   const handleExportMaestro = async (agentId) => {
     try {
-      const response = await axios.get(
+      // Calculate current week range (Sunday to Saturday)
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay()); // Sunday
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6); // Saturday
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const response = await axios.post(
         `${API_URL}/api/qa/export/maestro/${agentId}`,
+        {
+          weekStart: weekStart.toISOString(),
+          weekEnd: weekEnd.toISOString()
+        },
         { ...getAuthHeaders(), responseType: 'blob' }
       );
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let fileName = 'maestro_export.xlsx';
+
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (fileNameMatch && fileNameMatch[1]) {
+          fileName = fileNameMatch[1].replace(/"/g, '');
+        }
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      const agent = agents.find(a => a._id === agentId);
-      link.setAttribute('download', `maestro_${agent?.name || agentId}.xlsx`);
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -337,12 +406,11 @@ const QAManager = () => {
   // Status badge component
   const StatusBadge = ({ status }) => {
     const config = {
-      'Pending': { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
-      'In Progress': { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Activity },
-      'Completed': { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle }
+      'Selected': { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Clock },
+      'Graded': { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle }
     };
 
-    const { color, icon: Icon } = config[status] || config['Pending'];
+    const { color, icon: Icon } = config[status] || config['Selected'];
 
     return (
       <Badge variant="outline" className={`${color} border flex items-center gap-1 px-2 py-0.5`}>
@@ -443,8 +511,8 @@ const QAManager = () => {
       );
     }
 
-    const completionRate = dashboardStats.totalTickets > 0
-      ? ((dashboardStats.completedTickets / dashboardStats.totalTickets) * 100).toFixed(1)
+    const gradedRate = dashboardStats.totalTickets > 0
+      ? ((dashboardStats.gradedTickets / dashboardStats.totalTickets) * 100).toFixed(1)
       : 0;
 
     return (
@@ -460,10 +528,10 @@ const QAManager = () => {
           />
           <KPICard
             icon={CheckCircle}
-            title="Completion Rate"
-            value={`${completionRate}%`}
-            subtitle={`${dashboardStats.completedTickets || 0} of ${dashboardStats.totalTickets || 0} completed`}
-            trend={completionRate >= 70 ? `${completionRate}% target met` : null}
+            title="Graded Rate"
+            value={`${gradedRate}%`}
+            subtitle={`${dashboardStats.gradedTickets || 0} of ${dashboardStats.totalTickets || 0} graded`}
+            trend={gradedRate >= 70 ? `${gradedRate}% target met` : null}
             color="green"
           />
           <KPICard
@@ -493,32 +561,23 @@ const QAManager = () => {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                  <span className="text-sm font-medium text-card-foreground">Pending Tickets</span>
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium text-card-foreground">Selected Tickets</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{dashboardStats.pendingTickets || 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
-              </div>
-
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <Activity className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium text-card-foreground">In Progress</span>
-                </div>
-                <p className="text-2xl font-bold text-foreground">{dashboardStats.inProgressTickets || 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">Currently being reviewed</p>
+                <p className="text-2xl font-bold text-foreground">{dashboardStats.selectedTickets || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Awaiting grading</p>
               </div>
 
               <div className="p-4 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium text-card-foreground">Completed</span>
+                  <span className="text-sm font-medium text-card-foreground">Graded Tickets</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{dashboardStats.completedTickets || 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">Reviews completed</p>
+                <p className="text-2xl font-bold text-foreground">{dashboardStats.gradedTickets || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Quality evaluated</p>
               </div>
             </div>
           </CardContent>
@@ -538,7 +597,7 @@ const QAManager = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Agent</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Tickets</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Graded</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Score</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
@@ -562,10 +621,10 @@ const QAManager = () => {
                             <div className="flex-1 bg-muted/30 rounded-full h-2 max-w-[100px]">
                               <div
                                 className="bg-green-600 h-2 rounded-full"
-                                style={{ width: `${stat.ticketCount > 0 ? (stat.completedCount / stat.ticketCount) * 100 : 0}%` }}
+                                style={{ width: `${stat.ticketCount > 0 ? (stat.gradedCount / stat.ticketCount) * 100 : 0}%` }}
                               ></div>
                             </div>
-                            <span className="text-sm text-muted-foreground">{stat.completedCount || 0}</span>
+                            <span className="text-sm text-muted-foreground">{stat.gradedCount || 0}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -856,9 +915,8 @@ const QAManager = () => {
                       className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-card text-foreground"
                     >
                       <option value="">All Status</option>
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Graded">Graded</option>
                     </select>
                   </div>
 
@@ -1022,12 +1080,30 @@ const QAManager = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {ticket.status === 'Selected' ? (
+                              <button
+                                onClick={() => setGradeDialog({ open: true, ticket })}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
+                                title="Grade Ticket"
+                              >
+                                <Target className="w-4 h-4" />
+                                Grade
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setTicketDialog({ open: true, mode: 'edit', data: ticket })}
+                                className="p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors"
+                                title="Edit Ticket"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => setTicketDialog({ open: true, mode: 'edit', data: ticket })}
-                              className="p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors"
-                              title="Edit Ticket"
+                              onClick={() => setFeedbackDialog({ open: true, ticket })}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Add Feedback"
                             >
-                              <Edit className="w-4 h-4" />
+                              <MessageSquare className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleArchiveTicket(ticket._id)}
@@ -1060,6 +1136,7 @@ const QAManager = () => {
   // Archive Tab
   const renderArchive = () => {
     const sortedTickets = getSortedData(tickets);
+    const activeFilters = getActiveFilters();
 
     return (
       <div className="space-y-6">
@@ -1070,6 +1147,141 @@ const QAManager = () => {
             <p className="text-sm text-muted-foreground mt-1">View and restore archived tickets</p>
           </div>
         </div>
+
+        {/* Search and Filters */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder="Search archived tickets by ID or description..."
+                    value={filters.search}
+                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                    className="pl-10 pr-4 py-2 w-full border-input focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  {filters.search && (
+                    <button
+                      onClick={() => setFilters({ ...filters, search: '' })}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70 hover:text-muted-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    showFilters || activeFilters.length > 0
+                      ? 'bg-blue-50 border-blue-200 text-blue-700'
+                      : 'bg-card border-input text-card-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {activeFilters.length > 0 && (
+                    <Badge className="bg-blue-600 text-white ml-1">{activeFilters.length}</Badge>
+                  )}
+                </button>
+              </div>
+
+              {/* Active Filter Chips */}
+              {activeFilters.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Active filters:</span>
+                  {activeFilters.map((filter) => (
+                    <Badge
+                      key={filter.key}
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-800 border border-blue-200 px-3 py-1 flex items-center gap-2"
+                    >
+                      <span className="text-xs">{filter.label}</span>
+                      <button
+                        onClick={() => clearFilter(filter.key)}
+                        className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium ml-2"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+
+              {/* Advanced Filters */}
+              {showFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+                  <div>
+                    <Label htmlFor="filterAgentArchive" className="text-sm font-medium text-card-foreground mb-2 block">
+                      Agent
+                    </Label>
+                    <select
+                      id="filterAgentArchive"
+                      value={filters.agent}
+                      onChange={(e) => setFilters({ ...filters, agent: e.target.value })}
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-card text-foreground"
+                    >
+                      <option value="">All Agents</option>
+                      {agents.map(agent => (
+                        <option key={agent._id} value={agent._id}>{agent.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="filterStatusArchive" className="text-sm font-medium text-card-foreground mb-2 block">
+                      Status
+                    </Label>
+                    <select
+                      id="filterStatusArchive"
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-card text-foreground"
+                    >
+                      <option value="">All Status</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Graded">Graded</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="filterDateFromArchive" className="text-sm font-medium text-card-foreground mb-2 block">
+                      Date From
+                    </Label>
+                    <Input
+                      id="filterDateFromArchive"
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                      className="w-full text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="filterDateToArchive" className="text-sm font-medium text-card-foreground mb-2 block">
+                      Date To
+                    </Label>
+                    <Input
+                      id="filterDateToArchive"
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                      className="w-full text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Archived Tickets Table */}
         {loading ? (
@@ -1352,12 +1564,11 @@ const QAManager = () => {
       agent: '',
       ticketId: '',
       shortDescription: '',
-      status: 'Pending',
       dateEntered: new Date().toISOString().split('T')[0],
       notes: '',
-      qualityScorePercent: '',
-      timeStarted: '',
-      timeCompleted: ''
+      feedback: '',
+      status: 'Selected',
+      qualityScorePercent: ''
     });
 
     useEffect(() => {
@@ -1366,24 +1577,22 @@ const QAManager = () => {
           agent: ticketDialog.data.agent?._id || ticketDialog.data.agent || '',
           ticketId: ticketDialog.data.ticketId || '',
           shortDescription: ticketDialog.data.shortDescription || '',
-          status: ticketDialog.data.status || 'Pending',
           dateEntered: ticketDialog.data.dateEntered ? new Date(ticketDialog.data.dateEntered).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           notes: ticketDialog.data.notes || '',
-          qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
-          timeStarted: ticketDialog.data.timeStarted ? new Date(ticketDialog.data.timeStarted).toISOString().slice(0, 16) : '',
-          timeCompleted: ticketDialog.data.timeCompleted ? new Date(ticketDialog.data.timeCompleted).toISOString().slice(0, 16) : ''
+          feedback: ticketDialog.data.feedback || '',
+          status: ticketDialog.data.status || 'Selected',
+          qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : ''
         });
       } else {
         setFormData({
           agent: '',
           ticketId: '',
           shortDescription: '',
-          status: 'Pending',
           dateEntered: new Date().toISOString().split('T')[0],
           notes: '',
-          qualityScorePercent: '',
-          timeStarted: '',
-          timeCompleted: ''
+          feedback: '',
+          status: 'Selected',
+          qualityScorePercent: ''
         });
       }
     }, [ticketDialog.data]);
@@ -1453,78 +1662,17 @@ const QAManager = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ticketStatus" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Status <span className="text-red-500">*</span>
-                </Label>
-                <select
-                  id="ticketStatus"
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-foreground"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="ticketDate" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Date Entered
-                </Label>
-                <Input
-                  id="ticketDate"
-                  type="date"
-                  value={formData.dateEntered}
-                  onChange={(e) => setFormData({ ...formData, dateEntered: e.target.value })}
-                  className="w-full"
-                />
-              </div>
-            </div>
-
             <div>
-              <Label htmlFor="ticketQuality" className="text-sm font-medium text-card-foreground mb-2 block">
-                Quality Score (%)
+              <Label htmlFor="ticketDate" className="text-sm font-medium text-card-foreground mb-2 block">
+                Date Entered
               </Label>
               <Input
-                id="ticketQuality"
-                type="number"
-                min="0"
-                max="100"
-                value={formData.qualityScorePercent}
-                onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
-                placeholder="Enter quality score (0-100)"
+                id="ticketDate"
+                type="date"
+                value={formData.dateEntered}
+                onChange={(e) => setFormData({ ...formData, dateEntered: e.target.value })}
                 className="w-full"
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="timeStarted" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Time Started
-                </Label>
-                <Input
-                  id="timeStarted"
-                  type="datetime-local"
-                  value={formData.timeStarted}
-                  onChange={(e) => setFormData({ ...formData, timeStarted: e.target.value })}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <Label htmlFor="timeCompleted" className="text-sm font-medium text-card-foreground mb-2 block">
-                  Time Completed
-                </Label>
-                <Input
-                  id="timeCompleted"
-                  type="datetime-local"
-                  value={formData.timeCompleted}
-                  onChange={(e) => setFormData({ ...formData, timeCompleted: e.target.value })}
-                  className="w-full"
-                />
-              </div>
             </div>
 
             <div>
@@ -1541,6 +1689,69 @@ const QAManager = () => {
               />
             </div>
 
+            {/* Edit Mode Only - Status and Quality Score */}
+            {ticketDialog.mode === 'edit' && (
+              <>
+                <div className="border-t pt-4 space-y-4">
+                  <p className="text-sm font-medium text-muted-foreground">Edit Status & Quality Score</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="ticketStatus" className="text-sm font-medium text-card-foreground mb-2 block">
+                        Status
+                      </Label>
+                      <select
+                        id="ticketStatus"
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-foreground"
+                      >
+                        <option value="Selected">Selected</option>
+                        <option value="Graded">Graded</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-1">Change ticket status if needed</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="ticketQuality" className="text-sm font-medium text-card-foreground mb-2 block">
+                        Quality Score (%)
+                      </Label>
+                      <Input
+                        id="ticketQuality"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={formData.qualityScorePercent}
+                        onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
+                        placeholder="Enter quality score (0-100)"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Update or set quality score</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <Label htmlFor="ticketFeedback" className="text-sm font-medium text-card-foreground mb-2 block flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-purple-600" />
+                    Feedback (AI Training)
+                  </Label>
+                  <textarea
+                    id="ticketFeedback"
+                    value={formData.feedback}
+                    onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
+                    placeholder="Enter feedback for this ticket (optional)..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none bg-card text-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 This feedback will be used to train AI models for future ticket suggestions
+                  </p>
+                </div>
+              </>
+            )}
+
             <DialogFooter className="flex items-center gap-3 pt-4 border-t">
               <button
                 type="button"
@@ -1554,6 +1765,172 @@ const QAManager = () => {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Save Changes'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Grade Dialog Component
+  const GradeDialogComponent = () => {
+    const [qualityScore, setQualityScore] = useState('');
+
+    useEffect(() => {
+      if (gradeDialog.ticket) {
+        setQualityScore(gradeDialog.ticket.qualityScorePercent || '');
+      }
+    }, [gradeDialog.ticket]);
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (gradeDialog.ticket) {
+        handleGradeTicket(gradeDialog.ticket._id, parseFloat(qualityScore));
+      }
+    };
+
+    return (
+      <Dialog open={gradeDialog.open} onOpenChange={(open) => !open && setGradeDialog({ open: false, ticket: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <Target className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">Grade Ticket</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {gradeDialog.ticket?.ticketId}
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="py-4 space-y-4">
+              <div>
+                <Label htmlFor="qualityScore" className="text-sm font-medium text-card-foreground mb-2 block">
+                  Quality Score (%) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="qualityScore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={qualityScore}
+                  onChange={(e) => setQualityScore(e.target.value)}
+                  placeholder="Enter quality score (0-100)"
+                  required
+                  className="w-full"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  This will change the ticket status to "Graded"
+                </p>
+              </div>
+
+              {gradeDialog.ticket?.notes && (
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Notes:</p>
+                  <p className="text-sm text-foreground">{gradeDialog.ticket.notes}</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setGradeDialog({ open: false, ticket: null })}
+                className="px-4 py-2 text-card-foreground border border-input rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Grade Ticket
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Feedback Dialog Component
+  const FeedbackDialogComponent = () => {
+    const [feedback, setFeedback] = useState('');
+
+    useEffect(() => {
+      if (feedbackDialog.ticket) {
+        setFeedback(feedbackDialog.ticket.feedback || '');
+      }
+    }, [feedbackDialog.ticket]);
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (feedbackDialog.ticket) {
+        handleUpdateFeedback(feedbackDialog.ticket._id, feedback);
+      }
+    };
+
+    return (
+      <Dialog open={feedbackDialog.open} onOpenChange={(open) => !open && setFeedbackDialog({ open: false, ticket: null })}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <MessageSquare className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">Ticket Feedback</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {feedbackDialog.ticket?.ticketId}
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="py-4 space-y-4">
+              <div>
+                <Label htmlFor="feedback" className="text-sm font-medium text-card-foreground mb-2 block">
+                  Feedback
+                </Label>
+                <textarea
+                  id="feedback"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Enter feedback for this ticket... (This will be used for AI training)"
+                  rows={8}
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none bg-card text-foreground"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  💡 This feedback will be used to train AI models for future ticket suggestions
+                </p>
+              </div>
+
+              {feedbackDialog.ticket?.notes && (
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Ticket Notes:</p>
+                  <p className="text-sm text-foreground">{feedbackDialog.ticket.notes}</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setFeedbackDialog({ open: false, ticket: null })}
+                className="px-4 py-2 text-card-foreground border border-input rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Save Feedback
               </button>
             </DialogFooter>
           </form>
@@ -1690,6 +2067,8 @@ const QAManager = () => {
         {/* Dialogs */}
         <AgentDialogComponent />
         <TicketDialogComponent />
+        <GradeDialogComponent />
+        <FeedbackDialogComponent />
         <DeleteDialogComponent />
       </div>
     </div>
