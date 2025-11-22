@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Plus, Trash2, ChevronLeft, ChevronRight, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -48,6 +48,61 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
   const [title, setTitle] = useState(currentExample?.title || '');
 
   const isEditing = isEditingTitle || editingMessageIndex !== null;
+
+  // Sync external updates when not editing
+  useEffect(() => {
+    if (!isEditing && element?.content?.examples) {
+      const externalExamples = element.content.examples;
+      if (JSON.stringify(externalExamples) !== JSON.stringify(examples)) {
+        setExamples(externalExamples);
+        if (element.content.currentExampleIndex !== undefined) {
+          setCurrentExampleIndex(element.content.currentExampleIndex);
+        }
+        if (element.content.isExpanded !== undefined) {
+          setIsExpanded(element.content.isExpanded);
+        }
+      }
+    }
+  }, [element?.content?.examples, element?.content?.currentExampleIndex, element?.content?.isExpanded, isEditing]);
+
+  // Real-time collaboration - debounced updates for examples
+  const updateTimeoutRef = useRef(null);
+  useEffect(() => {
+    // Clear existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Only update if editing
+    if (!isEditing) {
+      return;
+    }
+
+    // Don't update if examples haven't changed
+    if (JSON.stringify(examples) === JSON.stringify(element?.content?.examples)) {
+      return;
+    }
+
+    // Set debounced update
+    updateTimeoutRef.current = setTimeout(() => {
+      if (onUpdate && element) {
+        onUpdate({
+          ...element,
+          content: {
+            ...element.content,
+            examples,
+            currentExampleIndex
+          }
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [examples, currentExampleIndex, isEditing, onUpdate, element]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,

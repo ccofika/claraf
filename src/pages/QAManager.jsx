@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target,
-  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap
+  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -14,7 +14,9 @@ import { Badge } from '../components/ui/badge';
 import { DatePicker } from '../components/ui/date-picker';
 import { toast } from 'sonner';
 import QASearchBar from '../components/QASearchBar';
-
+import QACommandPalette from '../components/QACommandPalette';
+import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -22,6 +24,7 @@ const QAManager = () => {
   // State
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   // Data state
   const [agents, setAgents] = useState([]);
@@ -82,6 +85,18 @@ const QAManager = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    'open-command-palette': {
+      keys: 'cmd+k',
+      handler: (e) => {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      },
+      description: 'Open Command Palette',
+      enabled: true
+    }
+  });
   const getAuthHeaders = () => ({
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
   });
@@ -1656,40 +1671,64 @@ const QAManager = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-neutral-950">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">QA Manager</h1>
-          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage agents, tickets, and quality metrics</p>
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-neutral-950">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">QA Manager</h1>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage agents, tickets, and quality metrics</p>
+          </div>
+          <button
+            onClick={() => setShowCommandPalette(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg transition-colors"
+          >
+            <Search className="w-4 h-4" />
+            Quick Search
+            <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded">⌘K</kbd>
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-          <TabsList className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 p-1 rounded-lg">
-            <TabsTrigger value="dashboard" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
-              Agents
-            </TabsTrigger>
-            <TabsTrigger value="tickets" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
-              Tickets
-            </TabsTrigger>
-            <TabsTrigger value="archive" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
-              Archive
-            </TabsTrigger>
-          </TabsList>
+      {/* Tabs - Fixed */}
+      <div className="flex-shrink-0 bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
+        <div className="max-w-7xl mx-auto px-6 pt-6 pb-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 p-1 rounded-lg">
+              <TabsTrigger value="dashboard" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                Agents
+              </TabsTrigger>
+              <TabsTrigger value="tickets" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                Tickets
+              </TabsTrigger>
+              <TabsTrigger value="archive" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                Archive
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                <BarChart3 className="w-4 h-4 inline mr-1.5" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
 
-          <div className="mt-6 mb-8">
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="dashboard">{renderDashboard()}</TabsContent>
             <TabsContent value="agents">{renderAgents()}</TabsContent>
             <TabsContent value="tickets">{renderTickets()}</TabsContent>
             <TabsContent value="archive">{renderArchive()}</TabsContent>
-          </div>
-        </Tabs>
+            <TabsContent value="analytics">
+              <QAAnalyticsDashboard />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Dialogs */}
@@ -1698,6 +1737,17 @@ const QAManager = () => {
       {gradeDialog.open && <GradeDialogContent />}
       {feedbackDialog.open && <FeedbackDialogContent />}
       {deleteDialog.open && <DeleteDialogContent />}
+
+      {/* Command Palette */}
+      <QACommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onTicketSelect={(ticket) => {
+          setTicketDialog({ open: true, mode: 'edit', data: ticket });
+          setShowCommandPalette(false);
+        }}
+        currentFilters={filters}
+      />
     </div>
   );
 };

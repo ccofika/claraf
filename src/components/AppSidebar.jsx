@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import ProfileModal from './ProfileModal';
 import DeleteBookmarkDialog from './DeleteBookmarkDialog';
 import PendingInvites from './PendingInvites';
+import CurrentlyViewing from './CurrentlyViewing';
+import axios from 'axios';
 import {
   Home,
   Calculator,
@@ -24,6 +26,10 @@ import {
   CheckmarkFilled,
   Task,
   EarthFilled,
+  Star,
+  StarFilled,
+  Time,
+  CloseFilled,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -191,6 +197,9 @@ function SectionTitle({ title, onToggleCollapse, isCollapsed }) {
 }
 
 function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit, onDelete, onSettings, isBookmark, isEditing, editValue, onEditChange, onSaveEdit, onCancelEdit }) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const tooltipTimeoutRef = React.useRef(null);
+
   const handleClick = (e) => {
     if (isEditing) return; // Don't navigate when editing
     if (item.hasDropdown && onToggle) onToggle();
@@ -222,6 +231,29 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
     }
   };
 
+  const handleMouseEnter = () => {
+    if (isCollapsed) {
+      tooltipTimeoutRef.current = setTimeout(() => {
+        setShowTooltip(true);
+      }, 500); // 500ms delay before showing tooltip
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    setShowTooltip(false);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div
       className={`relative shrink-0 transition-all duration-500 ${
@@ -235,8 +267,16 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
         } ${isCollapsed ? 'w-10 min-w-10 h-10 justify-center p-4' : isBookmark ? 'w-full min-h-[72px] px-4 py-2.5' : 'w-full h-10 px-4 py-2'}`}
         style={{ transitionTimingFunction: softSpringEasing }}
         onClick={handleClick}
-        title={isCollapsed ? item.label : undefined}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
+        {/* Tooltip for collapsed state */}
+        {isCollapsed && showTooltip && (
+          <div className="absolute left-full ml-2 px-3 py-1.5 bg-gray-900 dark:bg-neutral-700 text-white text-sm rounded-md whitespace-nowrap z-50 pointer-events-none shadow-lg">
+            {item.label}
+            <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-gray-900 dark:bg-neutral-700 rotate-45" />
+          </div>
+        )}
         <div className="flex items-center justify-center shrink-0">{item.icon}</div>
 
         <div
@@ -281,11 +321,29 @@ function MenuItem({ item, isExpanded, onToggle, onItemClick, isCollapsed, onEdit
           )}
         </div>
 
+        {/* Favorite button */}
+        {!isCollapsed && !isEditing && item.canFavorite && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              item.onToggleFavorite?.();
+            }}
+            className="ml-2 p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
+            title={item.isFavorited ? "Remove from favorites" : "Add to favorites"}
+          >
+            {item.isFavorited ? (
+              <StarFilled size={16} className="text-yellow-600 dark:text-yellow-400" />
+            ) : (
+              <Star size={16} className="text-gray-700 dark:text-neutral-300" />
+            )}
+          </button>
+        )}
+
         {/* Settings, Edit and Delete buttons */}
         {!isCollapsed && !isEditing && item.canSettings && (
           <button
             onClick={handleSettings}
-            className="ml-2 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
+            className="ml-1 p-1 rounded hover:bg-gray-300 dark:hover:bg-neutral-700 transition-colors"
             title="Workspace settings"
           >
             <Settings size={16} className="text-gray-700 dark:text-neutral-300" />
@@ -426,6 +484,9 @@ function DetailSidebar({
   const [bookmarkName, setBookmarkName] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookmarkToDelete, setBookmarkToDelete] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favoriteWorkspaces, setFavoriteWorkspaces] = useState([]);
+  const [recentWorkspaces, setRecentWorkspaces] = useState([]);
 
   const toggleExpanded = (itemKey) => {
     setExpandedItems((prev) => {
@@ -437,6 +498,59 @@ function DetailSidebar({
   };
 
   const toggleCollapse = () => setIsCollapsed((s) => !s);
+
+  // Fetch favorites and recent workspaces
+  React.useEffect(() => {
+    const fetchFavoritesAndRecent = async () => {
+      try {
+        const token = localStorage.getItem('token');
+
+        // Fetch favorites
+        const favoritesRes = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/user/favorites/workspaces`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setFavoriteWorkspaces(favoritesRes.data);
+
+        // Fetch recent workspaces
+        const recentRes = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/user/recent/workspaces`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setRecentWorkspaces(recentRes.data);
+      } catch (err) {
+        console.error('Error fetching favorites and recent workspaces:', err);
+      }
+    };
+
+    if (activeSection === 'workspaces') {
+      fetchFavoritesAndRecent();
+    }
+  }, [activeSection, workspaces]);
+
+  // Toggle favorite workspace
+  const handleToggleFavorite = async (workspaceId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/user/favorites/workspace/${workspaceId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update local state
+      if (response.data.isFavorited) {
+        const workspace = workspaces.find(w => w._id === workspaceId);
+        if (workspace) {
+          setFavoriteWorkspaces([...favoriteWorkspaces, workspace]);
+        }
+      } else {
+        setFavoriteWorkspaces(favoriteWorkspaces.filter(w => w._id !== workspaceId));
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  };
 
   // Notify parent when collapsed state or activeSection changes
   React.useEffect(() => {
@@ -530,42 +644,60 @@ function DetailSidebar({
 
   const getSectionContent = () => {
     if (activeSection === 'workspaces') {
+      // Filter workspaces based on search query
+      const filteredWorkspaces = workspaces?.filter(w =>
+        w.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ) || [];
+
       // Separate announcements and other workspaces
-      const announcements = workspaces?.find(w => w.type === 'announcements');
-      const otherWorkspaces = workspaces?.filter(w => w.type !== 'announcements') || [];
+      const announcements = filteredWorkspaces.find(w => w.type === 'announcements');
+      const otherWorkspaces = filteredWorkspaces.filter(w => w.type !== 'announcements');
 
-      const workspaceItems = [];
-
-      // Add Announcements first
-      if (announcements) {
-        workspaceItems.push({
-          icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />,
-          label: announcements.name,
-          isActive: currentWorkspace?._id === announcements._id,
-          onClick: () => onWorkspaceClick(announcements._id),
-          workspaceId: announcements._id,
-          canEdit: announcements.permissions?.canEdit,
-          canDelete: false, // Never allow deleting announcements
-        });
-      }
-
-      // Add other workspaces
-      otherWorkspaces.forEach(workspace => {
-        // Check if current user is the owner of this workspace
+      // Helper function to create workspace item
+      const createWorkspaceItem = (workspace, showFavoriteButton = true) => {
         const isOwner = workspace.owner && user && (
           (workspace.owner._id || workspace.owner) === user._id
         );
+        const isFavorited = favoriteWorkspaces.some(fw => fw._id === workspace._id);
 
-        workspaceItems.push({
+        return {
           icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />,
           label: workspace.name,
           isActive: currentWorkspace?._id === workspace._id,
           onClick: () => onWorkspaceClick(workspace._id),
           workspaceId: workspace._id,
-          canSettings: isOwner && workspace.type === 'personal', // Only owner of personal workspaces can access settings
+          canSettings: isOwner && workspace.type === 'personal',
           canEdit: workspace.permissions?.canEdit,
-          canDelete: workspace.permissions?.canDelete,
-        });
+          canDelete: workspace.type !== 'announcements' && workspace.permissions?.canDelete,
+          canFavorite: showFavoriteButton && workspace.type !== 'announcements',
+          isFavorited: isFavorited,
+          onToggleFavorite: showFavoriteButton && workspace.type !== 'announcements'
+            ? () => handleToggleFavorite(workspace._id)
+            : undefined
+        };
+      };
+
+      // Recent workspaces items (filtered by search)
+      const recentItems = recentWorkspaces
+        .filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .slice(0, 5) // Show only last 5
+        .map(w => createWorkspaceItem(w, true));
+
+      // Favorite workspaces items (filtered by search)
+      const favoriteItems = favoriteWorkspaces
+        .filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .map(w => createWorkspaceItem(w, true));
+
+      const workspaceItems = [];
+
+      // Add Announcements first
+      if (announcements) {
+        workspaceItems.push(createWorkspaceItem(announcements, false));
+      }
+
+      // Add other workspaces
+      otherWorkspaces.forEach(workspace => {
+        workspaceItems.push(createWorkspaceItem(workspace, true));
       });
 
       // Add "Add New Workspace" button
@@ -596,15 +728,32 @@ function DetailSidebar({
         };
       });
 
-      const sections = [
-        {
-          title: 'All Workspaces',
-          items: workspaceItems,
-        },
-      ];
+      const sections = [];
+
+      // Add Recent section if there are recent workspaces
+      if (recentItems.length > 0 && !searchQuery) {
+        sections.push({
+          title: 'Recent',
+          items: recentItems,
+        });
+      }
+
+      // Add Favorites section if there are favorite workspaces
+      if (favoriteItems.length > 0) {
+        sections.push({
+          title: 'Favorites',
+          items: favoriteItems,
+        });
+      }
+
+      // Add All Workspaces section
+      sections.push({
+        title: searchQuery ? 'Search Results' : 'All Workspaces',
+        items: workspaceItems,
+      });
 
       // Add bookmarks section if there are any bookmarks
-      if (bookmarkItems.length > 0) {
+      if (bookmarkItems.length > 0 && !searchQuery) {
         sections.push({
           title: 'All Bookmarks',
           items: bookmarkItems,
@@ -614,6 +763,7 @@ function DetailSidebar({
       return {
         title: 'Workspaces',
         sections,
+        showSearch: true,
       };
     }
 
@@ -639,6 +789,30 @@ function DetailSidebar({
       style={{ transitionTimingFunction: softSpringEasing }}
     >
       <SectionTitle title={content.title} onToggleCollapse={toggleCollapse} isCollapsed={isCollapsed} />
+
+      {/* Workspace Search - Only show in workspaces section and when not collapsed */}
+      {activeSection === 'workspaces' && !isCollapsed && content.showSearch && (
+        <div className="w-full px-2">
+          <div className="relative">
+            <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search workspaces..."
+              className="w-full pl-10 pr-8 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-gray-900 dark:text-neutral-50 placeholder-gray-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
+              >
+                <CloseFilled size={14} className="text-gray-400 dark:text-neutral-500" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         className={`flex flex-col w-full overflow-y-auto transition-all duration-500 ${
@@ -671,6 +845,13 @@ function DetailSidebar({
           />
         ))}
       </div>
+
+      {/* Currently Viewing - Real-time Collaboration Indicator */}
+      {activeSection === 'workspaces' && (
+        <div className={`mt-auto w-full border-t border-gray-200 dark:border-neutral-800 ${isCollapsed ? 'pt-2' : 'pt-0'}`}>
+          <CurrentlyViewing isCollapsed={isCollapsed} />
+        </div>
+      )}
 
       {/* Delete Bookmark Dialog */}
       <DeleteBookmarkDialog

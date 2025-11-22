@@ -12,6 +12,7 @@ import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtil
 import { copyElementContent, shareElement } from '../utils/clipboard';
 import ImageLightbox from './ImageLightbox';
 import { extractImageMetadata } from '../utils/imageUpload';
+import { useDebouncedUpdate } from '../hooks/useDebouncedUpdate';
 
 const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
@@ -25,6 +26,17 @@ const DescriptionElement = ({ element, canEdit, workspaceId, onUpdate, onDelete,
   const [currentValue, setCurrentValue] = useState(element?.content?.value || '');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+
+  // Enable real-time collaboration - debounced updates while editing
+  useDebouncedUpdate(value, isEditing ? onUpdate : null, element, 800);
+
+  // Sync external updates when not editing
+  React.useEffect(() => {
+    if (!isEditing && element?.content?.value !== value) {
+      setValue(element?.content?.value || '');
+      setHistory(element?.content?.history || []);
+    }
+  }, [element?.content?.value, element?.content?.history, isEditing]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -31,6 +31,60 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   const [currentDescriptionValue, setCurrentDescriptionValue] = useState(element?.content?.description || '');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+
+  // Sync external updates when not editing
+  useEffect(() => {
+    if (!isEditingTitle && element?.content?.title !== title) {
+      setTitle(element?.content?.title || '');
+      setTitleHistory(element?.content?.titleHistory || []);
+    }
+    if (!isEditingDescription && element?.content?.description !== description) {
+      setDescription(element?.content?.description || '');
+      setDescriptionHistory(element?.content?.descriptionHistory || []);
+    }
+    if (element?.content?.isExpanded !== undefined && element?.content?.isExpanded !== isExpanded) {
+      setIsExpanded(element?.content?.isExpanded);
+    }
+  }, [element?.content?.title, element?.content?.description, element?.content?.titleHistory, element?.content?.descriptionHistory, element?.content?.isExpanded, isEditingTitle, isEditingDescription]);
+
+  // Real-time collaboration - debounced updates for title and description
+  const updateTimeoutRef = useRef(null);
+  useEffect(() => {
+    // Clear existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Only update if editing
+    if (!isEditingTitle && !isEditingDescription) {
+      return;
+    }
+
+    // Don't update if values haven't changed
+    if (title === element?.content?.title && description === element?.content?.description) {
+      return;
+    }
+
+    // Set debounced update
+    updateTimeoutRef.current = setTimeout(() => {
+      if (onUpdate && element) {
+        onUpdate({
+          ...element,
+          content: {
+            ...element.content,
+            title,
+            description
+          }
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [title, description, isEditingTitle, isEditingDescription, onUpdate, element]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,

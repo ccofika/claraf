@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import CanvasElement from './CanvasElement';
@@ -12,13 +12,15 @@ import DynamicGrid from './DynamicGrid';
 import PostView from './PostView';
 import { useTheme } from '../context/ThemeContext';
 import { useTextFormatting } from '../context/TextFormattingContext';
+import { useSocket } from '../context/SocketContext';
 import { getElementsInsideWrapper } from '../utils/wrapperUtils';
 
-const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated }) => {
+const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, onRemoteElementUpdate, onRemoteElementCreate, onRemoteElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated, workspaceUsers = [], onViewportChange }) => {
   const [canvasElements, setCanvasElements] = useState(elements);
   const transformWrapperRef = useRef(null);
   const { theme } = useTheme();
   const { isEditing } = useTextFormatting();
+  const { socket, notifyElementCreated, notifyElementUpdated, notifyElementDeleted } = useSocket();
   const [highlightedElement, setHighlightedElement] = useState(null);
   const [isHoveringElement, setIsHoveringElement] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
@@ -97,6 +99,55 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     return bounds;
   }, [canvasElements, viewport.x, viewport.y, viewport.width, viewport.height, viewport.scale, isDraggingElement]);
 
+  // Sync canvasElements with elements prop from parent
+  useEffect(() => {
+    setCanvasElements(elements);
+  }, [elements]);
+
+  // Listen for real-time collaboration events
+  useEffect(() => {
+    if (!socket) return;
+
+    // Handle element created by other users
+    const handleElementCreated = (data) => {
+      const { element } = data;
+      // Update parent state via callback
+      if (onRemoteElementCreate) {
+        onRemoteElementCreate(element);
+      }
+    };
+
+    // Handle element updated by other users
+    const handleElementUpdated = (data) => {
+      const { element } = data;
+      // Update parent state via callback
+      if (onRemoteElementUpdate) {
+        onRemoteElementUpdate(element);
+      }
+    };
+
+    // Handle element deleted by other users
+    const handleElementDeleted = (data) => {
+      const { elementId } = data;
+      // Update parent state via callback
+      if (onRemoteElementDelete) {
+        onRemoteElementDelete(elementId);
+      }
+    };
+
+    // Register event listeners
+    socket.on('workspace:element:created:notify', handleElementCreated);
+    socket.on('workspace:element:updated:notify', handleElementUpdated);
+    socket.on('workspace:element:deleted:notify', handleElementDeleted);
+
+    // Cleanup
+    return () => {
+      socket.off('workspace:element:created:notify', handleElementCreated);
+      socket.off('workspace:element:updated:notify', handleElementUpdated);
+      socket.off('workspace:element:deleted:notify', handleElementDeleted);
+    };
+  }, [socket, onRemoteElementCreate, onRemoteElementUpdate, onRemoteElementDelete]);
+
   // Update viewport dimensions on window resize
   React.useEffect(() => {
     const handleResize = () => {
@@ -110,6 +161,72 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Track cursor movement for real-time collaboration
+  const { updateCursor } = useSocket();
+  const cursorThrottleRef = useRef(null);
+  const viewportRef = useRef(viewport);
+
+  // Keep viewport ref up to date
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
+
+  useEffect(() => {
+    const handleCursorMove = (e) => {
+      // Throttle cursor updates to avoid spamming
+      if (cursorThrottleRef.current) return;
+
+      cursorThrottleRef.current = setTimeout(() => {
+        cursorThrottleRef.current = null;
+      }, 50); // Update every 50ms max
+
+      // Transform screen coordinates to canvas coordinates
+      const scale = viewportRef.current.scale || 1;
+      const posX = viewportRef.current.x || 0;
+      const posY = viewportRef.current.y || 0;
+
+      // For react-zoom-pan-pinch, the transformation works differently.
+      // The positionX/Y are NOT simple offsets - they represent the translation
+      // BEFORE scaling is applied.
+      //
+      // The actual transform is: translate(posX, posY) scale(scale)
+      // But we need to reverse this to get canvas coordinates.
+      //
+      // CORRECT formula:
+      // First, we need to "undo" the translation: screenCoord - posX
+      // Then divide by scale to get canvas coordinate: (screenCoord - posX) / scale
+      //
+      // Let me test a different approach - using the inverse transformation
+      const canvasX = e.clientX / scale - posX / scale;
+      const canvasY = e.clientY / scale - posY / scale;
+
+      // DEBUG: Log every emit
+      console.log('🖱️ EMIT Cursor (NEW FORMULA):', {
+        screenCoords: { x: e.clientX, y: e.clientY },
+        viewport: { x: posX, y: posY, scale },
+        calculation: {
+          formula: 'screenX / scale - posX / scale',
+          step1: { x: e.clientX / scale, y: e.clientY / scale },
+          step2: { x: posX / scale, y: posY / scale },
+        },
+        canvasCoords: { x: canvasX.toFixed(2), y: canvasY.toFixed(2) }
+      });
+
+      updateCursor(canvasX, canvasY, null);
+    };
+
+    // Use pointermove instead of mousemove - it works during all interactions
+    // including dragging, panning, and touch events
+    window.addEventListener('pointermove', handleCursorMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointermove', handleCursorMove);
+      if (cursorThrottleRef.current) {
+        clearTimeout(cursorThrottleRef.current);
+      }
+    };
+  }, [updateCursor]);
 
   // Cleanup timeouts and RAF on unmount
   React.useEffect(() => {
@@ -220,16 +337,22 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
 
       // Use RAF to batch viewport updates
       rafRef.current = requestAnimationFrame(() => {
-        setViewport({
+        const newViewport = {
           x: ref.state.positionX,
           y: ref.state.positionY,
           width: window.innerWidth,
           height: window.innerHeight,
           scale: ref.state.scale
-        });
+        };
+        setViewport(newViewport);
+
+        // Notify parent of viewport change
+        if (onViewportChange) {
+          onViewportChange(newViewport);
+        }
       });
     }
-  }, []);
+  }, [onViewportChange]);
 
   // Handle panning start/end to control virtualization
   const handlePanningStart = useCallback(() => {
@@ -357,9 +480,12 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
         setCanvasElements(prev =>
           prev.map(el => el._id === tempElement._id ? createdElement : el)
         );
+
+        // Notify other users via socket
+        notifyElementCreated(createdElement);
       }
     }
-  }, [isInEditMode, viewport, canvasElements.length, theme, onElementCreate]);
+  }, [isInEditMode, viewport, canvasElements.length, theme, onElementCreate, notifyElementCreated]);
 
   const handleElementUpdate = useCallback((updatedElement) => {
     // Update local state
@@ -371,7 +497,10 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     if (onElementUpdate) {
       onElementUpdate(updatedElement);
     }
-  }, [onElementUpdate]);
+
+    // Notify other users via socket
+    notifyElementUpdated(updatedElement);
+  }, [onElementUpdate, notifyElementUpdated]);
 
   const handleElementDelete = useCallback(async (elementId) => {
     // Update local state immediately for responsive UI
@@ -381,7 +510,10 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     if (onElementDelete) {
       await onElementDelete(elementId);
     }
-  }, [onElementDelete]);
+
+    // Notify other users via socket
+    notifyElementDeleted(elementId);
+  }, [onElementDelete, notifyElementDeleted]);
 
   const [settingsModalOpen, setSettingsModalOpen] = React.useState(false);
   const [selectedElement, setSelectedElement] = React.useState(null);
@@ -480,11 +612,9 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
       };
     }
 
-    // Notify parent component about the update
-    if (onElementUpdate) {
-      onElementUpdate(updatedElement);
-    }
-  }, [canvasElements, onElementUpdate, isInEditMode, viewport.scale]);
+    // Notify parent component about the update (this will also emit socket event)
+    handleElementUpdate(updatedElement);
+  }, [canvasElements, handleElementUpdate, isInEditMode, viewport.scale]);
 
 
   const handleElementSelect = useCallback((element) => {

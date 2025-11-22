@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import InfiniteCanvas from '../components/InfiniteCanvas';
 import AppSidebar from '../components/AppSidebar';
 import HashExplorerFinder from './HashExplorerFinder';
@@ -18,12 +19,16 @@ import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal'
 import TitleNavigation from '../components/TitleNavigation';
 import TutorialModal from '../components/TutorialModal';
 import CommandPalette from '../components/CommandPalette/CommandPalette';
+import QuickSwitcher from '../components/QuickSwitcher';
+import LiveCursors from '../components/LiveCursors';
+import CollaborationNotifications from '../components/CollaborationNotifications';
 
 const Workspace = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { joinWorkspace, leaveWorkspace, workspaceUsers } = useSocket();
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [canvas, setCanvas] = useState(null);
@@ -36,6 +41,13 @@ const Workspace = () => {
   const [viewMode, setViewMode] = useState('view'); // 'edit', 'view', or 'post-view'
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [lastAccessedElement, setLastAccessedElement] = useState(null);
+  const [viewport, setViewport] = useState({
+    x: 0,
+    y: 0,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    scale: 1
+  });
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -73,6 +85,18 @@ const Workspace = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setWorkspace(workspaceRes.data);
+
+        // Track recent workspace access
+        try {
+          await axios.post(
+            `${process.env.REACT_APP_API_URL}/api/user/recent/workspace/${workspaceId}`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (trackErr) {
+          console.error('Error tracking recent workspace:', trackErr);
+          // Don't fail the whole load if tracking fails
+        }
 
         // Fetch canvas
         const canvasRes = await axios.get(
@@ -127,6 +151,20 @@ const Workspace = () => {
     }
   }, [user, loading]);
 
+  // Join workspace for real-time collaboration
+  useEffect(() => {
+    if (workspaceId && !loading) {
+      joinWorkspace(workspaceId);
+    }
+
+    // Cleanup: leave workspace when component unmounts or workspace changes
+    return () => {
+      if (workspaceId) {
+        leaveWorkspace();
+      }
+    };
+  }, [workspaceId, loading, joinWorkspace, leaveWorkspace]);
+
   // Fetch and load view mode preference and lastAccessedElement for current workspace
   useEffect(() => {
     const fetchWorkspacePreferences = async () => {
@@ -173,6 +211,25 @@ const Workspace = () => {
       // TODO: Optionally revert the optimistic update on error
     }
   };
+
+  // Handle remote element updates (from socket) - NO backend save, just state update
+  const handleRemoteElementUpdate = useCallback((updatedElement) => {
+    setElements(prevElements =>
+      prevElements.map(el => el._id === updatedElement._id ? updatedElement : el)
+    );
+  }, []);
+
+  const handleRemoteElementCreate = useCallback((newElement) => {
+    setElements(prevElements => {
+      const exists = prevElements.some(el => el._id === newElement._id);
+      if (exists) return prevElements;
+      return [...prevElements, newElement];
+    });
+  }, []);
+
+  const handleRemoteElementDelete = useCallback((elementId) => {
+    setElements(prevElements => prevElements.filter(el => el._id !== elementId));
+  }, []);
 
   const handleElementCreate = async (newElement) => {
     try {
@@ -338,6 +395,10 @@ const Workspace = () => {
 
   const handleBookmarkCreated = useCallback((newBookmark) => {
     setBookmarks(prevBookmarks => [...prevBookmarks, newBookmark]);
+  }, []);
+
+  const handleViewportChange = useCallback((newViewport) => {
+    setViewport(newViewport);
   }, []);
 
   const handleTitleClick = useCallback(async (element) => {
@@ -564,12 +625,17 @@ const Workspace = () => {
                 onElementUpdate={handleElementUpdate}
                 onElementCreate={handleElementCreate}
                 onElementDelete={handleElementDelete}
+                onRemoteElementUpdate={handleRemoteElementUpdate}
+                onRemoteElementCreate={handleRemoteElementCreate}
+                onRemoteElementDelete={handleRemoteElementDelete}
                 canEditContent={workspace?.permissions?.canEditContent}
                 viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}
                 workspaces={workspaces}
                 onElementNavigate={handleElementNavigate}
                 onBookmarkCreated={handleBookmarkCreated}
+                workspaceUsers={workspaceUsers}
+                onViewportChange={handleViewportChange}
               />
               {/* Hide TitleNavigation in post-view mode */}
               {viewMode !== 'post-view' && (
@@ -655,6 +721,15 @@ const Workspace = () => {
         onElementSelect={handleElementNavigate}
         onBookmarkCreate={handleBookmarkCreated}
       />
+
+      {/* Quick Switcher - Workspace Navigation */}
+      <QuickSwitcher currentWorkspaceId={workspaceId} />
+
+      {/* Live Cursors - Real-time Collaboration */}
+      {activeSection === 'workspaces' && <LiveCursors viewport={viewport} />}
+
+      {/* Collaboration Notifications - Real-time Activity */}
+      {activeSection === 'workspaces' && <CollaborationNotifications />}
     </>
   );
 };

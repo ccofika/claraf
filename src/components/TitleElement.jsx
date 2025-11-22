@@ -10,6 +10,7 @@ import RichTextEditor from './RichTextEditor';
 import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
+import { useDebouncedUpdate } from '../hooks/useDebouncedUpdate';
 
 const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
@@ -22,6 +23,17 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [currentValue, setCurrentValue] = useState(element?.content?.value || '');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Enable real-time collaboration - debounced updates while editing
+  useDebouncedUpdate(value, isEditing ? onUpdate : null, element, 800);
+
+  // Sync external updates when not editing
+  React.useEffect(() => {
+    if (!isEditing && element?.content?.value !== value) {
+      setValue(element?.content?.value || '');
+      setHistory(element?.content?.history || []);
+    }
+  }, [element?.content?.value, element?.content?.history, isEditing]);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
