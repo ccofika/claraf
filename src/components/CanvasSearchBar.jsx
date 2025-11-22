@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Globe, Box } from 'lucide-react';
+import { Search, Globe, Box, Command } from 'lucide-react';
 import axios from 'axios';
+import { useCommandPalette } from '../hooks/useCommandPalette';
 
 const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect }) => {
+  const { open } = useCommandPalette();
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState('local'); // 'local' or 'global'
   const [results, setResults] = useState([]);
@@ -181,8 +183,10 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => query && setShowResults(true)}
-            placeholder={`Search ${searchMode === 'local' ? 'workspace' : 'all workspaces'}...`}
-            className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/50 outline-none text-xs"
+            onClick={() => open()}
+            placeholder={`Search ${searchMode === 'local' ? 'workspace' : 'all workspaces'}... (Cmd+K)`}
+            className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/50 outline-none text-xs cursor-pointer"
+            readOnly
           />
 
           {/* Loading Spinner */}

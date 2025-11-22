@@ -11,11 +11,13 @@ import DeveloperDashboard from './DeveloperDashboard';
 import AffiliateBonusFinder from './AffiliateBonusFinder';
 import KYC from './KYC';
 import QAManager from './QAManager';
+import CountriesRestrictions from './CountriesRestrictions';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
 import TitleNavigation from '../components/TitleNavigation';
 import TutorialModal from '../components/TutorialModal';
+import CommandPalette from '../components/CommandPalette/CommandPalette';
 
 const Workspace = () => {
   const { workspaceId } = useParams();
@@ -287,6 +289,10 @@ const Workspace = () => {
       // Store the element to navigate to after workspace switch
       sessionStorage.setItem('pendingElementNavigation', JSON.stringify(element));
       navigate(`/workspace/${element.workspaceId}`);
+    } else {
+      // Zoom to element in current workspace
+      const event = new CustomEvent('zoomToElement', { detail: element });
+      window.dispatchEvent(event);
     }
   }, [workspaceId, navigate]);
 
@@ -596,6 +602,9 @@ const Workspace = () => {
           {activeSection === 'qa-manager' && (
             <QAManager />
           )}
+          {activeSection === 'countries-restrictions' && (
+            <CountriesRestrictions />
+          )}
         </div>
 
         {/* Workspace Switching Loader */}
@@ -637,6 +646,14 @@ const Workspace = () => {
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
         onDontShowAgain={() => setShowTutorial(false)}
+      />
+
+      {/* Command Palette - Global Search */}
+      <CommandPalette
+        currentWorkspaceId={workspaceId}
+        workspaces={workspaces}
+        onElementSelect={handleElementNavigate}
+        onBookmarkCreate={handleBookmarkCreated}
       />
     </>
   );
