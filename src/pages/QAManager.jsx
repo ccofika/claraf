@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target,
-  FileText, ArrowUpDown, MessageSquare
+  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -13,6 +13,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { DatePicker } from '../components/ui/date-picker';
 import { toast } from 'sonner';
+import QASearchBar from '../components/QASearchBar';
 
 const QAManager = () => {
   const { user } = useAuth();
@@ -36,9 +37,13 @@ const QAManager = () => {
     dateTo: '',
     scoreMin: 0,
     scoreMax: 100,
-    search: ''
+    search: '',
+    category: '',
+    priority: '',
+    tags: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [showAISearch, setShowAISearch] = useState(true);
 
   // Dialog state
   const [agentDialog, setAgentDialog] = useState({ open: false, mode: 'create', data: null });
@@ -283,6 +288,11 @@ const QAManager = () => {
       console.error('Error updating feedback:', err);
       toast.error(err.response?.data?.message || 'Failed to save feedback');
     }
+  };
+
+  const handleAISearchTicketSelect = (ticket) => {
+    // Open ticket for viewing/editing
+    setTicketDialog({ open: true, mode: 'edit', data: ticket });
   };
 
   const handleExportMaestro = async (agentId) => {
@@ -714,6 +724,17 @@ const QAManager = () => {
 
     return (
       <div className="space-y-4">
+        {/* AI Search Bar */}
+        {showAISearch && (
+          <div className="mb-4">
+            <QASearchBar
+              onTicketSelect={handleAISearchTicketSelect}
+              currentFilters={filters}
+              onFilterChange={setFilters}
+            />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -721,6 +742,14 @@ const QAManager = () => {
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowAISearch(!showAISearch)}
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              {showAISearch ? 'Hide' : 'Show'} AI Search
+            </Button>
             <Button
               variant="secondary"
               onClick={() => setShowFilters(!showFilters)}
@@ -951,18 +980,39 @@ const QAManager = () => {
 
     return (
       <div className="space-y-4">
+        {/* AI Search Bar */}
+        {showAISearch && (
+          <div className="mb-4">
+            <QASearchBar
+              onTicketSelect={handleAISearchTicketSelect}
+              currentFilters={{ ...filters, isArchived: true }}
+              onFilterChange={setFilters}
+            />
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Archive</h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Archived tickets</p>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Archived tickets from all QA agents</p>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="w-4 h-4 mr-1.5" />
-            Filters
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowAISearch(!showAISearch)}
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              {showAISearch ? 'Hide' : 'Show'} AI Search
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="w-4 h-4 mr-1.5" />
+              Filters
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -1151,7 +1201,7 @@ const QAManager = () => {
 
     return (
       <Dialog open={agentDialog.open} onOpenChange={(open) => setAgentDialog({ ...agentDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               {agentDialog.mode === 'create' ? 'Create Agent' : 'Edit Agent'}
@@ -1241,8 +1291,15 @@ const QAManager = () => {
       status: 'Selected',
       dateEntered: new Date().toISOString().split('T')[0],
       notes: '',
-      qualityScorePercent: ''
+      feedback: '',
+      qualityScorePercent: '',
+      category: 'General',
+      priority: 'Medium',
+      tags: [],
+      shortDescription: ''
     });
+
+    const [tagInput, setTagInput] = useState('');
 
     useEffect(() => {
       if (ticketDialog.data) {
@@ -1252,7 +1309,12 @@ const QAManager = () => {
           status: ticketDialog.data.status || 'Selected',
           dateEntered: ticketDialog.data.dateEntered ? new Date(ticketDialog.data.dateEntered).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           notes: ticketDialog.data.notes || '',
-          qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : ''
+          feedback: ticketDialog.data.feedback || '',
+          qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
+          category: ticketDialog.data.category || 'General',
+          priority: ticketDialog.data.priority || 'Medium',
+          tags: ticketDialog.data.tags || [],
+          shortDescription: ticketDialog.data.shortDescription || ''
         });
       } else {
         setFormData({
@@ -1261,10 +1323,27 @@ const QAManager = () => {
           status: 'Selected',
           dateEntered: new Date().toISOString().split('T')[0],
           notes: '',
-          qualityScorePercent: ''
+          feedback: '',
+          qualityScorePercent: '',
+          category: 'General',
+          priority: 'Medium',
+          tags: [],
+          shortDescription: ''
         });
       }
     }, [ticketDialog.data]);
+
+    const addTag = (e) => {
+      e.preventDefault();
+      if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+        setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] });
+        setTagInput('');
+      }
+    };
+
+    const removeTag = (tagToRemove) => {
+      setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
+    };
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -1277,14 +1356,14 @@ const QAManager = () => {
 
     return (
       <Dialog open={ticketDialog.open} onOpenChange={(open) => setTicketDialog({ ...ticketDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
                 <select
@@ -1311,7 +1390,18 @@ const QAManager = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Short Description */}
+            <div>
+              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Short Description</Label>
+              <Input
+                value={formData.shortDescription}
+                onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+                placeholder="Brief description of the ticket"
+                className="text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
                 <select
@@ -1331,30 +1421,108 @@ const QAManager = () => {
                   className="text-sm"
                 />
               </div>
+              <div>
+                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.qualityScorePercent}
+                  onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
+                  placeholder="0-100"
+                  className="text-sm"
+                />
+              </div>
             </div>
 
-            <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={formData.qualityScorePercent}
-                onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
-                placeholder="0-100"
-                className="text-sm"
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-1">
+                  <Tag className="w-3 h-3" />
+                  Category
+                </Label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                >
+                  <option value="General">General</option>
+                  <option value="Technical">Technical</option>
+                  <option value="Billing">Billing</option>
+                  <option value="Account">Account</option>
+                  <option value="Complaint">Complaint</option>
+                  <option value="Feature Request">Feature Request</option>
+                  <option value="Bug Report">Bug Report</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  Priority
+                </Label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
             </div>
 
+            {/* Tags */}
             <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Notes</Label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes or comments"
-                rows={3}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-              />
+              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Tags</Label>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addTag(e)}
+                  placeholder="Add tag..."
+                  className="text-sm flex-1"
+                />
+                <Button type="button" size="sm" onClick={addTag}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {formData.tags.map((tag, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-md">
+                    {tag}
+                    <button type="button" onClick={() => removeTag(tag)} className="hover:text-purple-900 dark:hover:text-purple-100">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Notes</Label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Internal notes for yourself"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Feedback</Label>
+                <textarea
+                  value={formData.feedback}
+                  onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
+                  placeholder="Feedback to agent after grading"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
+                />
+              </div>
             </div>
 
             <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
