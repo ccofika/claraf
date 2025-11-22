@@ -40,6 +40,7 @@ const ElementLinkModal = ({ isOpen, onClose, onElementSelect, onRemoveLink, curr
       fetchWorkspaces();
       fetchElements();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
@@ -49,7 +50,8 @@ const ElementLinkModal = ({ isOpen, onClose, onElementSelect, onRemoveLink, curr
       }, 300);
       return () => clearTimeout(delaySearch);
     }
-  }, [searchQuery, selectedWorkspace, selectedElementType, dateFrom, dateTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedWorkspace, selectedElementType, dateFrom, dateTo, isOpen]);
 
   const fetchWorkspaces = async () => {
     try {

@@ -34,6 +34,7 @@ const RichTextEditor = ({
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = value || '';
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto focus
@@ -143,6 +144,7 @@ const RichTextEditor = ({
         document.removeEventListener('selectionchange', handleSelectionChange);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused]);
 
   const handleFocus = () => {
@@ -221,10 +223,8 @@ const RichTextEditor = ({
     const items = clipboardData.items;
 
     // Check if there are any images in the clipboard
-    let hasImage = false;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
-        hasImage = true;
         e.preventDefault(); // Prevent default paste for images
 
         const imageFile = items[i].getAsFile();
@@ -431,10 +431,6 @@ const RichTextEditor = ({
           // Remove any existing link on the CURRENT selection only if it exists
           if (hasExistingLink) {
             document.execCommand('unlink', false, null);
-            // Re-get the range after unlink
-            if (currentSelection.rangeCount > 0) {
-              const updatedRange = currentSelection.getRangeAt(0);
-            }
           }
 
           // Get fresh range after any modifications
@@ -448,7 +444,7 @@ const RichTextEditor = ({
           const selectedContent = finalRange.extractContents();
 
           const link = document.createElement('a');
-          link.href = 'javascript:void(0)';
+          link.href = '#';
           link.className = 'element-link';
           link.style.color = '#10b981'; // Green color for element links
           link.style.textDecoration = 'underline';

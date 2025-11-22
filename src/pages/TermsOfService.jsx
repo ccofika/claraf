@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { FileText, ArrowLeft, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { Separator } from '../components/ui/separator';
 
 const TermsOfService = () => {
   return (

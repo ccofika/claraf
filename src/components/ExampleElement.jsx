@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Undo, Redo, Settings, X, ChevronDown, ChevronUp, Plus, Trash2, ChevronLeft, ChevronRight, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -42,7 +42,6 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
   const [currentTitleHistoryIndex, setCurrentTitleHistoryIndex] = useState(-1);
   const [currentTitleValue, setCurrentTitleValue] = useState(examples[currentExampleIndex]?.title || '');
   const [editingMessageIndex, setEditingMessageIndex] = useState(null);
-  const [inlineImages, setInlineImages] = useState(element?.content?.inlineImages || []);
   const [lightboxImage, setLightboxImage] = useState(null);
 
   const currentExample = examples[currentExampleIndex] || examples[0];
@@ -278,21 +277,8 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     });
   };
 
-  const handleImagePaste = (imageMetadata) => {
-    // Add new image to the inlineImages array
-    setInlineImages(prev => [...prev, imageMetadata]);
-  };
-
-  const handleImageClick = (e) => {
-    // Check if clicked element is an image - require Ctrl/Cmd+click to not interfere with text selection
-    if (e.target.tagName === 'IMG' && e.target.classList.contains('inline-image')) {
-      // Only open lightbox with Ctrl/Cmd+click to not interfere with text selection hover
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        setLightboxImage(e.target.src);
-      }
-    }
+  const handleImagePaste = () => {
+    // Images are automatically extracted and stored in content when saving
   };
 
   const handleMessageBlur = (index) => {
@@ -470,10 +456,6 @@ const ExampleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onS
     const words = firstUserMsg.text.split(' ');
     const preview = words.slice(0, 8).join(' ');
     return words.length > 8 ? `${preview}...` : preview;
-  };
-
-  const getFirstUserMessageIndex = () => {
-    return currentExample?.messages?.findIndex(m => m.type === 'user') ?? 0;
   };
 
 

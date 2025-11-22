@@ -34,6 +34,7 @@ const CanvasSearchBar = ({ currentWorkspaceId, workspaces = [], onElementSelect 
         clearTimeout(debounceTimer.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, searchMode, currentWorkspaceId]);
 
   const performSearch = async (searchQuery) => {

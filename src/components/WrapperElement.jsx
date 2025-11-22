@@ -77,7 +77,6 @@ const WrapperElement = ({
 
     // West: expand left (move position and increase width)
     if (direction.includes('w')) {
-      const widthChange = Math.min(deltaX, startWidth - 200); // Don't shrink below 200
       newWidth = Math.max(200, startWidth - deltaX);
       newPosX = startPosX + (startWidth - newWidth); // Move position to keep right edge fixed
     }
@@ -89,7 +88,6 @@ const WrapperElement = ({
 
     // North: expand up (move position and increase height)
     if (direction.includes('n')) {
-      const heightChange = Math.min(deltaY, startHeight - 150); // Don't shrink below 150
       newHeight = Math.max(150, startHeight - deltaY);
       newPosY = startPosY + (startHeight - newHeight); // Move position to keep bottom edge fixed
     }

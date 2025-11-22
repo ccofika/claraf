@@ -3,7 +3,7 @@ import axios from 'axios';
 import io from 'socket.io-client';
 import {
   Send, CheckCircle, Clock, AlertCircle, Loader, User, MessageSquare,
-  Search, History, X, ExternalLink, TrendingUp, CheckCheck, Filter
+  Search, History, X, ExternalLink, CheckCheck
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';

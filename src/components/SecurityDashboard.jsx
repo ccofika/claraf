@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Shield, Lock, Key, Settings, RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock, User, Activity } from 'lucide-react';
+import { Shield, Lock, Key, Settings, RefreshCw, CheckCircle, XCircle, User, Activity } from 'lucide-react';
 
 const SecurityDashboard = () => {
   const [securityData, setSecurityData] = useState(null);
@@ -67,6 +67,7 @@ const SecurityDashboard = () => {
 
   useEffect(() => {
     fetchSecurityDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {

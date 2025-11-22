@@ -1,8 +1,6 @@
 import React, { useMemo, useRef } from 'react';
-import { useTheme } from '../context/ThemeContext';
 
 const TitleNavigation = ({ elements = [], onTitleClick, isSidebarCollapsed = false }) => {
-  const { theme } = useTheme();
   const scrollContainerRef = useRef(null);
 
   // Filter and sort title elements (newest to oldest)

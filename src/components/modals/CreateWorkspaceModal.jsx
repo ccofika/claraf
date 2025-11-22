@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { Close, CheckmarkFilled } from '@carbon/icons-react';
+import { CheckmarkFilled } from '@carbon/icons-react';
 
 const CreateWorkspaceModal = ({ isOpen, onClose, onWorkspaceCreated }) => {
   const { user } = useAuth();
@@ -23,6 +23,7 @@ const CreateWorkspaceModal = ({ isOpen, onClose, onWorkspaceCreated }) => {
     if (isOpen) {
       fetchUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const fetchUsers = async () => {

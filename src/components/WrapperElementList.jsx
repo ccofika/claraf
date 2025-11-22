@@ -60,7 +60,9 @@ const WrapperElementList = ({ isOpen, onClose, wrapper, allElements, onUpdate })
     });
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const filteredSelected = useMemo(() => filterElements(selectedElements), [selectedElements, searchQuery, filterType]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const filteredUnselected = useMemo(() => filterElements(unselectedElements), [unselectedElements, searchQuery, filterType]);
 
   // Get element icon

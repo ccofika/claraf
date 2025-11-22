@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { DndContext, useSensor, useSensors, PointerSensor, DragOverlay } from '@dnd-kit/core';
+import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import CanvasElement from './CanvasElement';
 import DockBar from './DockBar';
 import Minimap from './Minimap';
@@ -31,7 +31,6 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   // Determine if user is actually in edit mode (has permission AND in edit mode)
   const isInEditMode = canEditContent && viewMode === 'edit';
   const [isDraggingElement, setIsDraggingElement] = React.useState(false);
-  const [activeId, setActiveId] = React.useState(null);
   const [viewport, setViewport] = useState({
     x: 0,
     y: 0,
@@ -409,7 +408,6 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
   const handleDragStart = useCallback((event) => {
     event.preventDefault?.();
     setIsDraggingElement(true);
-    setActiveId(event.active.id);
 
     // Force disable panning immediately
     if (transformWrapperRef.current?.instance?.setup?.panning) {
@@ -428,7 +426,6 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
     const { active, delta } = event;
 
     setIsDraggingElement(false);
-    setActiveId(null);
 
     // Re-enable panning after a small delay to prevent accidental panning
     setTimeout(() => {

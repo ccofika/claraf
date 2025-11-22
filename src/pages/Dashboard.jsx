@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Megaphone, Plus, FolderOpen } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState([]);
   const [announcementsWorkspace, setAnnouncementsWorkspace] = useState(null);

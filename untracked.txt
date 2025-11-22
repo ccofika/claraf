@@ -1,0 +1,3 @@
+changes.patch
+new_files.txt
+untracked.txt

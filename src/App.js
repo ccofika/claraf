@@ -6,7 +6,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import { TextFormattingProvider } from './context/TextFormattingContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
 import AuthCallback from './pages/AuthCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';

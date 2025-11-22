@@ -253,7 +253,8 @@ const PostView = ({ wrappers = [], allElements = [], currentWorkspace, onModeCha
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentWrapperIndex, sortedWrappers.length, searchResults, currentSearchIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWrapperIndex, sortedWrappers.length, searchResults, currentSearchIndex, performHighlighting]);
 
   // Render element content with proper formatting
   const renderDescription = (element) => {

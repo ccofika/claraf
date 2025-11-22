@@ -25,6 +25,7 @@ const EditWorkspaceModal = ({ isOpen, onClose, workspace, onWorkspaceUpdated }) 
       setSelectedUsers(workspace.invitedMembers?.map(m => m._id || m) || []);
       fetchUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, workspace]);
 
   const fetchUsers = async () => {

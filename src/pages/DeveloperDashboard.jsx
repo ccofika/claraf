@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { RefreshCw, Activity, Database, Users, FolderOpen, FileText, Server, Clock, Cpu, HardDrive, AlertCircle } from 'lucide-react';
+import { RefreshCw, Activity, Database, Users, FolderOpen, FileText, Server, Clock, HardDrive, AlertCircle } from 'lucide-react';
 import ActivityLogsSection from '../components/ActivityLogsSection';
 import SecurityDashboard from '../components/SecurityDashboard';
 
@@ -94,6 +94,7 @@ const DeveloperDashboard = () => {
       fetchAllData();
     }, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch logs when filters change
@@ -101,23 +102,8 @@ const DeveloperDashboard = () => {
     if (!loading) {
       fetchLogs(1); // Reset to page 1 when filters change
     }
-  }, [levelFilter, moduleFilter, searchFilter]);
-
-  const formatUptime = (seconds) => {
-    if (!seconds) return 'N/A';
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    parts.push(`${secs}s`);
-
-    return parts.join(' ');
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levelFilter, moduleFilter, searchFilter, loading]);
 
   if (loading && !metrics) {
     return (

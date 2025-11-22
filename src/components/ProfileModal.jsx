@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
-import { User, Mail, Palette, Shield, CheckCircle, AlertCircle, BarChart3, Calendar, Activity, BookOpen, ExternalLink, Keyboard, Sparkles } from 'lucide-react';
+import { User, Mail, Palette, Shield, CheckCircle, AlertCircle, BarChart3, Calendar, Activity, BookOpen, Keyboard, Sparkles } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 
@@ -321,14 +321,14 @@ const ProfileModal = ({ isOpen, onClose }) => {
                         <p className="text-xs text-muted-foreground">Restart</p>
                       </div>
                     </button>
-                    <a href="#" className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
+                    <button type="button" disabled className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
                       <BookOpen className="w-4 h-4 text-green-600 dark:text-green-400" />
                       <div>
                         <p className="text-xs font-medium">Docs</p>
                         <p className="text-xs text-muted-foreground">Learn</p>
                       </div>
-                    </a>
-                    <a href="#" className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
+                    </button>
+                    <button type="button" disabled className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
                       <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
                       </svg>
@@ -336,14 +336,14 @@ const ProfileModal = ({ isOpen, onClose }) => {
                         <p className="text-xs font-medium">Videos</p>
                         <p className="text-xs text-muted-foreground">Watch</p>
                       </div>
-                    </a>
-                    <a href="#" className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
+                    </button>
+                    <button type="button" disabled className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-all opacity-60 cursor-not-allowed">
                       <Keyboard className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                       <div>
                         <p className="text-xs font-medium">Shortcuts</p>
                         <kbd className="text-xs">?</kbd>
                       </div>
-                    </a>
+                    </button>
                   </div>
                   <div className="p-2 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800">
                     <div className="flex items-start gap-2">

@@ -22,28 +22,8 @@ const AuthCallback = () => {
     // We don't pass tokens in URL to prevent exposure in browser history
     // Always fetch user profile and redirect
     fetchUserProfileWithCookie();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, navigate]);
-
-  const redirectToAnnouncements = async (authToken) => {
-    try {
-      const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await axios.get(
-        `${backendURL}/api/workspaces`,
-        { headers: { Authorization: `Bearer ${authToken}` } }
-      );
-
-      const announcementsWorkspace = response.data.find(ws => ws.type === 'announcements');
-
-      if (announcementsWorkspace) {
-        navigate(`/workspace/${announcementsWorkspace._id}`);
-      } else {
-        navigate('/login?error=Announcements workspace not found');
-      }
-    } catch (err) {
-      console.error('Error fetching workspaces:', err);
-      navigate('/login?error=Failed to load workspace');
-    }
-  };
 
   const fetchUserProfileWithCookie = async () => {
     try {
@@ -85,27 +65,6 @@ const AuthCallback = () => {
       }
     } catch (error) {
       console.error('❌ Error fetching user profile:', error);
-      navigate('/login?error=Failed to fetch user profile');
-    }
-  };
-  const fetchUserProfile = async (authToken) => {
-    try {
-      const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${backendURL}/api/auth/profile`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-
-      const userData = await response.json();
-      setUser(userData);
-      await redirectToAnnouncements(authToken);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
       navigate('/login?error=Failed to fetch user profile');
     }
   };
