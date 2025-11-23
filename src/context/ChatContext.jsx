@@ -29,6 +29,7 @@ export const ChatProvider = ({ children }) => {
   const [userPresence, setUserPresence] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isChatInitialized, setIsChatInitialized] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -67,10 +68,10 @@ export const ChatProvider = ({ children }) => {
       });
       setUnreadCounts(counts);
     } catch (error) {
-      console.error('Error fetching channels:', error);
+      console.error('❌ Error fetching channels:', error);
       toast.error('Failed to load chat channels');
     }
-  }, [token, API_URL]);
+  }, [API_URL]);
 
   // Fetch messages for a channel
   const fetchMessages = useCallback(async (channelId, before = null) => {
@@ -104,11 +105,11 @@ export const ChatProvider = ({ children }) => {
 
       return { messages: newMessages, hasMore };
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('❌ Error fetching messages:', error);
       toast.error('Failed to load messages');
       return { messages: [], hasMore: false };
     }
-  }, [token, API_URL]);
+  }, [API_URL]);
 
   // Send message
   const sendMessage = useCallback(async (channelId, content, type = 'text', metadata = {}) => {
@@ -123,7 +124,33 @@ export const ChatProvider = ({ children }) => {
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      // Emit socket event for real-time delivery
+      console.log('✅ Message sent successfully:', response.data);
+
+      // Immediately add message to local state (don't wait for socket)
+      setMessages(prev => ({
+        ...prev,
+        [channelId]: [...(prev[channelId] || []), response.data]
+      }));
+
+      // Update channel's last message and unarchive if archived
+      setChannels(prev =>
+        prev.map(ch => {
+          if (!ch || !ch._id) return ch;
+          return ch._id === channelId
+            ? { ...ch,
+                isArchived: false, // Auto-unarchive when sending message
+                lastMessage: {
+                  content: content.substring(0, 100),
+                  sender: response.data.sender,
+                  timestamp: new Date(),
+                  type: type
+                }
+              }
+            : ch;
+        })
+      );
+
+      // Emit socket event for real-time delivery to OTHER users
       if (socket && isConnected) {
         socket.emit('chat:message:send', {
           channelId,
@@ -137,26 +164,44 @@ export const ChatProvider = ({ children }) => {
       toast.error('Failed to send message');
       throw error;
     }
-  }, [token, socket, isConnected, API_URL]);
+  }, [socket, isConnected, API_URL]);
 
   // Edit message
   const editMessage = useCallback(async (messageId, content) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!content || !content.trim()) {
+      toast.error('Message cannot be empty');
+      return;
+    }
 
     try {
+      console.log('✏️ Editing message:', messageId);
       const response = await axios.put(
         `${API_URL}/api/chat/messages/${messageId}`,
-        { content },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { content: content.trim() },
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
+
+      if (!response.data) {
+        throw new Error('No data returned from server');
+      }
+
+      console.log('✅ Message edited successfully');
 
       // Update local state
       setMessages(prev => {
         const newMessages = { ...prev };
         Object.keys(newMessages).forEach(channelId => {
-          newMessages[channelId] = newMessages[channelId].map(msg =>
-            msg._id === messageId ? response.data : msg
-          );
+          if (newMessages[channelId]) {
+            newMessages[channelId] = newMessages[channelId].map(msg =>
+              msg._id === messageId ? { ...msg, ...response.data, isEdited: true } : msg
+            );
+          }
         });
         return newMessages;
       });
@@ -166,32 +211,61 @@ export const ChatProvider = ({ children }) => {
         socket.emit('chat:message:edit', {
           messageId,
           channelId: activeChannel._id,
-          content
+          content: content.trim()
         });
       }
 
+      toast.success('Message updated');
       return response.data;
     } catch (error) {
-      console.error('Error editing message:', error);
-      toast.error('Failed to edit message');
+      console.error('❌ Error editing message:', error);
+      toast.error(error.response?.data?.message || 'Failed to edit message');
       throw error;
     }
-  }, [token, socket, isConnected, activeChannel, API_URL]);
+  }, [socket, isConnected, activeChannel, API_URL]);
 
   // Delete message
   const deleteMessage = useCallback(async (messageId, channelId) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!messageId || !channelId) {
+      console.error('❌ Missing messageId or channelId');
+      return;
+    }
 
     try {
+      console.log('🗑️ Deleting message:', messageId);
       await axios.delete(`${API_URL}/api/chat/messages/${messageId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${authToken}` }
       });
 
-      // Update local state
-      setMessages(prev => ({
-        ...prev,
-        [channelId]: prev[channelId]?.filter(msg => msg._id !== messageId) || []
-      }));
+      console.log('✅ Message deleted successfully');
+
+      // Update local state - remove message
+      setMessages(prev => {
+        const channelMessages = prev[channelId];
+        if (!channelMessages) return prev;
+
+        return {
+          ...prev,
+          [channelId]: channelMessages.filter(msg => msg._id !== messageId)
+        };
+      });
+
+      // Also remove from pinned if it was pinned
+      setPinnedMessages(prev => {
+        const pinnedInChannel = prev[channelId];
+        if (!pinnedInChannel) return prev;
+
+        return {
+          ...prev,
+          [channelId]: pinnedInChannel.filter(msg => msg._id !== messageId)
+        };
+      });
 
       // Emit socket event
       if (socket && isConnected) {
@@ -200,30 +274,48 @@ export const ChatProvider = ({ children }) => {
 
       toast.success('Message deleted');
     } catch (error) {
-      console.error('Error deleting message:', error);
-      toast.error('Failed to delete message');
+      console.error('❌ Error deleting message:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete message');
       throw error;
     }
-  }, [token, socket, isConnected, API_URL]);
+  }, [socket, isConnected, API_URL]);
 
   // Add reaction
   const addReaction = useCallback(async (messageId, emoji) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!messageId || !emoji) {
+      console.error('❌ Missing messageId or emoji');
+      return;
+    }
 
     try {
+      console.log('❤️ Adding reaction:', emoji, 'to message:', messageId);
       const response = await axios.post(
         `${API_URL}/api/chat/messages/${messageId}/reactions`,
         { emoji },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      // Update local state
+      if (!response.data) {
+        throw new Error('No data returned from server');
+      }
+
+      console.log('✅ Reaction added successfully');
+
+      // Update local state for ALL channels (message might be in any channel)
       setMessages(prev => {
         const newMessages = { ...prev };
         Object.keys(newMessages).forEach(channelId => {
-          newMessages[channelId] = newMessages[channelId].map(msg =>
-            msg._id === messageId ? response.data : msg
-          );
+          if (newMessages[channelId]) {
+            newMessages[channelId] = newMessages[channelId].map(msg =>
+              msg._id === messageId ? { ...msg, ...response.data } : msg
+            );
+          }
         });
         return newMessages;
       });
@@ -237,31 +329,49 @@ export const ChatProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.error('Error adding reaction:', error);
-      toast.error('Failed to add reaction');
+      console.error('❌ Error adding reaction:', error);
+      toast.error(error.response?.data?.message || 'Failed to add reaction');
     }
-  }, [token, socket, isConnected, activeChannel, API_URL]);
+  }, [socket, isConnected, activeChannel, API_URL]);
 
   // Remove reaction
   const removeReaction = useCallback(async (messageId, emoji) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!messageId || !emoji) {
+      console.error('❌ Missing messageId or emoji');
+      return;
+    }
 
     try {
+      console.log('💔 Removing reaction:', emoji, 'from message:', messageId);
       const response = await axios.delete(
         `${API_URL}/api/chat/messages/${messageId}/reactions`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authToken}` },
           data: { emoji }
         }
       );
 
-      // Update local state
+      if (!response.data) {
+        throw new Error('No data returned from server');
+      }
+
+      console.log('✅ Reaction removed successfully');
+
+      // Update local state for ALL channels
       setMessages(prev => {
         const newMessages = { ...prev };
         Object.keys(newMessages).forEach(channelId => {
-          newMessages[channelId] = newMessages[channelId].map(msg =>
-            msg._id === messageId ? response.data : msg
-          );
+          if (newMessages[channelId]) {
+            newMessages[channelId] = newMessages[channelId].map(msg =>
+              msg._id === messageId ? { ...msg, ...response.data } : msg
+            );
+          }
         });
         return newMessages;
       });
@@ -275,20 +385,111 @@ export const ChatProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.error('Error removing reaction:', error);
+      console.error('❌ Error removing reaction:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove reaction');
     }
-  }, [token, socket, isConnected, activeChannel, API_URL]);
+  }, [socket, isConnected, activeChannel, API_URL]);
+
+  // Pin/Unpin message
+  const pinMessage = useCallback(async (messageId, channelId) => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!messageId || !channelId) {
+      console.error('❌ Missing messageId or channelId');
+      return;
+    }
+
+    try {
+      console.log('📌 Toggling pin for message:', messageId);
+      const response = await axios.post(
+        `${API_URL}/api/chat/messages/${messageId}/pin`,
+        {},
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      if (!response.data) {
+        throw new Error('Invalid response from server');
+      }
+
+      const updatedMessage = response.data;
+      const isPinned = updatedMessage.isPinned;
+
+      console.log(isPinned ? '✅ Message pinned' : '✅ Message unpinned');
+
+      // Update local state with server response
+      setMessages(prev => {
+        const newMessages = { ...prev };
+        if (newMessages[channelId]) {
+          newMessages[channelId] = newMessages[channelId].map(msg =>
+            msg._id === messageId ? updatedMessage : msg
+          );
+        }
+        return newMessages;
+      });
+
+      // Update pinned messages list
+      setPinnedMessages(prev => {
+        const currentPinned = prev[channelId] || [];
+
+        if (isPinned) {
+          // Message was pinned - add to list
+          const alreadyPinned = currentPinned.some(m => m._id === messageId);
+          if (alreadyPinned) {
+            // Update existing pinned message
+            return {
+              ...prev,
+              [channelId]: currentPinned.map(m => m._id === messageId ? updatedMessage : m)
+            };
+          } else {
+            // Add new pinned message
+            return {
+              ...prev,
+              [channelId]: [...currentPinned, updatedMessage]
+            };
+          }
+        } else {
+          // Message was unpinned - remove from list
+          return {
+            ...prev,
+            [channelId]: currentPinned.filter(m => m._id !== messageId)
+          };
+        }
+      });
+
+      // Emit socket event
+      if (socket && isConnected) {
+        socket.emit('chat:message:pin', { messageId, channelId, isPinned });
+      }
+
+      toast.success(isPinned ? 'Message pinned' : 'Message unpinned');
+    } catch (error) {
+      console.error('❌ Error toggling pin:', error);
+      toast.error(error.response?.data?.message || 'Failed to pin message');
+    }
+  }, [socket, isConnected, API_URL]);
 
   // Mark messages as read
   const markAsRead = useCallback(async (channelId) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) return;
+
+    if (!channelId) {
+      console.error('❌ Missing channelId');
+      return;
+    }
 
     try {
       await axios.post(
         `${API_URL}/api/chat/channels/${channelId}/read`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
+
+      console.log('✅ Messages marked as read for channel:', channelId);
 
       // Update unread count
       setUnreadCounts(prev => ({
@@ -301,77 +502,173 @@ export const ChatProvider = ({ children }) => {
         socket.emit('chat:messages:read', { channelId });
       }
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error('❌ Error marking messages as read:', error);
     }
-  }, [token, socket, isConnected, API_URL]);
+  }, [socket, isConnected, API_URL]);
 
   // Create channel
   const createChannel = useCallback(async (type, name, description, memberIds, workspaceId) => {
     const authToken = getAuthToken();
-    if (!authToken) return;
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!type) {
+      toast.error('Channel type is required');
+      return;
+    }
+
+    // Validation
+    if (type === 'group' && (!name || !name.trim())) {
+      toast.error('Channel name is required for group chats');
+      return;
+    }
+
+    if (type === 'dm' && (!memberIds || memberIds.length !== 1)) {
+      toast.error('Direct message requires exactly one member');
+      return;
+    }
 
     try {
-      console.log('📡 Sending request to:', `${API_URL}/api/chat/channels`);
-      console.log('📡 Request body:', { type, name, description, memberIds, workspaceId });
+      console.log('📡 Creating channel:', { type, name, memberIds: memberIds?.length || 0 });
+
+      const requestData = {
+        type,
+        ...(name && { name: name.trim() }),
+        ...(description && { description: description.trim() }),
+        ...(memberIds && { memberIds }),
+        ...(workspaceId && { workspaceId })
+      };
 
       const response = await axios.post(
         `${API_URL}/api/chat/channels`,
-        { type, name, description, memberIds, workspaceId },
+        requestData,
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      console.log('📥 Response received:', response);
-      console.log('📥 Response data:', response.data);
-      console.log('📥 Response status:', response.status);
+      if (!response.data || !response.data._id) {
+        throw new Error('Invalid response from server');
+      }
 
+      console.log('✅ Channel created:', response.data._id);
+
+      // Add to channels list if not already there
       setChannels(prev => {
-        console.log('📝 Updating channels, prev count:', prev.length);
-        const newChannels = [response.data, ...prev];
-        console.log('📝 New channels count:', newChannels.length);
-        return newChannels;
+        const exists = prev.some(ch => ch._id === response.data._id);
+        if (exists) {
+          console.log('Channel already exists in list');
+          return prev;
+        }
+        return [response.data, ...prev];
       });
 
       // Emit socket event
       if (socket && isConnected) {
-        console.log('🔌 Emitting socket event');
         socket.emit('chat:channel:created', { channel: response.data });
       }
 
-      toast.success('Channel created successfully');
-      console.log('✅ Returning channel data:', response.data);
+      toast.success(`${type === 'dm' ? 'Direct message' : 'Channel'} created successfully`);
       return response.data;
     } catch (error) {
       console.error('❌ Error creating channel:', error);
-      console.error('❌ Error response:', error.response);
-      toast.error('Failed to create channel');
+      const errorMsg = error.response?.data?.message || 'Failed to create channel';
+      toast.error(errorMsg);
       throw error;
     }
-  }, [token, socket, isConnected, API_URL]);
+  }, [socket, isConnected, API_URL]);
 
   // Create or get DM channel
   const createDM = useCallback(async (otherUserId) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!otherUserId) {
+      toast.error('User ID is required');
+      return;
+    }
 
     try {
+      console.log('💬 Creating DM with user:', otherUserId);
+
       const response = await axios.post(
         `${API_URL}/api/chat/channels`,
         { type: 'dm', memberIds: [otherUserId] },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      // Check if channel already exists in state
-      const existingChannel = channels.find(ch => ch._id === response.data._id);
-      if (!existingChannel) {
-        setChannels(prev => [response.data, ...prev]);
+      if (!response.data || !response.data._id) {
+        throw new Error('Invalid response from server');
       }
+
+      console.log('✅ DM created/retrieved:', response.data._id);
+
+      // Check if channel already exists in state
+      setChannels(prev => {
+        const exists = prev.some(ch => ch._id === response.data._id);
+        if (exists) {
+          console.log('DM already exists in list');
+          return prev;
+        }
+        return [response.data, ...prev];
+      });
 
       return response.data;
     } catch (error) {
-      console.error('Error creating DM:', error);
-      toast.error('Failed to create direct message');
+      console.error('❌ Error creating DM:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to create direct message';
+      toast.error(errorMsg);
       throw error;
     }
-  }, [token, channels, API_URL]);
+  }, [socket, isConnected, API_URL]);
+
+  // Toggle archive channel
+  const toggleArchiveChannel = useCallback(async (channelId) => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    if (!channelId) {
+      console.error('❌ Missing channelId');
+      return;
+    }
+
+    try {
+      console.log('📦 Toggling archive for channel:', channelId);
+      const response = await axios.post(
+        `${API_URL}/api/chat/channels/${channelId}/archive`,
+        {},
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      const { archived } = response.data;
+      console.log(archived ? '✅ Channel archived' : '✅ Channel unarchived');
+
+      // Remove channel from list if archived
+      if (archived) {
+        setChannels(prev => prev.filter(ch => ch._id !== channelId));
+
+        // If it was active channel, clear it
+        if (activeChannel?._id === channelId) {
+          setActiveChannel(null);
+        }
+
+        toast.success('Conversation archived');
+      } else {
+        toast.success('Conversation unarchived');
+        // Refresh channels to get it back
+        fetchChannels();
+      }
+    } catch (error) {
+      console.error('❌ Error toggling archive:', error);
+      toast.error(error.response?.data?.message || 'Failed to archive conversation');
+    }
+  }, [activeChannel, API_URL, fetchChannels]);
 
   // Initialize chat when user is authenticated
   useEffect(() => {
@@ -402,6 +699,37 @@ export const ChatProvider = ({ children }) => {
     }
   }, [user, socket, isConnected, isChatInitialized, fetchChannels]);
 
+  // Restore active channel after channels are loaded (after refresh)
+  useEffect(() => {
+    if (channels.length > 0 && !activeChannel) {
+      const lastChannelId = localStorage.getItem('lastActiveChannelId');
+
+      if (lastChannelId) {
+        const channel = channels.find(ch => ch._id === lastChannelId);
+        if (channel) {
+          console.log('🔄 Restoring last active channel:', channel.name || channel._id);
+          setActiveChannel(channel);
+        } else {
+          // If saved channel not found, select first channel
+          console.log('📌 Selecting first channel (saved not found)');
+          setActiveChannel(channels[0]);
+        }
+      } else {
+        // No saved channel, select first one
+        console.log('📌 Selecting first channel (no saved)');
+        setActiveChannel(channels[0]);
+      }
+    }
+  }, [channels, activeChannel]);
+
+  // Save active channel ID to localStorage when it changes
+  useEffect(() => {
+    if (activeChannel?._id) {
+      localStorage.setItem('lastActiveChannelId', activeChannel._id);
+      console.log('💾 Saved active channel:', activeChannel._id);
+    }
+  }, [activeChannel]);
+
   // Socket event listeners
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -410,10 +738,22 @@ export const ChatProvider = ({ children }) => {
     socket.on('chat:message:received', (data) => {
       const { channelId, message } = data;
 
-      setMessages(prev => ({
-        ...prev,
-        [channelId]: [...(prev[channelId] || []), message]
-      }));
+      setMessages(prev => {
+        const existingMessages = prev[channelId] || [];
+
+        // Check if message already exists (avoid duplicates)
+        const messageExists = existingMessages.some(msg => msg._id === message._id);
+
+        if (messageExists) {
+          console.log('⚠️ Message already exists, skipping duplicate:', message._id);
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [channelId]: [...existingMessages, message]
+        };
+      });
 
       // Update unread count if not in active channel
       if (!activeChannel || activeChannel._id !== channelId) {
@@ -425,11 +765,12 @@ export const ChatProvider = ({ children }) => {
 
       // Update channel's last message
       setChannels(prev =>
-        prev.map(ch =>
-          ch._id === channelId
+        prev.map(ch => {
+          if (!ch || !ch._id) return ch; // Safety check
+          return ch._id === channelId
             ? { ...ch, lastMessage: data.lastMessage || ch.lastMessage }
-            : ch
-        )
+            : ch;
+        })
       );
     });
 
@@ -496,14 +837,21 @@ export const ChatProvider = ({ children }) => {
 
     // Channel updated
     socket.on('chat:channel:updated', (data) => {
+      if (!data || !data.channel) return; // Safety check
+
       setChannels(prev =>
-        prev.map(ch => (ch._id === data.channel._id ? data.channel : ch))
+        prev.map(ch => {
+          if (!ch || !ch._id) return ch; // Safety check
+          return ch._id === data.channel._id ? data.channel : ch;
+        })
       );
     });
 
     // Channel deleted
     socket.on('chat:channel:deleted', (data) => {
-      setChannels(prev => prev.filter(ch => ch._id !== data.channelId));
+      if (!data || !data.channelId) return; // Safety check
+
+      setChannels(prev => prev.filter(ch => ch && ch._id && ch._id !== data.channelId));
       if (activeChannel && activeChannel._id === data.channelId) {
         setActiveChannel(null);
       }
@@ -533,6 +881,17 @@ export const ChatProvider = ({ children }) => {
     };
   }, [socket, isConnected, activeChannel]);
 
+  // Fetch messages when active channel changes
+  useEffect(() => {
+    if (activeChannel && activeChannel._id) {
+      // Check if messages are already loaded for this channel
+      if (!messages[activeChannel._id] || messages[activeChannel._id].length === 0) {
+        console.log('📥 Loading messages for channel:', activeChannel._id);
+        fetchMessages(activeChannel._id);
+      }
+    }
+  }, [activeChannel]);
+
   // Mark as read when active channel changes
   useEffect(() => {
     if (activeChannel) {
@@ -551,6 +910,7 @@ export const ChatProvider = ({ children }) => {
     totalUnreadCount,
     userPresence,
     isLoading,
+    replyingTo,
 
     // Actions
     setActiveChannel,
@@ -558,12 +918,15 @@ export const ChatProvider = ({ children }) => {
     fetchMessages,
     sendMessage,
     editMessage,
+    pinMessage,
+    setReplyingTo,
     deleteMessage,
     addReaction,
     removeReaction,
     markAsRead,
     createChannel,
     createDM,
+    toggleArchiveChannel,
 
     // Helpers
     getChannelById: (id) => channels.find(ch => ch._id === id),

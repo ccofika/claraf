@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Undo, Redo, Settings, X, Copy, Share2, Bookmark, Pencil } from 'lucide-react';
+import { Undo, Redo, Settings, X, Copy, Share2, Bookmark, Pencil, Send } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +11,9 @@ import { useTheme } from '../context/ThemeContext';
 import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtils';
 import { copyElementContent, shareElement } from '../utils/clipboard';
 import { useDebouncedUpdate } from '../hooks/useDebouncedUpdate';
+import ShareButton from './Chat/ShareButton';
 
-const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
+const TitleElement = ({ element, canEdit, workspaceId, workspaceName, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
   const navigate = useNavigate();
@@ -310,6 +311,21 @@ const TitleElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
               >
                 <Bookmark size={14} />
               </button>
+
+              <div className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300">
+                <ShareButton
+                  item={{
+                    _id: element._id,
+                    workspaceId: workspaceId,
+                    workspaceName: workspaceName || 'Workspace',
+                    type: element.type,
+                    title: element.content?.value || 'Untitled',
+                    content: element.content?.value
+                  }}
+                  type="element"
+                  variant="icon"
+                />
+              </div>
             </>
           )}
         </div>

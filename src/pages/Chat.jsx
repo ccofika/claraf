@@ -63,7 +63,7 @@ const Chat = () => {
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-black">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-black">
       {/* Main App Sidebar (Icon Navigation) */}
       <AppSidebar
         activeSection={activeSection}

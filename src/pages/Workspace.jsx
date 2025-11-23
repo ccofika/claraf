@@ -619,6 +619,7 @@ const Workspace = () => {
         <div className="flex-1 relative overflow-hidden">
           <InfiniteCanvas
             workspaceId={workspaceId}
+            workspaceName={workspace?.name}
             elements={elements}
             onElementUpdate={handleElementUpdate}
             onElementCreate={handleElementCreate}

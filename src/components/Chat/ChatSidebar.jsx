@@ -17,6 +17,12 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
 
     if (!matchesSearch) return false;
 
+    // Archived filter
+    if (filter === 'archived') return channel.isArchived === true;
+
+    // For other filters, exclude archived channels
+    if (channel.isArchived) return false;
+
     // Type filter
     if (filter === 'dms') return channel.type === 'dm';
     if (filter === 'groups') return channel.type === 'group';
@@ -84,46 +90,50 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
     return (
       <button
         onClick={() => setActiveChannel(channel)}
-        className={`w-full px-3 py-2 flex items-center gap-3 rounded-lg transition-all ${
+        className={`w-full px-2 py-1 flex items-center gap-2 transition-colors ${
           isActive
-            ? 'bg-blue-600 text-white'
-            : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800'
+            ? 'bg-[#1164A3] dark:bg-[#1164A3] text-white'
+            : 'text-gray-900 dark:text-[#D1D2D3] hover:bg-gray-100 dark:hover:bg-[#1A1D21]'
         }`}
       >
-        <div className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500 dark:text-neutral-400'}`}>
+        <div className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-600 dark:text-neutral-400'}`}>
           {getChannelIcon(channel)}
         </div>
 
         <div className="flex-1 min-w-0 text-left">
-          <div className="flex items-center justify-between gap-2 mb-0.5">
-            <span className={`text-sm font-semibold truncate ${isActive ? 'text-white' : ''}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-[15px] truncate ${
+              isActive ? 'text-white font-bold' : 'font-normal'
+            } ${unreadCount > 0 && !isActive ? 'font-bold' : ''}`}>
               {getChannelName(channel)}
             </span>
             {channel.lastMessage?.timestamp && (
-              <span className={`text-xs flex-shrink-0 ${
-                isActive ? 'text-blue-200' : 'text-gray-500 dark:text-neutral-500'
+              <span className={`text-[11px] flex-shrink-0 ${
+                isActive ? 'text-white/80' : 'text-gray-500 dark:text-neutral-500'
               }`}>
                 {formatTime(channel.lastMessage.timestamp)}
               </span>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <span className={`text-xs truncate ${
-              isActive ? 'text-blue-100' : 'text-gray-500 dark:text-neutral-400'
-            }`}>
-              {formatLastMessage(channel)}
-            </span>
-            {unreadCount > 0 && (
-              <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-xs font-semibold ${
-                isActive
-                  ? 'bg-white text-blue-600'
-                  : 'bg-blue-600 text-white'
+          {channel.lastMessage?.content && (
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span className={`text-[13px] truncate ${
+                isActive ? 'text-white/90' : 'text-gray-600 dark:text-neutral-400'
               }`}>
-                {unreadCount > 99 ? '99+' : unreadCount}
+                {formatLastMessage(channel)}
               </span>
-            )}
-          </div>
+              {unreadCount > 0 && (
+                <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                  isActive
+                    ? 'bg-white text-[#1164A3]'
+                    : 'bg-[#E01E5A] text-white'
+                }`}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </button>
     );
@@ -133,13 +143,13 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
     if (channels.length === 0) return null;
 
     return (
-      <div className="mb-4">
-        <div className="px-3 mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
-            {title} {showCount && `(${channels.length})`}
+      <div className="mb-3">
+        <div className="px-2 py-1 flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-gray-600 dark:text-neutral-400">
+            {title}
           </span>
         </div>
-        <div className="space-y-1">
+        <div>
           {channels.map(channel => (
             <ChannelItem key={channel._id} channel={channel} />
           ))}
@@ -150,11 +160,11 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
 
   if (isCollapsed) {
     return (
-      <div className="w-16 bg-gray-50 dark:bg-neutral-950 border-r border-gray-200 dark:border-neutral-800 flex flex-col">
-        <div className="h-14 flex items-center justify-center border-b border-gray-200 dark:border-neutral-800">
+      <div className="w-16 bg-white dark:bg-[#1A1D21] border-r border-gray-200/60 dark:border-neutral-800/60 flex flex-col">
+        <div className="h-14 flex items-center justify-center border-b border-gray-200/60 dark:border-neutral-800/60">
           <button
             onClick={onToggleCollapse}
-            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
           >
             <ChevronRight className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
           </button>
@@ -162,7 +172,7 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
 
         {totalUnreadCount > 0 && (
           <div className="px-3 py-2">
-            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+            <div className="w-10 h-10 rounded-full bg-[#E01E5A] text-white flex items-center justify-center text-[11px] font-bold">
               {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
             </div>
           </div>
@@ -173,30 +183,30 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
 
   return (
     <>
-      <div className="w-80 bg-gray-50 dark:bg-neutral-950 border-r border-gray-200 dark:border-neutral-800 flex flex-col">
+      <div className="w-80 bg-white dark:bg-[#1A1D21] border-r border-gray-200/60 dark:border-neutral-800/60 flex flex-col">
         {/* Header */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200 dark:border-neutral-800">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-neutral-50">Messages</h1>
-          <div className="flex items-center gap-2">
+        <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200/60 dark:border-neutral-800/60">
+          <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">Messages</h1>
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
               title="New conversation"
             >
-              <Plus className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
+              <Plus className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
             </button>
             <button
               onClick={onToggleCollapse}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
               title="Collapse sidebar"
             >
-              <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
+              <ChevronLeft className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
             </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="p-3 border-b border-gray-200 dark:border-neutral-800">
+        <div className="p-3 border-b border-gray-200/60 dark:border-neutral-800/60">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-neutral-500" />
             <input
@@ -204,26 +214,27 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg text-sm text-gray-900 dark:text-neutral-50 placeholder-gray-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+              className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-neutral-900/50 border border-gray-300 dark:border-neutral-700 text-[15px] text-gray-900 dark:text-neutral-50 placeholder-gray-500 dark:placeholder-neutral-500 focus:outline-none focus:border-[#1164A3] dark:focus:border-[#1164A3]"
             />
           </div>
         </div>
 
         {/* Filter Tabs */}
-        <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-800 flex gap-2">
+        <div className="px-2 py-2 border-b border-gray-200/60 dark:border-neutral-800/60 flex justify-center gap-0.5">
           {[
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },
             { id: 'dms', label: 'DMs' },
-            { id: 'groups', label: 'Groups' }
+            { id: 'groups', label: 'Groups' },
+            { id: 'archived', label: 'Archived' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setFilter(tab.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex-shrink-0 px-2.5 py-1 text-[13px] font-medium transition-colors ${
                 filter === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 hover:bg-gray-300 dark:hover:bg-neutral-700'
+                  ? 'text-gray-900 dark:text-white border-b-2 border-[#1164A3]'
+                  : 'text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               {tab.label}
@@ -235,10 +246,10 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
         </div>
 
         {/* Channel List */}
-        <div className="flex-1 overflow-y-auto py-3">
+        <div className="flex-1 overflow-y-auto py-2">
           {filteredChannels.length === 0 ? (
             <div className="px-3 py-8 text-center">
-              <p className="text-sm text-gray-500 dark:text-neutral-400">
+              <p className="text-[15px] text-gray-500 dark:text-neutral-400">
                 {searchQuery ? 'No conversations found' : 'No conversations yet'}
               </p>
             </div>

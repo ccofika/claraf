@@ -7,7 +7,7 @@ import MacroElement from './MacroElement';
 import ExampleElement from './ExampleElement';
 import WrapperElement from './WrapperElement';
 
-const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave, allElements = [], viewportScale = 1 }) => {
+const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, workspaceName, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave, allElements = [], viewportScale = 1 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: element._id,
     disabled: element.locked || !canEdit, // Disable dragging if user can't edit
@@ -20,6 +20,7 @@ const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, onUpda
         element={element}
         canEdit={canEdit}
         workspaceId={workspaceId}
+        workspaceName={workspaceName}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}

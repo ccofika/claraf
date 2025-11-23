@@ -3,10 +3,14 @@ import { useChat } from '../../context/ChatContext';
 import { MoreVertical, Users, Search, Pin, Archive } from 'lucide-react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
+import SearchModal from './SearchModal';
+import PinnedMessagesModal from './PinnedMessagesModal';
 
 const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
-  const { activeChannel, messages, pinnedMessages, typingUsers } = useChat();
+  const { activeChannel, messages, pinnedMessages, typingUsers, toggleArchiveChannel } = useChat();
   const [showChannelMenu, setShowChannelMenu] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showPinnedModal, setShowPinnedModal] = useState(false);
 
   const getChannelName = (channel) => {
     if (channel.name) return channel.name;
@@ -38,43 +42,44 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
   if (!activeChannel) return null;
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-black">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#1A1D21]">
       {/* Channel Header */}
-      <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200 dark:border-neutral-800">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200/60 dark:border-neutral-800/60 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-neutral-50 truncate">
+            <h2 className="text-[15px] font-bold text-gray-900 dark:text-white truncate">
               {getChannelName(activeChannel)}
             </h2>
             {getChannelDescription(activeChannel) && (
-              <p className="text-xs text-gray-500 dark:text-neutral-400 truncate">
+              <p className="text-[13px] text-gray-600 dark:text-neutral-400 truncate">
                 {getChannelDescription(activeChannel)}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5">
           {/* Search Messages */}
           <button
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
+            onClick={() => setShowSearchModal(true)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
             title="Search in conversation"
           >
-            <Search className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
+            <Search className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
           </button>
 
           {/* Toggle Member List */}
           {activeChannel.type !== 'dm' && (
             <button
               onClick={onToggleMemberList}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-2 transition-colors ${
                 showMemberList
-                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                  ? 'bg-[#1164A3]/10 dark:bg-[#1164A3]/20 text-[#1164A3]'
                   : 'hover:bg-gray-100 dark:hover:bg-neutral-900 text-gray-600 dark:text-neutral-400'
               }`}
               title="Toggle member list"
             >
-              <Users className="w-5 h-5" />
+              <Users className="w-[18px] h-[18px]" />
             </button>
           )}
 
@@ -82,19 +87,35 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
           <div className="relative">
             <button
               onClick={() => setShowChannelMenu(!showChannelMenu)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
               title="Channel options"
             >
-              <MoreVertical className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
+              <MoreVertical className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
             </button>
 
             {showChannelMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg shadow-lg py-1 z-10">
-                <button className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 flex items-center gap-2">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-900 border border-gray-200/60 dark:border-neutral-700 shadow-xl py-1 z-10">
+                <button
+                  onClick={() => {
+                    setShowPinnedModal(true);
+                    setShowChannelMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-[15px] text-gray-900 dark:text-neutral-300 hover:bg-[#1164A3] hover:text-white dark:hover:bg-[#1164A3] flex items-center gap-2"
+                >
                   <Pin className="w-4 h-4" />
                   View Pinned Messages
                 </button>
-                <button className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      await toggleArchiveChannel(activeChannel._id);
+                      setShowChannelMenu(false);
+                    } catch (error) {
+                      console.error('Failed to archive channel:', error);
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-left text-[15px] text-gray-900 dark:text-neutral-300 hover:bg-[#1164A3] hover:text-white dark:hover:bg-[#1164A3] flex items-center gap-2"
+                >
                   <Archive className="w-4 h-4" />
                   Archive Conversation
                 </button>
@@ -105,11 +126,11 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
       </div>
 
       {/* Pinned Messages Banner */}
-      {pinnedMessages.length > 0 && (
+      {(pinnedMessages[activeChannel?._id]?.length || 0) > 0 && (
         <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
           <div className="flex items-center gap-2 text-sm text-blue-900 dark:text-blue-300">
             <Pin className="w-4 h-4" />
-            <span className="font-medium">{pinnedMessages.length} pinned message{pinnedMessages.length > 1 ? 's' : ''}</span>
+            <span className="font-medium">{pinnedMessages[activeChannel._id].length} pinned message{pinnedMessages[activeChannel._id].length > 1 ? 's' : ''}</span>
           </div>
         </div>
       )}
@@ -119,7 +140,7 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="px-4 py-2 text-sm text-gray-500 dark:text-neutral-400">
+        <div className="px-4 py-2 text-sm text-gray-500 dark:text-neutral-400 flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
               <span className="w-2 h-2 bg-gray-400 dark:bg-neutral-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
@@ -136,7 +157,17 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
       )}
 
       {/* Chat Input */}
-      <ChatInput />
+      <div className="flex-shrink-0">
+        <ChatInput />
+      </div>
+
+      {/* Modals */}
+      <SearchModal isOpen={showSearchModal} onClose={() => setShowSearchModal(false)} />
+      <PinnedMessagesModal
+        isOpen={showPinnedModal}
+        onClose={() => setShowPinnedModal(false)}
+        pinnedMessages={pinnedMessages[activeChannel._id] || []}
+      />
     </div>
   );
 };

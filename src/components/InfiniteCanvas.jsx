@@ -15,7 +15,7 @@ import { useTextFormatting } from '../context/TextFormattingContext';
 import { useSocket } from '../context/SocketContext';
 import { getElementsInsideWrapper } from '../utils/wrapperUtils';
 
-const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElementCreate, onElementDelete, onRemoteElementUpdate, onRemoteElementCreate, onRemoteElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated, workspaceUsers = [], onViewportChange }) => {
+const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUpdate, onElementCreate, onElementDelete, onRemoteElementUpdate, onRemoteElementCreate, onRemoteElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated, workspaceUsers = [], onViewportChange }) => {
   const [canvasElements, setCanvasElements] = useState(elements);
   const transformWrapperRef = useRef(null);
   const { theme } = useTheme();
@@ -949,6 +949,7 @@ const InfiniteCanvas = ({ workspaceId, elements = [], onElementUpdate, onElement
                         element={element}
                         canEdit={isInEditMode}
                         workspaceId={workspaceId}
+                        workspaceName={workspaceName}
                         onUpdate={handleElementUpdate}
                         onDelete={handleElementDelete}
                         onSettingsClick={handleSettingsClick}

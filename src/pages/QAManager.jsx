@@ -17,6 +17,7 @@ import QASearchBar from '../components/QASearchBar';
 import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import ShareButton from '../components/Chat/ShareButton';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -1108,6 +1109,20 @@ const QAManager = () => {
                         >
                           <Edit className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
                         </button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <ShareButton
+                            item={{
+                              _id: ticket._id,
+                              title: ticket.title || `Ticket ${ticket.ticketId || ticket._id.slice(-6)}`,
+                              description: ticket.description,
+                              status: ticket.status,
+                              priority: ticket.priority,
+                              category: ticket.category
+                            }}
+                            type="ticket"
+                            variant="icon"
+                          />
+                        </div>
                         <button
                           onClick={() => handleArchiveTicket(ticket._id)}
                           className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
@@ -1308,6 +1323,20 @@ const QAManager = () => {
                         >
                           <RotateCcw className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
                         </button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <ShareButton
+                            item={{
+                              _id: ticket._id,
+                              title: ticket.title || `Ticket ${ticket.ticketId || ticket._id.slice(-6)}`,
+                              description: ticket.description,
+                              status: ticket.status,
+                              priority: ticket.priority,
+                              category: ticket.category
+                            }}
+                            type="ticket"
+                            variant="icon"
+                          />
+                        </div>
                         <button
                           onClick={() => setDeleteDialog({ open: true, type: 'ticket', id: ticket._id, name: ticket.ticketId })}
                           className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
