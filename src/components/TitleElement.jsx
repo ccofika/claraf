@@ -285,6 +285,23 @@ const TitleElement = ({ element, canEdit, workspaceId, workspaceName, onUpdate, 
               >
                 <X size={14} />
               </button>
+
+              <div className="w-px bg-gray-300 dark:bg-neutral-700" />
+
+              <div className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300">
+                <ShareButton
+                  item={{
+                    _id: element._id,
+                    workspaceId: workspaceId,
+                    workspaceName: workspaceName || 'Workspace',
+                    type: element.type,
+                    title: element.content?.value || 'Untitled',
+                    content: element.content?.value
+                  }}
+                  type="element"
+                  variant="icon"
+                />
+              </div>
             </>
           ) : (
             <>

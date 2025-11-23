@@ -201,18 +201,6 @@ const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUp
       const canvasX = e.clientX / scale - posX / scale;
       const canvasY = e.clientY / scale - posY / scale;
 
-      // DEBUG: Log every emit
-      console.log('🖱️ EMIT Cursor (NEW FORMULA):', {
-        screenCoords: { x: e.clientX, y: e.clientY },
-        viewport: { x: posX, y: posY, scale },
-        calculation: {
-          formula: 'screenX / scale - posX / scale',
-          step1: { x: e.clientX / scale, y: e.clientY / scale },
-          step2: { x: posX / scale, y: posY / scale },
-        },
-        canvasCoords: { x: canvasX.toFixed(2), y: canvasY.toFixed(2) }
-      });
-
       updateCursor(canvasX, canvasY, null);
     };
 

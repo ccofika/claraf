@@ -12,8 +12,9 @@ import { getAdaptiveColor, getAdaptiveBackgroundColor } from '../utils/colorUtil
 import { copyElementContent, shareElement } from '../utils/clipboard';
 import ImageLightbox from './ImageLightbox';
 import { extractImageMetadata } from '../utils/imageUpload';
+import ShareButton from './Chat/ShareButton';
 
-const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
+const MacroElement = ({ element, canEdit, workspaceId, workspaceName, onUpdate, onDelete, onSettingsClick, isHighlighted = false, onBookmarkCreated, onMouseEnter, onMouseLeave }) => {
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
   const navigate = useNavigate();
@@ -458,6 +459,25 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                 >
                   <X size={14} />
                 </button>
+
+                <div className="w-px bg-gray-300 dark:bg-neutral-700" />
+
+                <div className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300">
+                  <ShareButton
+                    item={{
+                      _id: element._id,
+                      workspaceId: workspaceId,
+                      workspaceName: workspaceName || 'Workspace',
+                      type: element.type,
+                      title: element.content?.title || 'Untitled Macro',
+                      content: element.content?.title || '',
+                      description: element.content?.description || '',
+                      macro: element.content?.description || ''
+                    }}
+                    type="element"
+                    variant="icon"
+                  />
+                </div>
               </>
             ) : (
               <>
@@ -484,6 +504,23 @@ const MacroElement = ({ element, canEdit, workspaceId, onUpdate, onDelete, onSet
                 >
                   <Bookmark size={14} />
                 </button>
+
+                <div className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors text-gray-700 dark:text-neutral-300">
+                  <ShareButton
+                    item={{
+                      _id: element._id,
+                      workspaceId: workspaceId,
+                      workspaceName: workspaceName || 'Workspace',
+                      type: element.type,
+                      title: element.content?.title || 'Untitled Macro',
+                      content: element.content?.title || '',
+                      description: element.content?.description || '',
+                      macro: element.content?.description || ''
+                    }}
+                    type="element"
+                    variant="icon"
+                  />
+                </div>
               </>
             )}
           </div>

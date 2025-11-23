@@ -1,13 +1,254 @@
 import React, { useState, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
-import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive, Star, MessageSquare, Bell, BellOff } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
+import PresenceIndicator from './PresenceIndicator';
+import ChannelContextMenu from './ChannelContextMenu';
+import SectionHeader from './SectionHeader';
+import SectionModal from './SectionModal';
+import axios from 'axios';
 
-const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
-  const { channels, activeChannel, setActiveChannel, totalUnreadCount, getUnreadCount } = useChat();
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onChatViewChange }) => {
+  const {
+    channels,
+    activeChannel,
+    setActiveChannel,
+    totalUnreadCount,
+    getUnreadCount,
+    starredChannels,
+    toggleStarChannel,
+    isChannelStarred,
+    fetchChannels
+  } = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all'); // all, dms, groups, unread
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [mutedChannels, setMutedChannels] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const [showSectionModal, setShowSectionModal] = useState(false);
+  const [editingSection, setEditingSection] = useState(null);
+
+  // Fetch muted channels
+  useEffect(() => {
+    const fetchMutedChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const { data } = await axios.get(`${API_URL}/api/chat/muted`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMutedChannels(data.mutedChannels.map(mc => mc.channel._id || mc.channel));
+      } catch (error) {
+        console.error('Error fetching muted channels:', error);
+      }
+    };
+    fetchMutedChannels();
+  }, []);
+
+  // Fetch sections
+  useEffect(() => {
+    const fetchSections = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const { data } = await axios.get(`${API_URL}/api/sections`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSections(data.sections || []);
+      } catch (error) {
+        console.error('Error fetching sections:', error);
+      }
+    };
+    if (chatView === 'messages') {
+      fetchSections();
+    }
+  }, [chatView]);
+
+  // Check if channel is muted
+  const isChannelMuted = (channelId) => {
+    return mutedChannels.includes(channelId);
+  };
+
+  // Section management functions
+  const handleCreateSection = async (data) => {
+    try {
+      const token = localStorage.getItem('token');
+      const { data: response } = await axios.post(
+        `${API_URL}/api/sections`,
+        data,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(prev => [...prev, response.section]);
+      setShowSectionModal(false);
+      setEditingSection(null);
+    } catch (error) {
+      console.error('Error creating section:', error);
+      alert('Failed to create section');
+    }
+  };
+
+  const handleEditSection = async (sectionId, data) => {
+    try {
+      const token = localStorage.getItem('token');
+      const { data: response } = await axios.put(
+        `${API_URL}/api/sections/${sectionId}`,
+        data,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(prev => prev.map(s => s._id === sectionId ? response.section : s));
+      setShowSectionModal(false);
+      setEditingSection(null);
+    } catch (error) {
+      console.error('Error editing section:', error);
+      alert('Failed to update section');
+    }
+  };
+
+  const handleDeleteSection = async (sectionId) => {
+    if (!window.confirm('Are you sure you want to delete this section? Channels will be moved back to their default sections.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `${API_URL}/api/sections/${sectionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(prev => prev.filter(s => s._id !== sectionId));
+      setCollapsedSections(prev => {
+        const newState = { ...prev };
+        delete newState[sectionId];
+        return newState;
+      });
+    } catch (error) {
+      console.error('Error deleting section:', error);
+      alert('Failed to delete section');
+    }
+  };
+
+  const handleToggleSectionCollapse = async (sectionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/api/sections/${sectionId}/toggle-collapse`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCollapsedSections(prev => ({
+        ...prev,
+        [sectionId]: !prev[sectionId]
+      }));
+    } catch (error) {
+      console.error('Error toggling section collapse:', error);
+    }
+  };
+
+  const handleSaveSection = (data) => {
+    if (editingSection) {
+      handleEditSection(editingSection._id, data);
+    } else {
+      handleCreateSection(data);
+    }
+  };
+
+  // Handle context menu actions
+  const handleContextMenuAction = async (action, ...args) => {
+    const token = localStorage.getItem('token');
+    const channelId = contextMenu.channel._id;
+
+    try {
+      switch (action) {
+        case 'open':
+          setActiveChannel(contextMenu.channel);
+          break;
+
+        case 'markRead':
+          await axios.post(
+            `${API_URL}/api/chat/channels/${channelId}/read`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          await fetchChannels();
+          break;
+
+        case 'toggleStar':
+          await toggleStarChannel(channelId);
+          break;
+
+        case 'mute':
+          const duration = args[0];
+          await axios.post(
+            `${API_URL}/api/chat/channels/${channelId}/mute`,
+            { duration },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (duration === 0) {
+            // Unmute
+            setMutedChannels(prev => prev.filter(id => id !== channelId));
+          } else {
+            // Mute
+            setMutedChannels(prev => [...prev, channelId]);
+          }
+          break;
+
+        case 'toggleArchive':
+          await axios.post(
+            `${API_URL}/api/chat/channels/${channelId}/archive`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          await fetchChannels();
+          break;
+
+        case 'leave':
+          if (window.confirm(`Are you sure you want to leave ${contextMenu.channel.name}?`)) {
+            await axios.delete(
+              `${API_URL}/api/chat/channels/${channelId}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            await fetchChannels();
+          }
+          break;
+
+        case 'copyLink':
+          const link = `${window.location.origin}/chat?channel=${channelId}`;
+          navigator.clipboard.writeText(link);
+          break;
+
+        case 'addToSection':
+          const sectionId = args[0];
+          await axios.post(
+            `${API_URL}/api/sections/${sectionId}/channels`,
+            { channelId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          // Refresh sections to show updated channel list
+          const { data } = await axios.get(`${API_URL}/api/sections`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setSections(data.sections || []);
+          break;
+
+        default:
+          console.warn(`Unknown action: ${action}`);
+      }
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+    }
+  };
+
+  // Handle right-click
+  const handleContextMenu = (e, channel) => {
+    e.preventDefault();
+    setContextMenu({
+      channel,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  };
 
   // Filter channels based on search and filter type
   const filteredChannels = channels.filter(channel => {
@@ -31,11 +272,24 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
     return true;
   });
 
-  // Group channels by type
-  const dmChannels = filteredChannels.filter(ch => ch.type === 'dm');
-  const groupChannels = filteredChannels.filter(ch => ch.type === 'group');
-  const workspaceChannels = filteredChannels.filter(ch => ch.type === 'workspace');
-  const qaChannels = filteredChannels.filter(ch => ch.type === 'qa');
+  // Get channels that are in custom sections
+  const channelsInSections = new Set();
+  sections.forEach(section => {
+    section.channels?.forEach(channelId => {
+      channelsInSections.add(channelId);
+    });
+  });
+
+  // Filter out channels that are in custom sections from regular channel lists
+  const filteredChannelsNotInSections = filteredChannels.filter(
+    ch => !channelsInSections.has(ch._id)
+  );
+
+  // Group channels by type (excluding channels in custom sections)
+  const dmChannels = filteredChannelsNotInSections.filter(ch => ch.type === 'dm');
+  const groupChannels = filteredChannelsNotInSections.filter(ch => ch.type === 'group');
+  const workspaceChannels = filteredChannelsNotInSections.filter(ch => ch.type === 'workspace');
+  const qaChannels = filteredChannelsNotInSections.filter(ch => ch.type === 'qa');
 
   const getChannelIcon = (channel) => {
     if (channel.type === 'dm') return <User className="w-4 h-4" />;
@@ -86,56 +340,114 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
   const ChannelItem = ({ channel }) => {
     const isActive = activeChannel?._id === channel._id;
     const unreadCount = getUnreadCount(channel._id);
+    const isStarred = isChannelStarred(channel._id);
+    const isMuted = isChannelMuted(channel._id);
+
+    // Get other user ID for DM channels
+    const getOtherUserId = () => {
+      if (channel.type === 'dm' && channel.members?.length === 2) {
+        const otherMember = channel.members.find(m => m.userId._id !== channel._id);
+        return otherMember?.userId?._id;
+      }
+      return null;
+    };
+
+    const handleStarClick = (e) => {
+      e.stopPropagation(); // Prevent channel selection
+      toggleStarChannel(channel._id);
+    };
 
     return (
-      <button
-        onClick={() => setActiveChannel(channel)}
-        className={`w-full px-2 py-1 flex items-center gap-2 transition-colors ${
-          isActive
-            ? 'bg-[#1164A3] dark:bg-[#1164A3] text-white'
-            : 'text-gray-900 dark:text-[#D1D2D3] hover:bg-gray-100 dark:hover:bg-[#1A1D21]'
-        }`}
-      >
-        <div className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-600 dark:text-neutral-400'}`}>
-          {getChannelIcon(channel)}
-        </div>
-
-        <div className="flex-1 min-w-0 text-left">
-          <div className="flex items-center justify-between gap-2">
-            <span className={`text-[15px] truncate ${
-              isActive ? 'text-white font-bold' : 'font-normal'
-            } ${unreadCount > 0 && !isActive ? 'font-bold' : ''}`}>
-              {getChannelName(channel)}
-            </span>
-            {channel.lastMessage?.timestamp && (
-              <span className={`text-[11px] flex-shrink-0 ${
-                isActive ? 'text-white/80' : 'text-gray-500 dark:text-neutral-500'
-              }`}>
-                {formatTime(channel.lastMessage.timestamp)}
-              </span>
-            )}
+      <div className="group relative">
+        <button
+          onClick={() => setActiveChannel(channel)}
+          onContextMenu={(e) => handleContextMenu(e, channel)}
+          className={`w-full px-2 py-1 flex items-center gap-2 transition-colors ${
+            isActive
+              ? 'bg-[#1164A3] dark:bg-[#1164A3] text-white'
+              : isMuted
+              ? 'opacity-50 text-gray-900 dark:text-[#D1D2D3] hover:bg-gray-100 dark:hover:bg-[#1A1D21]'
+              : 'text-gray-900 dark:text-[#D1D2D3] hover:bg-gray-100 dark:hover:bg-[#1A1D21]'
+          }`}
+        >
+          <div className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-600 dark:text-neutral-400'}`}>
+            {getChannelIcon(channel)}
           </div>
 
-          {channel.lastMessage?.content && (
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span className={`text-[13px] truncate ${
-                isActive ? 'text-white/90' : 'text-gray-600 dark:text-neutral-400'
-              }`}>
-                {formatLastMessage(channel)}
-              </span>
-              {unreadCount > 0 && (
-                <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                  isActive
-                    ? 'bg-white text-[#1164A3]'
-                    : 'bg-[#E01E5A] text-white'
+          {/* Presence indicator for DMs */}
+          {channel.type === 'dm' && getOtherUserId() && (
+            <div className="flex-shrink-0 -ml-1">
+              <PresenceIndicator userId={getOtherUserId()} size="sm" />
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {/* Star icon (always visible for starred, on hover for others) */}
+                <button
+                  onClick={handleStarClick}
+                  className={`flex-shrink-0 ${
+                    isStarred
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  } transition-opacity`}
+                >
+                  <Star
+                    className={`w-3.5 h-3.5 ${
+                      isStarred
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : isActive
+                        ? 'text-white hover:text-yellow-400'
+                        : 'text-gray-400 dark:text-neutral-500 hover:text-yellow-400'
+                    }`}
+                  />
+                </button>
+
+                <span className={`text-[15px] truncate ${
+                  isActive ? 'text-white font-bold' : 'font-normal'
+                } ${unreadCount > 0 && !isActive ? 'font-bold' : ''}`}>
+                  {getChannelName(channel)}
+                </span>
+
+                {/* Mute indicator */}
+                {isMuted && (
+                  <BellOff className={`w-3 h-3 flex-shrink-0 ${
+                    isActive ? 'text-white/70' : 'text-gray-400 dark:text-neutral-500'
+                  }`} />
+                )}
+              </div>
+
+              {channel.lastMessage?.timestamp && (
+                <span className={`text-[11px] flex-shrink-0 ${
+                  isActive ? 'text-white/80' : 'text-gray-500 dark:text-neutral-500'
                 }`}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
+                  {formatTime(channel.lastMessage.timestamp)}
                 </span>
               )}
             </div>
-          )}
-        </div>
-      </button>
+
+            {channel.lastMessage?.content && (
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <span className={`text-[13px] truncate ${
+                  isActive ? 'text-white/90' : 'text-gray-600 dark:text-neutral-400'
+                }`}>
+                  {formatLastMessage(channel)}
+                </span>
+                {unreadCount > 0 && (
+                  <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                    isActive
+                      ? 'bg-white text-[#1164A3]'
+                      : 'bg-[#E01E5A] text-white'
+                  }`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </button>
+      </div>
     );
   };
 
@@ -184,89 +496,202 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse }) => {
   return (
     <>
       <div className="w-80 bg-white dark:bg-[#1A1D21] border-r border-gray-200/60 dark:border-neutral-800/60 flex flex-col">
-        {/* Header */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200/60 dark:border-neutral-800/60">
-          <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">Messages</h1>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
-              title="New conversation"
-            >
-              <Plus className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
-            </button>
-            <button
-              onClick={onToggleCollapse}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
-              title="Collapse sidebar"
-            >
-              <ChevronLeft className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="p-3 border-b border-gray-200/60 dark:border-neutral-800/60">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-neutral-500" />
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-neutral-900/50 border border-gray-300 dark:border-neutral-700 text-[15px] text-gray-900 dark:text-neutral-50 placeholder-gray-500 dark:placeholder-neutral-500 focus:outline-none focus:border-[#1164A3] dark:focus:border-[#1164A3]"
-            />
-          </div>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="px-2 py-2 border-b border-gray-200/60 dark:border-neutral-800/60 flex justify-center gap-0.5">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'unread', label: 'Unread' },
-            { id: 'dms', label: 'DMs' },
-            { id: 'groups', label: 'Groups' },
-            { id: 'archived', label: 'Archived' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id)}
-              className={`flex-shrink-0 px-2.5 py-1 text-[13px] font-medium transition-colors ${
-                filter === tab.id
-                  ? 'text-gray-900 dark:text-white border-b-2 border-[#1164A3]'
-                  : 'text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              {tab.label}
-              {tab.id === 'unread' && totalUnreadCount > 0 && (
-                <span className="ml-1">({totalUnreadCount})</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Channel List */}
-        <div className="flex-1 overflow-y-auto py-2">
-          {filteredChannels.length === 0 ? (
-            <div className="px-3 py-8 text-center">
-              <p className="text-[15px] text-gray-500 dark:text-neutral-400">
-                {searchQuery ? 'No conversations found' : 'No conversations yet'}
-              </p>
+        {/* Header with View Switcher */}
+        <div className="border-b border-gray-200/60 dark:border-neutral-800/60">
+          <div className="h-14 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => onChatViewChange?.('messages')}
+                className={`flex items-center gap-2 px-2 py-1 transition-colors ${
+                  chatView === 'messages'
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-[16px] font-bold">Messages</span>
+              </button>
+              <button
+                onClick={() => onChatViewChange?.('activity')}
+                className={`flex items-center gap-2 px-2 py-1 transition-colors ${
+                  chatView === 'activity'
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Bell className="w-5 h-5" />
+                <span className="text-[16px] font-bold">Activity</span>
+              </button>
             </div>
-          ) : (
-            <>
-              <ChannelSection title="Direct Messages" channels={dmChannels} showCount />
-              <ChannelSection title="Group Chats" channels={groupChannels} showCount />
-              <ChannelSection title="Workspace Channels" channels={workspaceChannels} showCount />
-              <ChannelSection title="QA Tickets" channels={qaChannels} showCount />
-            </>
-          )}
+            <div className="flex items-center gap-1">
+              {chatView === 'messages' && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
+                  title="New conversation"
+                >
+                  <Plus className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
+                </button>
+              )}
+              <button
+                onClick={onToggleCollapse}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft className="w-[18px] h-[18px] text-gray-600 dark:text-neutral-400" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Search Bar (only show for messages view) */}
+        {chatView === 'messages' && (
+          <>
+            <div className="p-3 border-b border-gray-200/60 dark:border-neutral-800/60">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-neutral-500" />
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-neutral-900/50 border border-gray-300 dark:border-neutral-700 text-[15px] text-gray-900 dark:text-neutral-50 placeholder-gray-500 dark:placeholder-neutral-500 focus:outline-none focus:border-[#1164A3] dark:focus:border-[#1164A3]"
+                />
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="px-2 py-2 border-b border-gray-200/60 dark:border-neutral-800/60 flex justify-center gap-0.5">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'unread', label: 'Unread' },
+                { id: 'dms', label: 'DMs' },
+                { id: 'groups', label: 'Groups' },
+                { id: 'archived', label: 'Archived' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id)}
+                  className={`flex-shrink-0 px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                    filter === tab.id
+                      ? 'text-gray-900 dark:text-white border-b-2 border-[#1164A3]'
+                      : 'text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.id === 'unread' && totalUnreadCount > 0 && (
+                    <span className="ml-1">({totalUnreadCount})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Channel List (only show for messages view) */}
+        {chatView === 'messages' && (
+          <div className="flex-1 overflow-y-auto py-2">
+            {filteredChannels.length === 0 && starredChannels.length === 0 && sections.length === 0 ? (
+              <div className="px-3 py-8 text-center">
+                <p className="text-[15px] text-gray-500 dark:text-neutral-400">
+                  {searchQuery ? 'No conversations found' : 'No conversations yet'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Starred Section - always show at top if has starred channels */}
+                {starredChannels.length > 0 && filter === 'all' && !searchQuery && (
+                  <ChannelSection title="Starred" channels={starredChannels} showCount />
+                )}
+
+                {/* Custom Sections */}
+                {sections.length > 0 && filter === 'all' && !searchQuery && sections.map(section => {
+                  const sectionChannels = channels.filter(ch =>
+                    section.channels?.includes(ch._id)
+                  );
+                  const isCollapsed = collapsedSections[section._id];
+
+                  if (sectionChannels.length === 0) return null;
+
+                  return (
+                    <div key={section._id} className="mb-3">
+                      <SectionHeader
+                        section={section}
+                        isCollapsed={isCollapsed}
+                        onToggleCollapse={() => handleToggleSectionCollapse(section._id)}
+                        onEdit={() => {
+                          setEditingSection(section);
+                          setShowSectionModal(true);
+                        }}
+                        onDelete={() => handleDeleteSection(section._id)}
+                        channelCount={sectionChannels.length}
+                      />
+                      {!isCollapsed && (
+                        <div>
+                          {sectionChannels.map(channel => (
+                            <ChannelItem key={channel._id} channel={channel} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* New Section Button */}
+                {filter === 'all' && !searchQuery && (
+                  <div className="px-2 py-1 mb-3">
+                    <button
+                      onClick={() => {
+                        setEditingSection(null);
+                        setShowSectionModal(true);
+                      }}
+                      className="w-full px-2 py-1.5 flex items-center gap-2 text-[14px] text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>New Section</span>
+                    </button>
+                  </div>
+                )}
+
+                <ChannelSection title="Direct Messages" channels={dmChannels} showCount />
+                <ChannelSection title="Group Chats" channels={groupChannels} showCount />
+                <ChannelSection title="Workspace Channels" channels={workspaceChannels} showCount />
+                <ChannelSection title="QA Tickets" channels={qaChannels} showCount />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Create Channel Modal */}
       {showCreateModal && (
         <CreateChannelModal onClose={() => setShowCreateModal(false)} />
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ChannelContextMenu
+          channel={contextMenu.channel}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onAction={handleContextMenuAction}
+          isStarred={isChannelStarred(contextMenu.channel._id)}
+          isMuted={isChannelMuted(contextMenu.channel._id)}
+          isArchived={contextMenu.channel.isArchived || false}
+          sections={sections}
+        />
+      )}
+
+      {/* Section Modal */}
+      {showSectionModal && (
+        <SectionModal
+          section={editingSection}
+          onClose={() => {
+            setShowSectionModal(false);
+            setEditingSection(null);
+          }}
+          onSave={handleSaveSection}
+        />
       )}
     </>
   );

@@ -78,14 +78,14 @@ const QuickSwitcher = ({ currentWorkspaceId }) => {
 
       // Fetch recent workspaces
       const recentRes = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/user/recent/workspaces`,
+        `${process.env.REACT_APP_API_URL}/api/users/recent/workspaces`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setRecentWorkspaces(recentRes.data);
 
       // Fetch favorite workspaces
       const favoritesRes = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/user/favorites/workspaces`,
+        `${process.env.REACT_APP_API_URL}/api/users/favorites/workspaces`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setFavoriteWorkspaces(favoritesRes.data);

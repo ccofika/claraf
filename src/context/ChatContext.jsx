@@ -30,6 +30,10 @@ export const ChatProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isChatInitialized, setIsChatInitialized] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [threadMessage, setThreadMessage] = useState(null); // For thread panel
+  const [starredChannels, setStarredChannels] = useState([]);
+  const [recentChannels, setRecentChannels] = useState([]);
+  const [lastActivityTime, setLastActivityTime] = useState(Date.now());
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -896,8 +900,171 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     if (activeChannel) {
       markAsRead(activeChannel._id);
+      // Track as recent channel
+      updateRecentChannels(activeChannel);
     }
   }, [activeChannel, markAsRead]);
+
+  // Update recent channels when active channel changes
+  const updateRecentChannels = useCallback((channel) => {
+    setRecentChannels(prev => {
+      // Remove if already exists
+      const filtered = prev.filter(ch => ch._id !== channel._id);
+      // Add to beginning
+      return [channel, ...filtered].slice(0, 10); // Keep max 10 recent
+    });
+  }, []);
+
+  // Star/Unstar channel
+  const toggleStarChannel = useCallback(async (channelId) => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
+
+    try {
+      const isStarred = starredChannels.some(ch => ch._id === channelId);
+
+      if (isStarred) {
+        // Unstar
+        await axios.delete(`${API_URL}/api/chat/channels/${channelId}/star`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        setStarredChannels(prev => prev.filter(ch => ch._id !== channelId));
+      } else {
+        // Star
+        await axios.post(`${API_URL}/api/chat/channels/${channelId}/star`, {}, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const channel = channels.find(ch => ch._id === channelId);
+        if (channel) {
+          setStarredChannels(prev => [...prev, channel]);
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling star:', error);
+      toast.error('Failed to update starred channels');
+    }
+  }, [starredChannels, channels, API_URL]);
+
+  // Fetch starred channels
+  const fetchStarredChannels = useCallback(async () => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
+
+    try {
+      const response = await axios.get(`${API_URL}/api/chat/starred`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      setStarredChannels(response.data);
+    } catch (error) {
+      console.error('Error fetching starred channels:', error);
+    }
+  }, [API_URL]);
+
+  // Update user's own presence status
+  const updateMyPresence = useCallback(async (status, customStatus = null) => {
+    const authToken = getAuthToken();
+    if (!authToken || !user) return;
+
+    try {
+      await axios.put(`${API_URL}/api/user/presence`, {
+        status,
+        customStatus
+      }, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+
+      // Update local state
+      setUserPresence(prev => ({
+        ...prev,
+        [user._id]: {
+          status,
+          customStatus,
+          isOnline: status === 'active' || status === 'dnd',
+          lastActiveAt: new Date()
+        }
+      }));
+
+      // Emit via socket
+      if (socket && isConnected) {
+        socket.emit('user:presence:update', {
+          userId: user._id,
+          status,
+          customStatus
+        });
+      }
+    } catch (error) {
+      console.error('Error updating presence:', error);
+    }
+  }, [user, socket, isConnected, API_URL]);
+
+  // Auto-away timer - set to away after 10 minutes of inactivity
+  useEffect(() => {
+    const handleActivity = () => {
+      setLastActivityTime(Date.now());
+      // If user was away, set them back to active
+      if (user && userPresence[user._id]?.status === 'away') {
+        updateMyPresence('active');
+      }
+    };
+
+    // Track various activity events
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('click', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+    };
+  }, [user, userPresence, updateMyPresence]);
+
+  // Check for inactivity every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const inactiveTime = Date.now() - lastActivityTime;
+      const TEN_MINUTES = 10 * 60 * 1000;
+
+      if (inactiveTime > TEN_MINUTES && user && userPresence[user._id]?.status === 'active') {
+        updateMyPresence('away');
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [lastActivityTime, user, userPresence, updateMyPresence]);
+
+  // Socket listener for presence updates
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handlePresenceUpdate = (data) => {
+      const { userId, status, customStatus } = data;
+      setUserPresence(prev => ({
+        ...prev,
+        [userId]: {
+          status,
+          customStatus,
+          isOnline: status === 'active' || status === 'dnd',
+          lastActiveAt: new Date()
+        }
+      }));
+    };
+
+    socket.on('user:presence:updated', handlePresenceUpdate);
+
+    return () => {
+      socket.off('user:presence:updated', handlePresenceUpdate);
+    };
+  }, [socket, isConnected]);
+
+  // Fetch starred channels on mount
+  useEffect(() => {
+    if (user) {
+      fetchStarredChannels();
+    }
+  }, [user, fetchStarredChannels]);
 
   const value = {
     // State
@@ -911,6 +1078,9 @@ export const ChatProvider = ({ children }) => {
     userPresence,
     isLoading,
     replyingTo,
+    threadMessage,
+    starredChannels,
+    recentChannels,
 
     // Actions
     setActiveChannel,
@@ -920,6 +1090,7 @@ export const ChatProvider = ({ children }) => {
     editMessage,
     pinMessage,
     setReplyingTo,
+    setThreadMessage,
     deleteMessage,
     addReaction,
     removeReaction,
@@ -927,11 +1098,14 @@ export const ChatProvider = ({ children }) => {
     createChannel,
     createDM,
     toggleArchiveChannel,
+    toggleStarChannel,
+    updateMyPresence,
 
     // Helpers
     getChannelById: (id) => channels.find(ch => ch._id === id),
     getUnreadCount: (id) => unreadCounts[id] || 0,
-    getUserPresence: (userId) => userPresence[userId] || { status: 'offline' }
+    getUserPresence: (userId) => userPresence[userId] || { status: 'offline' },
+    isChannelStarred: (id) => starredChannels.some(ch => ch._id === id)
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

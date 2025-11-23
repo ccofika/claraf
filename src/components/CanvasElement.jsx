@@ -39,6 +39,7 @@ const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, worksp
         element={element}
         canEdit={canEdit}
         workspaceId={workspaceId}
+        workspaceName={workspaceName}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
@@ -57,6 +58,7 @@ const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, worksp
         element={element}
         canEdit={canEdit}
         workspaceId={workspaceId}
+        workspaceName={workspaceName}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}
@@ -75,6 +77,7 @@ const CanvasElement = React.memo(({ element, canEdit = true, workspaceId, worksp
         element={element}
         canEdit={canEdit}
         workspaceId={workspaceId}
+        workspaceName={workspaceName}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onSettingsClick={onSettingsClick}

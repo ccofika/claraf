@@ -115,7 +115,7 @@ const TutorialModal = ({ isOpen, onClose, onDontShowAgain }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/user/tutorial-completed`,
+        `${process.env.REACT_APP_API_URL}/api/users/tutorial-completed`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

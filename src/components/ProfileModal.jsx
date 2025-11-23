@@ -31,7 +31,7 @@ const ProfileModal = ({ isOpen, onClose }) => {
       setLoadingStats(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/user/statistics`,
+        `${process.env.REACT_APP_API_URL}/api/users/statistics`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStatistics(response.data);
@@ -47,7 +47,7 @@ const ProfileModal = ({ isOpen, onClose }) => {
       setLoading(true);
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/user/tutorial-reset`,
+        `${process.env.REACT_APP_API_URL}/api/users/tutorial-reset`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

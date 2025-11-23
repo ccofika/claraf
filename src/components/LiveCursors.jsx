@@ -130,19 +130,6 @@ const LiveCursors = ({ viewport = { x: 0, y: 0, scale: 1 } }) => {
         const screenX = cursor.x * viewport.scale + viewport.x;
         const screenY = cursor.y * viewport.scale + viewport.y;
 
-        // DEBUG: Log every render
-        console.log('👁️ RENDER Cursor (NEW FORMULA):', {
-          user: cursor.userName,
-          canvasCoords: { x: cursor.x.toFixed(2), y: cursor.y.toFixed(2) },
-          viewport: { x: viewport.x, y: viewport.y, scale: viewport.scale },
-          calculation: {
-            formula: 'canvasX * scale + posX',
-            step1: { x: cursor.x * viewport.scale, y: cursor.y * viewport.scale },
-            step2: { x: viewport.x, y: viewport.y }
-          },
-          screenCoords: { x: screenX.toFixed(2), y: screenY.toFixed(2) }
-        });
-
         // Don't render cursors that are far outside the viewport to prevent scrollbar
         // Add some padding (200px) to allow cursors slightly outside to still be visible
         const padding = 200;

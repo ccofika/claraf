@@ -81,7 +81,7 @@ const Workspace = () => {
         // Track recent workspace access
         try {
           await axios.post(
-            `${process.env.REACT_APP_API_URL}/api/user/recent/workspace/${workspaceId}`,
+            `${process.env.REACT_APP_API_URL}/api/users/recent/workspace/${workspaceId}`,
             {},
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -169,7 +169,7 @@ const Workspace = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
+          `${process.env.REACT_APP_API_URL}/api/users/preferences/workspace/${workspaceId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setViewMode(response.data.viewMode || 'view');
@@ -402,7 +402,7 @@ const Workspace = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+        `${process.env.REACT_APP_API_URL}/api/users/preferences/workspace/${workspaceId}/last-accessed`,
         { elementId: element._id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -426,7 +426,7 @@ const Workspace = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}`,
+        `${process.env.REACT_APP_API_URL}/api/users/preferences/workspace/${workspaceId}`,
         { viewMode: newViewMode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -535,7 +535,7 @@ const Workspace = () => {
             try {
               const token = localStorage.getItem('token');
               await axios.put(
-                `${process.env.REACT_APP_API_URL}/api/user/preferences/workspace/${workspaceId}/last-accessed`,
+                `${process.env.REACT_APP_API_URL}/api/users/preferences/workspace/${workspaceId}/last-accessed`,
                 { elementId: targetElement._id },
                 { headers: { Authorization: `Bearer ${token}` } }
               );

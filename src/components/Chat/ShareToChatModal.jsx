@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Send, Search, Hash, User, Users, Loader2 } from 'lucide-react';
 import { useChat } from '../../context/ChatContext';
 import { toast } from 'sonner';
@@ -55,9 +56,8 @@ const ShareToChatModal = ({ isOpen, onClose, item, type }) => {
       let content, metadata, messageType;
 
       if (type === 'element') {
-        // Strip HTML tags from title and preview
+        // Strip HTML only for the text message content, keep HTML in metadata
         const cleanTitle = stripHtml(item.title || 'Untitled');
-        const cleanPreview = stripHtml(item.content || '');
 
         content = `Shared workspace element: ${cleanTitle}`;
         messageType = 'element';
@@ -67,8 +67,12 @@ const ShareToChatModal = ({ isOpen, onClose, item, type }) => {
             workspaceId: item.workspaceId,
             workspaceName: item.workspaceName,
             type: item.type,
-            title: cleanTitle,
-            preview: cleanPreview.substring(0, 100) || '',
+            title: item.title || 'Untitled', // Keep HTML
+            preview: item.content || '', // Keep HTML
+            description: item.description || '', // Keep HTML
+            macro: item.macro || '', // Keep HTML
+            example: item.example || null,
+            exampleIndex: item.exampleIndex !== null && item.exampleIndex !== undefined ? item.exampleIndex : null,
             thumbnailUrl: item.thumbnailUrl || null
           }
         };
@@ -100,10 +104,10 @@ const ShareToChatModal = ({ isOpen, onClose, item, type }) => {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-white dark:bg-[#1A1D21] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+        className="w-full max-w-lg bg-white dark:bg-[#1A1D21] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] rounded-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -206,7 +210,8 @@ const ShareToChatModal = ({ isOpen, onClose, item, type }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

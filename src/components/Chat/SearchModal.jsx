@@ -35,7 +35,7 @@ const SearchModal = ({ isOpen, onClose }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/chat/messages/search`,
+        `${process.env.REACT_APP_API_URL}/api/chat/search`,
         {
           params: {
             query: searchQuery,

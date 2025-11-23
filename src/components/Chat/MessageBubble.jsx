@@ -1,21 +1,150 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
-import { MoreVertical, Reply, Edit, Trash2, Pin, Bookmark, Smile, File, Download, Image as ImageIcon, Square, Circle, Type, ArrowRight, ClipboardList } from 'lucide-react';
+import { MoreVertical, Reply, Edit, Trash2, Pin, Bookmark, Smile, File, Download, Image as ImageIcon, Square, Circle, Type, ArrowRight, ClipboardList, Eye } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
+import ElementPreviewModal from './ElementPreviewModal';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const MessageBubble = ({ message, isGrouped }) => {
   const { user } = useAuth();
-  const { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, setReplyingTo } = useChat();
+  const { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, setReplyingTo, setThreadMessage } = useChat();
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [isHovered, setIsHovered] = useState(false);
+  const [showElementPreview, setShowElementPreview] = useState(false);
 
   const isOwnMessage = user?._id === message.sender._id;
+
+  // Helper function to remove empty/whitespace-only HTML tags AGGRESSIVELY
+  const cleanEmptyTags = (html) => {
+    if (!html) return '';
+
+    let cleaned = html;
+    let previousLength;
+    let iterations = 0;
+    const maxIterations = 50; // Prevent infinite loops
+
+    do {
+      previousLength = cleaned.length;
+
+      // Remove empty tags with any attributes
+      cleaned = cleaned.replace(/<(\w+)(\s[^>]*)?>(\s|&nbsp;)*<\/\1>/gi, '');
+      // Remove self-closing empty tags
+      cleaned = cleaned.replace(/<(\w+)(\s[^>]*)?\/>/gi, '');
+      // Remove tags with only whitespace/nbsp
+      cleaned = cleaned.replace(/<(\w+)(\s[^>]*)?>(&nbsp;|\s)+<\/\1>/gi, '');
+      // Remove multiple consecutive spaces/nbsp
+      cleaned = cleaned.replace(/(&nbsp;\s*)+/g, ' ');
+      cleaned = cleaned.replace(/\s{2,}/g, ' ');
+
+      iterations++;
+    } while (cleaned.length < previousLength && iterations < maxIterations);
+
+    return cleaned.trim();
+  };
+
+  // Helper to get preview content with HTML preserved, limited to ~200 chars
+  const getPreviewContent = (element) => {
+    let content = '';
+
+    switch (element.type) {
+      case 'title':
+        content = element.preview || element.title || '';
+        break;
+      case 'description':
+        content = element.description || '';
+        break;
+      case 'macro':
+        content = element.macro || '';
+        break;
+      case 'example':
+        if (element.example && element.example.messages) {
+          content = element.example.messages.map(m => m.text).join(' ');
+        }
+        break;
+      default:
+        content = element.preview || '';
+    }
+
+    if (!content) return '';
+
+    // AGGRESSIVELY clean empty tags first - this is KEY
+    content = cleanEmptyTags(content);
+
+    // Get plain text to check length
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = content;
+    const textContent = tmp.textContent || tmp.innerText || '';
+
+    // If text is short enough, return the cleaned HTML
+    if (textContent.length <= 200) {
+      return content;
+    }
+
+    // Need to truncate - walk through HTML and count actual text characters
+    let charCount = 0;
+    let result = '';
+    let inTag = false;
+    let tagBuffer = '';
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+
+      if (char === '<') {
+        inTag = true;
+        tagBuffer = '<';
+      } else if (char === '>') {
+        inTag = false;
+        tagBuffer += '>';
+        result += tagBuffer;
+        tagBuffer = '';
+      } else if (inTag) {
+        tagBuffer += char;
+      } else {
+        // This is actual text content
+        if (charCount < 200) {
+          result += char;
+          charCount++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Close any unclosed tags
+    const openTags = [];
+    const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+    let match;
+
+    while ((match = tagRegex.exec(result)) !== null) {
+      if (match[0][1] !== '/') {
+        // Opening tag
+        if (!match[0].endsWith('/>')) {
+          openTags.push(match[1]);
+        }
+      } else {
+        // Closing tag
+        const tagName = match[1];
+        const idx = openTags.lastIndexOf(tagName);
+        if (idx !== -1) {
+          openTags.splice(idx, 1);
+        }
+      }
+    }
+
+    // Close remaining open tags in reverse order
+    while (openTags.length > 0) {
+      result += `</${openTags.pop()}>`;
+    }
+
+    return result + '...';
+  };
 
   const getElementIcon = (type) => {
     switch (type) {
@@ -77,7 +206,11 @@ const MessageBubble = ({ message, isGrouped }) => {
   };
 
   const handleReply = () => {
-    if (setReplyingTo) {
+    // Open thread panel instead of inline reply
+    if (setThreadMessage) {
+      setThreadMessage(message);
+    } else if (setReplyingTo) {
+      // Fallback to inline reply
       setReplyingTo(message);
     }
   };
@@ -213,8 +346,77 @@ const MessageBubble = ({ message, isGrouped }) => {
                   )}
 
                   {/* Message Content */}
-                  <div className="text-[15px] leading-[1.47] break-words whitespace-pre-wrap text-gray-900 dark:text-[#D1D2D3]">
-                    {message.content}
+                  <div className="text-[15px] leading-[1.47] break-words text-gray-900 dark:text-[#D1D2D3] prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Custom rendering for specific elements
+                        a: ({ node, ...props }) => (
+                          <a
+                            {...props}
+                            className="text-[#1164A3] dark:text-blue-400 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          />
+                        ),
+                        code: ({ node, inline, ...props }) =>
+                          inline ? (
+                            <code
+                              {...props}
+                              className="bg-gray-200 dark:bg-neutral-800 text-red-600 dark:text-red-400 px-1 py-0.5 rounded text-[14px] font-mono"
+                            />
+                          ) : (
+                            <code
+                              {...props}
+                              className="block bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 p-2 rounded text-[13px] font-mono overflow-x-auto"
+                            />
+                          ),
+                        pre: ({ node, ...props }) => (
+                          <pre
+                            {...props}
+                            className="bg-gray-100 dark:bg-neutral-900 p-3 rounded overflow-x-auto my-2"
+                          />
+                        ),
+                        ul: ({ node, ...props }) => (
+                          <ul {...props} className="list-disc list-inside my-1" />
+                        ),
+                        ol: ({ node, ...props }) => (
+                          <ol {...props} className="list-decimal list-inside my-1" />
+                        ),
+                        blockquote: ({ node, ...props }) => (
+                          <blockquote
+                            {...props}
+                            className="border-l-4 border-gray-300 dark:border-neutral-600 pl-4 italic text-gray-600 dark:text-neutral-400 my-2"
+                          />
+                        ),
+                        p: ({ node, children, ...props }) => {
+                          // Process children to highlight @mentions
+                          const processedChildren = React.Children.map(children, (child) => {
+                            if (typeof child === 'string') {
+                              // Split by @mentions and wrap them
+                              const parts = child.split(/(@\w+)/g);
+                              return parts.map((part, i) => {
+                                if (part.startsWith('@')) {
+                                  return (
+                                    <span
+                                      key={i}
+                                      className="bg-blue-100 dark:bg-blue-900/30 text-[#1164A3] dark:text-blue-400 px-1 rounded font-medium"
+                                    >
+                                      {part}
+                                    </span>
+                                  );
+                                }
+                                return part;
+                              });
+                            }
+                            return child;
+                          });
+                          return <p {...props} className="my-1">{processedChildren}</p>;
+                        },
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
                   </div>
 
                   {/* File Attachments */}
@@ -270,33 +472,67 @@ const MessageBubble = ({ message, isGrouped }) => {
                   )}
 
                   {/* Workspace Element */}
-                  {message.metadata?.element && (
-                    <div className="mt-2">
-                      <button
-                        onClick={() => navigate(`/workspace/${message.metadata.element.workspaceId}`)}
-                        className="flex items-start gap-3 w-full max-w-md px-4 py-3 border-l-4 border-purple-500 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-left"
-                      >
-                        <div className="flex-shrink-0 p-2 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
-                          {getElementIcon(message.metadata.element.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide mb-1">
-                            Workspace Element
+                  {message.metadata?.element && message.metadata.element.elementId && (
+                    <div className="mt-2" style={{ maxWidth: '60%' }}>
+                      <div className="w-full border-l-4 border-purple-500 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20 overflow-hidden rounded-lg">
+                        <div className="flex items-start gap-3 px-4 py-3">
+                          <div className="flex-shrink-0 p-2 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded-lg">
+                            {getElementIcon(message.metadata.element.type)}
                           </div>
-                          <div className="text-[15px] font-semibold text-gray-900 dark:text-neutral-50 mb-1">
-                            {message.metadata.element.title || 'Untitled Element'}
-                          </div>
-                          <div className="text-[13px] text-gray-600 dark:text-neutral-400">
-                            From: {message.metadata.element.workspaceName || 'Unknown Workspace'}
-                          </div>
-                          {message.metadata.element.preview && (
-                            <div className="text-[12px] text-gray-500 dark:text-neutral-500 mt-1 truncate">
-                              {message.metadata.element.preview}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide mb-1">
+                              {message.metadata.element.type} Element
                             </div>
-                          )}
+                            <div
+                              className="text-[15px] font-semibold text-gray-900 dark:text-neutral-50 mb-1"
+                              dangerouslySetInnerHTML={{ __html: message.metadata.element.title || 'Untitled Element' }}
+                            />
+                            <div className="text-[13px] text-gray-600 dark:text-neutral-400 mb-2">
+                              From: {message.metadata.element.workspaceName || 'Unknown Workspace'}
+                            </div>
+                            {getPreviewContent(message.metadata.element) && (
+                              <div
+                                className="text-[13px] text-gray-700 dark:text-neutral-300 mt-2 overflow-hidden break-words"
+                                style={{
+                                  maxHeight: '4.5em',
+                                  lineHeight: '1.5em'
+                                }}
+                                dangerouslySetInnerHTML={{ __html: getPreviewContent(message.metadata.element) }}
+                              />
+                            )}
+                          </div>
                         </div>
-                        <ArrowRight className="w-5 h-5 text-gray-400 dark:text-neutral-500 flex-shrink-0 mt-1" />
-                      </button>
+                        {/* Action buttons */}
+                        <div className="flex items-center border-t border-purple-200 dark:border-purple-800/50">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowElementPreview(true);
+                            }}
+                            className="flex-1 px-4 py-2.5 text-[13px] font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </button>
+                          <div className="w-px h-8 bg-purple-200 dark:bg-purple-800/50" />
+                          <button
+                            onClick={() => {
+                              const baseUrl = `/workspace/${message.metadata.element.workspaceId}?element=${message.metadata.element.elementId}`;
+                              // Add exampleIndex to URL if this is an example element and index is available
+                              const url = message.metadata.element.type === 'example' &&
+                                          message.metadata.element.exampleIndex !== null &&
+                                          message.metadata.element.exampleIndex !== undefined
+                                ? `${baseUrl}&exampleIndex=${message.metadata.element.exampleIndex}`
+                                : baseUrl;
+                              navigate(url);
+                            }}
+                            className="flex-1 px-4 py-2.5 text-[13px] font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <ArrowRight className="w-4 h-4" />
+                            Open in Workspace
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -461,6 +697,15 @@ const MessageBubble = ({ message, isGrouped }) => {
         <div className="absolute top-0 right-0 z-20">
           <EmojiPicker onSelectEmoji={handleReaction} onClose={() => setShowEmojiPicker(false)} />
         </div>
+      )}
+
+      {/* Element Preview Modal */}
+      {showElementPreview && message.metadata?.element && (
+        <ElementPreviewModal
+          isOpen={showElementPreview}
+          onClose={() => setShowElementPreview(false)}
+          element={message.metadata.element}
+        />
       )}
     </div>
   );

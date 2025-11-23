@@ -6,16 +6,21 @@ import AppSidebar from '../components/AppSidebar';
 import ChatSidebar from '../components/Chat/ChatSidebar';
 import ChatMessageArea from '../components/Chat/ChatMessageArea';
 import ChatMemberList from '../components/Chat/ChatMemberList';
+import QuickSwitcher from '../components/Chat/QuickSwitcher';
+import ActivityTab from '../components/Chat/ActivityTab';
+import ThreadPanel from '../components/Chat/ThreadPanel';
 import axios from 'axios';
 
 const Chat = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { activeChannel } = useChat();
+  const { activeChannel, threadMessage, setThreadMessage } = useChat();
   const [showMemberList, setShowMemberList] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('chat');
   const [workspaces, setWorkspaces] = useState([]);
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
+  const [chatView, setChatView] = useState('messages'); // 'messages' or 'activity'
 
   // Fetch workspaces for navigation
   useEffect(() => {
@@ -62,6 +67,20 @@ const Chat = () => {
     navigate(`/${section}`);
   };
 
+  // Keyboard shortcut handler for Ctrl+K / Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl+K or Cmd+K for Quick Switcher
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowQuickSwitcher(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-black">
       {/* Main App Sidebar (Icon Navigation) */}
@@ -88,11 +107,15 @@ const Chat = () => {
       <ChatSidebar
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        chatView={chatView}
+        onChatViewChange={setChatView}
       />
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {activeChannel ? (
+        {chatView === 'activity' ? (
+          <ActivityTab />
+        ) : activeChannel ? (
           <>
             <ChatMessageArea
               showMemberList={showMemberList}
@@ -128,10 +151,24 @@ const Chat = () => {
         )}
       </div>
 
+      {/* Thread Panel (conditionally shown) */}
+      {threadMessage && (
+        <ThreadPanel
+          parentMessage={threadMessage}
+          onClose={() => setThreadMessage(null)}
+        />
+      )}
+
       {/* Member List Sidebar (conditionally shown) */}
-      {activeChannel && showMemberList && (
+      {activeChannel && showMemberList && !threadMessage && (
         <ChatMemberList channel={activeChannel} />
       )}
+
+      {/* Quick Switcher Modal (Ctrl+K) */}
+      <QuickSwitcher
+        isOpen={showQuickSwitcher}
+        onClose={() => setShowQuickSwitcher(false)}
+      />
     </div>
   );
 };
