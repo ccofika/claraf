@@ -30,6 +30,12 @@ const QAManager = () => {
   const [agents, setAgents] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0
+  });
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -54,6 +60,7 @@ const QAManager = () => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null, name: '' });
   const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
   const [feedbackDialog, setFeedbackDialog] = useState({ open: false, ticket: null });
+  const [viewDialog, setViewDialog] = useState({ open: false, ticket: null });
 
   // Selection state
   const [selectedTickets, setSelectedTickets] = useState([]);
@@ -78,7 +85,7 @@ const QAManager = () => {
       fetchTickets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, activeTab]);
+  }, [filters, activeTab, pagination.page]);
 
   useEffect(() => {
     fetchAgents(); // Always fetch agents for dropdowns
@@ -143,12 +150,23 @@ const QAManager = () => {
       if (filters.scoreMax && filters.scoreMax < 100) params.append('scoreMax', filters.scoreMax);
       if (filters.search) params.append('search', filters.search);
       params.append('isArchived', activeTab === 'archive');
+      params.append('page', pagination.page);
+      params.append('limit', pagination.limit);
 
       const response = await axios.get(
         `${API_URL}/api/qa/tickets?${params.toString()}`,
         getAuthHeaders()
       );
       setTickets(response.data.tickets || response.data);
+
+      // Update pagination info from response
+      if (response.data.pagination) {
+        setPagination(prev => ({
+          ...prev,
+          total: response.data.pagination.total,
+          pages: response.data.pagination.pages
+        }));
+      }
     } catch (err) {
       console.error('Error fetching tickets:', err);
       toast.error('Failed to load tickets');
@@ -360,6 +378,17 @@ const QAManager = () => {
     }));
   };
 
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reset to page 1 when filters change
+  const updateFilters = (newFilters) => {
+    setFilters(newFilters);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
   const getSortedData = (data) => {
     if (!sortConfig.key) return data;
 
@@ -485,6 +514,105 @@ const QAManager = () => {
       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${config.color}`}>
         {config.label}
       </span>
+    );
+  };
+
+  // Pagination Component
+  const Pagination = ({ currentPage, totalPages, onPageChange, totalItems }) => {
+    if (totalPages <= 1) return null;
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const showEllipsis = totalPages > 7;
+
+      if (!showEllipsis) {
+        // Show all pages if 7 or fewer
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // Always show first page
+        pages.push(1);
+
+        if (currentPage > 3) {
+          pages.push('ellipsis-start');
+        }
+
+        // Show current page and neighbors
+        const start = Math.max(2, currentPage - 1);
+        const end = Math.min(totalPages - 1, currentPage + 1);
+
+        for (let i = start; i <= end; i++) {
+          pages.push(i);
+        }
+
+        if (currentPage < totalPages - 2) {
+          pages.push('ellipsis-end');
+        }
+
+        // Always show last page
+        pages.push(totalPages);
+      }
+
+      return pages;
+    };
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-neutral-400">
+          <span>
+            Showing <span className="font-medium text-gray-900 dark:text-white">{((currentPage - 1) * pagination.limit) + 1}</span> to{' '}
+            <span className="font-medium text-gray-900 dark:text-white">{Math.min(currentPage * pagination.limit, totalItems)}</span> of{' '}
+            <span className="font-medium text-gray-900 dark:text-white">{totalItems}</span> results
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-2"
+          >
+            Previous
+          </Button>
+
+          {getPageNumbers().map((page, idx) => {
+            if (page === 'ellipsis-start' || page === 'ellipsis-end') {
+              return (
+                <span key={page} className="px-2 text-gray-400 dark:text-neutral-500">
+                  ...
+                </span>
+              );
+            }
+
+            return (
+              <button
+                key={idx}
+                onClick={() => onPageChange(page)}
+                className={`px-3 py-1 text-sm rounded transition-colors ${
+                  currentPage === page
+                    ? 'bg-black dark:bg-white text-white dark:text-black font-medium'
+                    : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800'
+                }`}
+              >
+                {page}
+              </button>
+            );
+          })}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-2"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -788,7 +916,7 @@ const QAManager = () => {
                 <Input
                   placeholder="Search tickets..."
                   value={filters.search}
-                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, search: e.target.value })}
                   className="text-sm"
                 />
               </div>
@@ -796,7 +924,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent</Label>
                 <select
                   value={filters.agent}
-                  onChange={(e) => setFilters({ ...filters, agent: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, agent: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
                 >
                   <option value="">All agents</option>
@@ -809,7 +937,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, status: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
                 >
                   <option value="">All statuses</option>
@@ -821,7 +949,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date From</Label>
                 <DatePicker
                   value={filters.dateFrom}
-                  onChange={(value) => setFilters({ ...filters, dateFrom: value })}
+                  onChange={(value) => updateFilters({ ...filters, dateFrom: value })}
                   className="text-sm"
                 />
               </div>
@@ -829,7 +957,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date To</Label>
                 <DatePicker
                   value={filters.dateTo}
-                  onChange={(value) => setFilters({ ...filters, dateTo: value })}
+                  onChange={(value) => updateFilters({ ...filters, dateTo: value })}
                   className="text-sm"
                 />
               </div>
@@ -837,7 +965,7 @@ const QAManager = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setFilters({
+                  onClick={() => updateFilters({
                     agent: '',
                     status: '',
                     isArchived: false,
@@ -918,8 +1046,18 @@ const QAManager = () => {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
                 {sortedTickets.map((ticket) => (
-                  <tr key={ticket._id} className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr
+                    key={ticket._id}
+                    className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      // Don't open dialog if clicking on checkbox or action buttons
+                      if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) {
+                        return;
+                      }
+                      setViewDialog({ open: true, ticket });
+                    }}
+                  >
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedTickets.includes(ticket._id)}
@@ -983,6 +1121,12 @@ const QAManager = () => {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              onPageChange={handlePageChange}
+            />
           </div>
         )}
       </div>
@@ -1039,7 +1183,7 @@ const QAManager = () => {
                 <Input
                   placeholder="Search tickets..."
                   value={filters.search}
-                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, search: e.target.value })}
                   className="text-sm"
                 />
               </div>
@@ -1047,7 +1191,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent</Label>
                 <select
                   value={filters.agent}
-                  onChange={(e) => setFilters({ ...filters, agent: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, agent: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
                 >
                   <option value="">All agents</option>
@@ -1060,7 +1204,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  onChange={(e) => updateFilters({ ...filters, status: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
                 >
                   <option value="">All statuses</option>
@@ -1072,7 +1216,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date From</Label>
                 <DatePicker
                   value={filters.dateFrom}
-                  onChange={(value) => setFilters({ ...filters, dateFrom: value })}
+                  onChange={(value) => updateFilters({ ...filters, dateFrom: value })}
                   className="text-sm"
                 />
               </div>
@@ -1080,7 +1224,7 @@ const QAManager = () => {
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date To</Label>
                 <DatePicker
                   value={filters.dateTo}
-                  onChange={(value) => setFilters({ ...filters, dateTo: value })}
+                  onChange={(value) => updateFilters({ ...filters, dateTo: value })}
                   className="text-sm"
                 />
               </div>
@@ -1088,7 +1232,7 @@ const QAManager = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setFilters({
+                  onClick={() => updateFilters({
                     agent: '',
                     status: '',
                     isArchived: false,
@@ -1133,7 +1277,17 @@ const QAManager = () => {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
                 {sortedTickets.map((ticket) => (
-                  <tr key={ticket._id} className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">
+                  <tr
+                    key={ticket._id}
+                    className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      // Don't open dialog if clicking on action buttons
+                      if (e.target.closest('button')) {
+                        return;
+                      }
+                      setViewDialog({ open: true, ticket });
+                    }}
+                  >
                     <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{ticket.agent?.name || 'Unknown'}</td>
                     <td className="px-6 py-4">
@@ -1166,6 +1320,12 @@ const QAManager = () => {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              onPageChange={handlePageChange}
+            />
           </div>
         )}
       </div>
@@ -1308,13 +1468,8 @@ const QAManager = () => {
       notes: '',
       feedback: '',
       qualityScorePercent: '',
-      category: 'General',
-      priority: 'Medium',
-      tags: [],
-      shortDescription: ''
+      category: 'General'
     });
-
-    const [tagInput, setTagInput] = useState('');
 
     useEffect(() => {
       if (ticketDialog.data) {
@@ -1326,10 +1481,7 @@ const QAManager = () => {
           notes: ticketDialog.data.notes || '',
           feedback: ticketDialog.data.feedback || '',
           qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
-          category: ticketDialog.data.category || 'General',
-          priority: ticketDialog.data.priority || 'Medium',
-          tags: ticketDialog.data.tags || [],
-          shortDescription: ticketDialog.data.shortDescription || ''
+          category: ticketDialog.data.category || 'General'
         });
       } else {
         setFormData({
@@ -1340,25 +1492,10 @@ const QAManager = () => {
           notes: '',
           feedback: '',
           qualityScorePercent: '',
-          category: 'General',
-          priority: 'Medium',
-          tags: [],
-          shortDescription: ''
+          category: 'General'
         });
       }
     }, [ticketDialog.data]);
-
-    const addTag = (e) => {
-      e.preventDefault();
-      if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-        setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] });
-        setTagInput('');
-      }
-    };
-
-    const removeTag = (tagToRemove) => {
-      setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
-    };
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -1405,17 +1542,6 @@ const QAManager = () => {
               </div>
             </div>
 
-            {/* Short Description */}
-            <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Short Description</Label>
-              <Input
-                value={formData.shortDescription}
-                onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                placeholder="Brief description of the ticket"
-                className="text-sm"
-              />
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
@@ -1450,70 +1576,22 @@ const QAManager = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-1">
-                  <Tag className="w-3 h-3" />
-                  Category
-                </Label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="General">General</option>
-                  <option value="Technical">Technical</option>
-                  <option value="Billing">Billing</option>
-                  <option value="Account">Account</option>
-                  <option value="Complaint">Complaint</option>
-                  <option value="Feature Request">Feature Request</option>
-                  <option value="Bug Report">Bug Report</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  Priority
-                </Label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Critical">Critical</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Tags */}
             <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Tags</Label>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addTag(e)}
-                  placeholder="Add tag..."
-                  className="text-sm flex-1"
-                />
-                <Button type="button" size="sm" onClick={addTag}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {formData.tags.map((tag, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-md">
-                    {tag}
-                    <button type="button" onClick={() => removeTag(tag)} className="hover:text-purple-900 dark:hover:text-purple-100">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Category</Label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              >
+                <option value="General">General</option>
+                <option value="Technical">Technical</option>
+                <option value="Billing">Billing</option>
+                <option value="Account">Account</option>
+                <option value="Complaint">Complaint</option>
+                <option value="Feature Request">Feature Request</option>
+                <option value="Bug Report">Bug Report</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1638,6 +1716,140 @@ const QAManager = () => {
     );
   };
 
+  // View Ticket Details Dialog Component
+  const ViewTicketDialogContent = () => {
+    if (!viewDialog.ticket) return null;
+
+    const ticket = viewDialog.ticket;
+
+    return (
+      <Dialog open={viewDialog.open} onOpenChange={(open) => setViewDialog({ ...viewDialog, open })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-3xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+              Ticket Details
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="overflow-y-auto max-h-[calc(85vh-120px)] space-y-6 pr-2">
+            {/* Header Info */}
+            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200 dark:border-neutral-800">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Ticket ID</p>
+                <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{ticket.ticketId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Agent</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{ticket.agent?.name || ticket.agentName || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Status</p>
+                <StatusBadge status={ticket.status} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Quality Score</p>
+                <QualityScoreBadge score={ticket.qualityScorePercent} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Date Entered</p>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {new Date(ticket.dateEntered || ticket.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              </div>
+              {ticket.gradedDate && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Graded Date</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {new Date(ticket.gradedDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Notes Section */}
+            {ticket.notes && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Notes
+                </h4>
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                  <p className="text-sm text-gray-700 dark:text-neutral-300 whitespace-pre-wrap">{ticket.notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback Section */}
+            {ticket.feedback && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Feedback
+                </h4>
+                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-gray-700 dark:text-neutral-300 whitespace-pre-wrap">{ticket.feedback}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-neutral-800">
+              {ticket.category && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Category</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{ticket.category}</p>
+                </div>
+              )}
+              {ticket.createdBy && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Created By</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {ticket.createdBy.name || ticket.createdBy.email}
+                  </p>
+                </div>
+              )}
+              {ticket.isArchived && ticket.archivedDate && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Archived Date</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {new Date(ticket.archivedDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
+            <Button variant="secondary" onClick={() => setViewDialog({ open: false, ticket: null })}>
+              Close
+            </Button>
+            {!ticket.isArchived && (
+              <Button onClick={() => {
+                setViewDialog({ open: false, ticket: null });
+                setTicketDialog({ open: true, mode: 'edit', data: ticket });
+              }}>
+                <Edit className="w-4 h-4 mr-1.5" />
+                Edit Ticket
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   // Delete Dialog Component
   const DeleteDialogContent = () => {
     const handleDelete = () => {
@@ -1736,6 +1948,7 @@ const QAManager = () => {
       {ticketDialog.open && <TicketDialogContent />}
       {gradeDialog.open && <GradeDialogContent />}
       {feedbackDialog.open && <FeedbackDialogContent />}
+      {viewDialog.open && <ViewTicketDialogContent />}
       {deleteDialog.open && <DeleteDialogContent />}
 
       {/* Command Palette */}

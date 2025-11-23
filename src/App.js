@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { TextFormattingProvider } from './context/TextFormattingContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { SocketProvider } from './context/SocketContext';
+import { ChatProvider } from './context/ChatContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -15,12 +16,14 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import CountriesRestrictions from './pages/CountriesRestrictions';
 import PrivateRoute from './components/PrivateRoute';
+import Chat from './pages/Chat';
 
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <SocketProvider>
+        <ChatProvider>
           <CommandPaletteProvider>
             <TextFormattingProvider>
               <Router>
@@ -41,6 +44,14 @@ function App() {
                       </PrivateRoute>
                     }
                   />
+                  <Route
+                    path="/chat"
+                    element={
+                      <PrivateRoute>
+                        <Chat />
+                      </PrivateRoute>
+                    }
+                  />
                 </Routes>
               </Router>
               <Toaster
@@ -51,6 +62,7 @@ function App() {
               />
             </TextFormattingProvider>
           </CommandPaletteProvider>
+          </ChatProvider>
         </SocketProvider>
       </AuthProvider>
     </ThemeProvider>

@@ -31,7 +31,6 @@ import {
   StarFilled,
   Time,
   CloseFilled,
-  Chat as ChatBubble,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -624,6 +623,13 @@ function DetailSidebar({
     };
     return labels[type] || type;
   };
+
+  const handleNavigation = (sectionId) => {
+    if (sectionId === 'chat') {
+      navigate('/chat');
+      setActiveSection(null); // Ne prikazuj secondary sidebar
+      return;
+    }
 
   const stripHtml = (html) => {
     const tmp = document.createElement('div');
