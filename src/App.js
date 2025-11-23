@@ -17,6 +17,14 @@ import TermsOfService from './pages/TermsOfService';
 import CountriesRestrictions from './pages/CountriesRestrictions';
 import PrivateRoute from './components/PrivateRoute';
 import Chat from './pages/Chat';
+import PageLayout from './components/PageLayout';
+import VIPProgressCalculator from './pages/VIPProgressCalculator';
+import HashExplorerFinder from './pages/HashExplorerFinder';
+import QuickLinks from './pages/QuickLinks';
+import AffiliateBonusFinder from './pages/AffiliateBonusFinder';
+import KYC from './pages/KYC';
+import DeveloperDashboard from './pages/DeveloperDashboard';
+import QAManager from './pages/QAManager';
 
 function App() {
   return (
@@ -28,6 +36,7 @@ function App() {
             <TextFormattingProvider>
               <Router>
                 <Routes>
+                  {/* Public routes */}
                   <Route path="/" element={<Navigate to="/login" />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/login/:username" element={<AutoLogin />} />
@@ -35,7 +44,97 @@ function App() {
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
-                  <Route path="/countries-restrictions" element={<CountriesRestrictions />} />
+
+                  {/* Protected routes with PageLayout wrapper */}
+                  <Route
+                    path="/vip-calculator"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="vip-calculator">
+                          <VIPProgressCalculator />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/hash-explorer"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="hash-explorer">
+                          <HashExplorerFinder />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/quick-links"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="quick-links">
+                          <QuickLinks />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/affiliate-bonus-finder"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="affiliate-bonus-finder">
+                          <AffiliateBonusFinder />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/kyc"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="kyc">
+                          <KYC />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/developer-dashboard"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="developer-dashboard">
+                          <DeveloperDashboard />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/qa-manager"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="qa-manager">
+                          <QAManager />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/countries-restrictions"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="countries-restrictions">
+                          <CountriesRestrictions />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Workspace route - ONLY for canvas */}
                   <Route
                     path="/workspace/:workspaceId"
                     element={
@@ -44,6 +143,8 @@ function App() {
                       </PrivateRoute>
                     }
                   />
+
+                  {/* Chat route */}
                   <Route
                     path="/chat"
                     element={

@@ -5,14 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import InfiniteCanvas from '../components/InfiniteCanvas';
 import AppSidebar from '../components/AppSidebar';
-import HashExplorerFinder from './HashExplorerFinder';
-import VIPProgressCalculator from './VIPProgressCalculator';
-import QuickLinks from './QuickLinks';
-import DeveloperDashboard from './DeveloperDashboard';
-import AffiliateBonusFinder from './AffiliateBonusFinder';
-import KYC from './KYC';
-import QAManager from './QAManager';
-import CountriesRestrictions from './CountriesRestrictions';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
 import EditWorkspaceModal from '../components/modals/EditWorkspaceModal';
 import WorkspaceSettingsModal from '../components/modals/WorkspaceSettingsModal';
@@ -36,7 +28,6 @@ const Workspace = () => {
   const [loading, setLoading] = useState(true);
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('workspaces');
   const [bookmarks, setBookmarks] = useState([]);
   const [viewMode, setViewMode] = useState('view'); // 'edit', 'view', or 'post-view'
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -70,6 +61,7 @@ const Workspace = () => {
     }
   }, []);
 
+  // Handle query param ?section=... for navigation
   useEffect(() => {
     const fetchWorkspaceData = async () => {
       try {
@@ -487,12 +479,10 @@ const Workspace = () => {
     hasZoomedToLatestTitle.current = false;
   }, [location.key]);
 
-  // Reset flag when returning to workspaces section (handles KYC, VIP Calculator, etc navigation)
+  // Reset zoom flag when workspace changes
   React.useEffect(() => {
-    if (activeSection === 'workspaces') {
-      hasZoomedToLatestTitle.current = false;
-    }
-  }, [activeSection]);
+    hasZoomedToLatestTitle.current = false;
+  }, [workspaceId]);
 
   React.useEffect(() => {
     // Only zoom if:
@@ -501,10 +491,9 @@ const Workspace = () => {
     // 3. Elements are loaded
     // 4. Haven't zoomed yet for this workspace
     // 5. Not currently switching workspaces
-    // 6. Currently viewing workspaces section (not KYC, VIP Calculator, etc)
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
 
-    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current && activeSection === 'workspaces') {
+    if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
       let targetElement = null;
 
       // First, try to find the lastAccessedElement if it exists
@@ -559,7 +548,7 @@ const Workspace = () => {
         }
       }
     }
-  }, [canvas, elements, switchingWorkspace, lastAccessedElement, viewMode, workspaceId, location.key, activeSection]);
+  }, [canvas, elements, switchingWorkspace, lastAccessedElement, viewMode, workspaceId, location.key]);
 
   // Auto-redirect to announcements workspace if access is denied
   useEffect(() => {
@@ -608,8 +597,19 @@ const Workspace = () => {
           onBookmarkClick={handleBookmarkClick}
           onBookmarkUpdate={handleBookmarkUpdate}
           onBookmarkDelete={handleBookmarkDelete}
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
+          activeSection="workspaces"
+          onSectionChange={(section) => {
+            // Navigate to section's route
+            if (section === 'chat') {
+              navigate('/chat');
+            } else if (section === 'workspaces') {
+              // Already on workspace route
+              return;
+            } else {
+              // Navigate to section's direct route
+              navigate(`/${section}`);
+            }
+          }}
           onCollapsedChange={setIsSidebarCollapsed}
           onRefreshWorkspaces={fetchAllWorkspaces}
           viewMode={viewMode}
@@ -617,59 +617,31 @@ const Workspace = () => {
 
         {/* Main Content */}
         <div className="flex-1 relative overflow-hidden">
-          {activeSection === 'workspaces' && (
-            <>
-              <InfiniteCanvas
-                workspaceId={workspaceId}
-                elements={elements}
-                onElementUpdate={handleElementUpdate}
-                onElementCreate={handleElementCreate}
-                onElementDelete={handleElementDelete}
-                onRemoteElementUpdate={handleRemoteElementUpdate}
-                onRemoteElementCreate={handleRemoteElementCreate}
-                onRemoteElementDelete={handleRemoteElementDelete}
-                canEditContent={workspace?.permissions?.canEditContent}
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-                workspaces={workspaces}
-                onElementNavigate={handleElementNavigate}
-                onBookmarkCreated={handleBookmarkCreated}
-                workspaceUsers={workspaceUsers}
-                onViewportChange={handleViewportChange}
-              />
-              {/* Hide TitleNavigation in post-view mode */}
-              {viewMode !== 'post-view' && (
-                <TitleNavigation
-                  elements={elements}
-                  onTitleClick={handleTitleClick}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                />
-              )}
-            </>
-          )}
-          {activeSection === 'vip-calculator' && (
-            <VIPProgressCalculator />
-          )}
-          {activeSection === 'hash-explorer' && (
-            <HashExplorerFinder />
-          )}
-          {activeSection === 'quick-links' && (
-            <QuickLinks />
-          )}
-          {activeSection === 'affiliate-bonus-finder' && (
-            <AffiliateBonusFinder />
-          )}
-          {activeSection === 'kyc' && (
-            <KYC />
-          )}
-          {activeSection === 'developer-dashboard' && (
-            <DeveloperDashboard />
-          )}
-          {activeSection === 'qa-manager' && (
-            <QAManager />
-          )}
-          {activeSection === 'countries-restrictions' && (
-            <CountriesRestrictions />
+          <InfiniteCanvas
+            workspaceId={workspaceId}
+            elements={elements}
+            onElementUpdate={handleElementUpdate}
+            onElementCreate={handleElementCreate}
+            onElementDelete={handleElementDelete}
+            onRemoteElementUpdate={handleRemoteElementUpdate}
+            onRemoteElementCreate={handleRemoteElementCreate}
+            onRemoteElementDelete={handleRemoteElementDelete}
+            canEditContent={workspace?.permissions?.canEditContent}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            workspaces={workspaces}
+            onElementNavigate={handleElementNavigate}
+            onBookmarkCreated={handleBookmarkCreated}
+            workspaceUsers={workspaceUsers}
+            onViewportChange={handleViewportChange}
+          />
+          {/* Hide TitleNavigation in post-view mode */}
+          {viewMode !== 'post-view' && (
+            <TitleNavigation
+              elements={elements}
+              onTitleClick={handleTitleClick}
+              isSidebarCollapsed={isSidebarCollapsed}
+            />
           )}
         </div>
 
@@ -726,10 +698,10 @@ const Workspace = () => {
       <QuickSwitcher currentWorkspaceId={workspaceId} />
 
       {/* Live Cursors - Real-time Collaboration */}
-      {activeSection === 'workspaces' && <LiveCursors viewport={viewport} />}
+      <LiveCursors viewport={viewport} />
 
       {/* Collaboration Notifications - Real-time Activity */}
-      {activeSection === 'workspaces' && <CollaborationNotifications />}
+      <CollaborationNotifications />
     </>
   );
 };

@@ -34,22 +34,32 @@ const Chat = () => {
     fetchWorkspaces();
   }, []);
 
-  // Handle section change - navigate away from chat when needed
+  // Handle section change - navigate to proper routes
   const handleSectionChange = (section) => {
+    console.log('📍 Chat navigating to section:', section);
+
     if (section === 'chat') {
+      // Stay on chat page
       setActiveSection(section);
-    } else if (section === 'workspaces') {
-      // Navigate to first available workspace or last accessed
+      return;
+    }
+
+    // Navigate to workspaces section
+    if (section === 'workspaces') {
       const lastWorkspaceId = localStorage.getItem('lastWorkspaceId');
       if (lastWorkspaceId) {
         navigate(`/workspace/${lastWorkspaceId}`);
       } else if (workspaces.length > 0) {
         navigate(`/workspace/${workspaces[0]._id}`);
+      } else {
+        console.error('No workspaces available');
+        alert('Please create or select a workspace first');
       }
-    } else {
-      // For other sections, stay on current page but change active section
-      setActiveSection(section);
+      return;
     }
+
+    // Navigate directly to section's route (VIP Calculator, Quick Links, etc.)
+    navigate(`/${section}`);
   };
 
   return (

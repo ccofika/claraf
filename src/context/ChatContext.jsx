@@ -32,6 +32,15 @@ export const ChatProvider = ({ children }) => {
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+  // Helper function to get fresh token from localStorage
+  const getAuthToken = () => {
+    const authToken = localStorage.getItem('token');
+    if (!authToken) {
+      console.warn('⚠️ No auth token available in localStorage');
+    }
+    return authToken;
+  };
+
   // Calculate total unread count
   useEffect(() => {
     const total = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
@@ -40,11 +49,13 @@ export const ChatProvider = ({ children }) => {
 
   // Fetch channels
   const fetchChannels = useCallback(async () => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) return;
 
     try {
+      console.log('📡 Fetching channels...');
       const response = await axios.get(`${API_URL}/api/chat/channels`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${authToken}` }
       });
 
       setChannels(response.data);
@@ -63,14 +74,16 @@ export const ChatProvider = ({ children }) => {
 
   // Fetch messages for a channel
   const fetchMessages = useCallback(async (channelId, before = null) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) return;
 
     try {
+      console.log('📥 Fetching messages for channel:', channelId);
       const params = before ? { before } : {};
       const response = await axios.get(
         `${API_URL}/api/chat/channels/${channelId}/messages`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authToken}` },
           params
         }
       );
@@ -99,13 +112,15 @@ export const ChatProvider = ({ children }) => {
 
   // Send message
   const sendMessage = useCallback(async (channelId, content, type = 'text', metadata = {}) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) return;
 
     try {
+      console.log('📤 Sending message to channel:', channelId);
       const response = await axios.post(
         `${API_URL}/api/chat/messages`,
         { channelId, content, type, metadata },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
       // Emit socket event for real-time delivery
@@ -292,26 +307,42 @@ export const ChatProvider = ({ children }) => {
 
   // Create channel
   const createChannel = useCallback(async (type, name, description, memberIds, workspaceId) => {
-    if (!token) return;
+    const authToken = getAuthToken();
+    if (!authToken) return;
 
     try {
+      console.log('📡 Sending request to:', `${API_URL}/api/chat/channels`);
+      console.log('📡 Request body:', { type, name, description, memberIds, workspaceId });
+
       const response = await axios.post(
         `${API_URL}/api/chat/channels`,
         { type, name, description, memberIds, workspaceId },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      setChannels(prev => [response.data, ...prev]);
+      console.log('📥 Response received:', response);
+      console.log('📥 Response data:', response.data);
+      console.log('📥 Response status:', response.status);
+
+      setChannels(prev => {
+        console.log('📝 Updating channels, prev count:', prev.length);
+        const newChannels = [response.data, ...prev];
+        console.log('📝 New channels count:', newChannels.length);
+        return newChannels;
+      });
 
       // Emit socket event
       if (socket && isConnected) {
+        console.log('🔌 Emitting socket event');
         socket.emit('chat:channel:created', { channel: response.data });
       }
 
       toast.success('Channel created successfully');
+      console.log('✅ Returning channel data:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error creating channel:', error);
+      console.error('❌ Error creating channel:', error);
+      console.error('❌ Error response:', error.response);
       toast.error('Failed to create channel');
       throw error;
     }
@@ -344,21 +375,32 @@ export const ChatProvider = ({ children }) => {
 
   // Initialize chat when user is authenticated
   useEffect(() => {
-    if (user && token && socket && isConnected && !isChatInitialized) {
-      // Emit chat:init to join all user's channels
-      socket.emit('chat:init');
+    // Check token from localStorage directly (more reliable than state)
+    const authToken = localStorage.getItem('token');
 
-      socket.on('chat:init:success', () => {
-        console.log('✅ Chat initialized successfully');
-        setIsChatInitialized(true);
-        fetchChannels();
-      });
+    if (user && authToken && !isChatInitialized) {
+      console.log('🔄 Initializing chat...');
+      console.log('🔑 User:', user.email || user.name);
+      console.log('🔑 Token exists:', !!authToken);
 
-      return () => {
-        socket.off('chat:init:success');
-      };
+      // Fetch channels immediately
+      fetchChannels();
+      setIsChatInitialized(true);
+
+      // Also initialize socket if available
+      if (socket && isConnected) {
+        socket.emit('chat:init');
+
+        socket.on('chat:init:success', () => {
+          console.log('✅ Chat socket initialized successfully');
+        });
+
+        return () => {
+          socket.off('chat:init:success');
+        };
+      }
     }
-  }, [user, token, socket, isConnected, isChatInitialized, fetchChannels]);
+  }, [user, socket, isConnected, isChatInitialized, fetchChannels]);
 
   // Socket event listeners
   useEffect(() => {
