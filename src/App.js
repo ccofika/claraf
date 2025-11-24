@@ -7,6 +7,7 @@ import { TextFormattingProvider } from './context/TextFormattingContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { SocketProvider } from './context/SocketContext';
 import { ChatProvider } from './context/ChatContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -31,11 +32,12 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <SocketProvider>
-        <ChatProvider>
-          <CommandPaletteProvider>
-            <TextFormattingProvider>
-              <Router>
-                <Routes>
+          <NotificationProvider>
+            <ChatProvider>
+              <CommandPaletteProvider>
+                <TextFormattingProvider>
+                  <Router>
+                    <Routes>
                   {/* Public routes */}
                   <Route path="/" element={<Navigate to="/login" />} />
                   <Route path="/login" element={<Login />} />
@@ -144,7 +146,7 @@ function App() {
                     }
                   />
 
-                  {/* Chat route */}
+                  {/* Chat routes */}
                   <Route
                     path="/chat"
                     element={
@@ -153,17 +155,26 @@ function App() {
                       </PrivateRoute>
                     }
                   />
+                  <Route
+                    path="/chat/:channelId"
+                    element={
+                      <PrivateRoute>
+                        <Chat />
+                      </PrivateRoute>
+                    }
+                  />
                 </Routes>
               </Router>
-              <Toaster
-                position="top-center"
-                richColors
-                closeButton
-                theme="system"
-              />
-            </TextFormattingProvider>
-          </CommandPaletteProvider>
-          </ChatProvider>
+                  <Toaster
+                    position="top-center"
+                    richColors
+                    closeButton
+                    theme="system"
+                  />
+                </TextFormattingProvider>
+              </CommandPaletteProvider>
+            </ChatProvider>
+          </NotificationProvider>
         </SocketProvider>
       </AuthProvider>
     </ThemeProvider>

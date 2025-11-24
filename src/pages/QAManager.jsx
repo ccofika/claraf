@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target,
-  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search
+  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import QASearchBar from '../components/QASearchBar';
 import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
+import QAAllAgents from '../components/QAAllAgents';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
 const QAManager = () => {
@@ -29,6 +30,8 @@ const QAManager = () => {
 
   // Data state
   const [agents, setAgents] = useState([]);
+  const [allExistingAgents, setAllExistingAgents] = useState([]); // All existing agents in system
+  const [agentsForFilter, setAgentsForFilter] = useState([]); // Agents who have tickets (for filters)
   const [tickets, setTickets] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [pagination, setPagination] = useState({
@@ -50,13 +53,14 @@ const QAManager = () => {
     search: '',
     category: '',
     priority: '',
-    tags: ''
+    tags: '',
+    searchMode: 'text' // 'ai' for semantic search, 'text' for keyword search
   });
-  const [showFilters, setShowFilters] = useState(false);
-  const [showAISearch, setShowAISearch] = useState(true);
 
   // Dialog state
   const [agentDialog, setAgentDialog] = useState({ open: false, mode: 'create', data: null });
+  const [addExistingAgentDialog, setAddExistingAgentDialog] = useState({ open: false });
+  const [similarAgentDialog, setSimilarAgentDialog] = useState({ open: false, similarAgents: [], newAgentName: '' });
   const [ticketDialog, setTicketDialog] = useState({ open: false, mode: 'create', data: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null, name: '' });
   const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
@@ -90,6 +94,7 @@ const QAManager = () => {
 
   useEffect(() => {
     fetchAgents(); // Always fetch agents for dropdowns
+    fetchAgentsForFilter(); // Fetch all agents with tickets for filters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,9 +144,38 @@ const QAManager = () => {
     }
   };
 
+  const fetchAllExistingAgents = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/agents/all/existing`, getAuthHeaders());
+      setAllExistingAgents(response.data);
+    } catch (err) {
+      console.error('Error fetching all existing agents:', err);
+      toast.error('Failed to load existing agents');
+    }
+  };
+
+  const fetchAgentsForFilter = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/agents/with-tickets`, getAuthHeaders());
+      setAgentsForFilter(response.data);
+    } catch (err) {
+      console.error('Error fetching agents for filter:', err);
+      toast.error('Failed to load agents for filter');
+    }
+  };
+
   const fetchTickets = async () => {
     try {
       setLoading(true);
+
+      // Determine if we should use AI semantic search or regular text search
+      const useAISearch = filters.searchMode === 'ai' && filters.search && filters.search.trim().length > 0;
+
+      // Clear tickets immediately when starting AI search to prevent flickering
+      if (useAISearch) {
+        setTickets([]);
+      }
+
       const params = new URLSearchParams();
       if (filters.agent) params.append('agent', filters.agent);
       if (filters.status) params.append('status', filters.status);
@@ -149,24 +183,49 @@ const QAManager = () => {
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       if (filters.scoreMin) params.append('scoreMin', filters.scoreMin);
       if (filters.scoreMax && filters.scoreMax < 100) params.append('scoreMax', filters.scoreMax);
-      if (filters.search) params.append('search', filters.search);
       params.append('isArchived', activeTab === 'archive');
-      params.append('page', pagination.page);
-      params.append('limit', pagination.limit);
 
-      const response = await axios.get(
-        `${API_URL}/api/qa/tickets?${params.toString()}`,
-        getAuthHeaders()
-      );
-      setTickets(response.data.tickets || response.data);
+      if (useAISearch) {
+        // AI Semantic Search - uses embeddings to find semantically similar tickets
+        params.append('query', filters.search);
+        params.append('limit', pagination.limit);
 
-      // Update pagination info from response
-      if (response.data.pagination) {
+        const response = await axios.get(
+          `${API_URL}/api/qa/ai-search?${params.toString()}`,
+          getAuthHeaders()
+        );
+
+        // AI search returns array directly with relevanceScore
+        const results = response.data || [];
+        setTickets(results);
+
+        // Update pagination for AI search results
         setPagination(prev => ({
           ...prev,
-          total: response.data.pagination.total,
-          pages: response.data.pagination.pages
+          total: results.length,
+          pages: 1,
+          page: 1
         }));
+      } else {
+        // Regular text search
+        if (filters.search) params.append('search', filters.search);
+        params.append('page', pagination.page);
+        params.append('limit', pagination.limit);
+
+        const response = await axios.get(
+          `${API_URL}/api/qa/tickets?${params.toString()}`,
+          getAuthHeaders()
+        );
+        setTickets(response.data.tickets || response.data);
+
+        // Update pagination info from response
+        if (response.data.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            total: response.data.pagination.total,
+            pages: response.data.pagination.pages
+          }));
+        }
       }
     } catch (err) {
       console.error('Error fetching tickets:', err);
@@ -179,10 +238,43 @@ const QAManager = () => {
   // Agent CRUD
   const handleCreateAgent = async (formData) => {
     try {
+      // First, check for similar agents
+      const checkResponse = await axios.post(
+        `${API_URL}/api/qa/agents/check-similar`,
+        { name: formData.name },
+        getAuthHeaders()
+      );
+
+      if (checkResponse.data.exactMatch) {
+        // Exact match found - automatically add existing agent
+        await axios.post(
+          `${API_URL}/api/qa/agents/${checkResponse.data.agent._id}/add-to-list`,
+          {},
+          getAuthHeaders()
+        );
+        setAgents([...agents, checkResponse.data.agent]);
+        setAgentDialog({ open: false, mode: 'create', data: null });
+        toast.success(`Agent "${checkResponse.data.agent.name}" added to your list`);
+        return;
+      }
+
+      if (checkResponse.data.similar && checkResponse.data.similar.length > 0) {
+        // Similar agents found - ask user
+        setSimilarAgentDialog({
+          open: true,
+          similarAgents: checkResponse.data.similar,
+          newAgentName: formData.name,
+          formData: formData
+        });
+        return;
+      }
+
+      // No similar agents - create new one
       const response = await axios.post(`${API_URL}/api/qa/agents`, formData, getAuthHeaders());
       setAgents([...agents, response.data]);
       setAgentDialog({ open: false, mode: 'create', data: null });
       toast.success('Agent created successfully');
+      fetchAgentsForFilter(); // Refresh filter list
     } catch (err) {
       console.error('Error creating agent:', err);
       toast.error(err.response?.data?.message || 'Failed to create agent');
@@ -206,10 +298,50 @@ const QAManager = () => {
       await axios.delete(`${API_URL}/api/qa/agents/${id}`, getAuthHeaders());
       setAgents(agents.filter(a => a._id !== id));
       setDeleteDialog({ open: false, type: null, id: null, name: '' });
-      toast.success('Agent deleted successfully');
+      toast.success('Agent removed from your grading list');
     } catch (err) {
-      console.error('Error deleting agent:', err);
-      toast.error(err.response?.data?.message || 'Failed to delete agent');
+      console.error('Error removing agent:', err);
+      toast.error(err.response?.data?.message || 'Failed to remove agent');
+    }
+  };
+
+  const handleAddExistingAgent = async (agentId) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/qa/agents/${agentId}/add-to-list`,
+        {},
+        getAuthHeaders()
+      );
+      setAgents([...agents, response.data]);
+      setAddExistingAgentDialog({ open: false });
+      toast.success(`Agent "${response.data.name}" added to your list`);
+    } catch (err) {
+      console.error('Error adding existing agent:', err);
+      toast.error(err.response?.data?.message || 'Failed to add agent');
+    }
+  };
+
+  const handleConfirmSimilarAgent = async (selectedAgentId) => {
+    try {
+      if (selectedAgentId) {
+        // User selected an existing agent
+        await handleAddExistingAgent(selectedAgentId);
+      } else {
+        // User wants to create new agent
+        const response = await axios.post(
+          `${API_URL}/api/qa/agents`,
+          similarAgentDialog.formData,
+          getAuthHeaders()
+        );
+        setAgents([...agents, response.data]);
+        toast.success('Agent created successfully');
+        fetchAgentsForFilter();
+      }
+      setSimilarAgentDialog({ open: false, similarAgents: [], newAgentName: '', formData: null });
+      setAgentDialog({ open: false, mode: 'create', data: null });
+    } catch (err) {
+      console.error('Error handling similar agent:', err);
+      toast.error(err.response?.data?.message || 'Failed to process agent');
     }
   };
 
@@ -290,6 +422,29 @@ const QAManager = () => {
     }
   };
 
+  // State for embedding regeneration
+  const [regeneratingEmbeddings, setRegeneratingEmbeddings] = useState(false);
+
+  const handleRegenerateEmbeddings = async () => {
+    try {
+      setRegeneratingEmbeddings(true);
+      toast.info('Regenerating AI embeddings for all tickets... This may take a moment.');
+
+      const response = await axios.post(
+        `${API_URL}/api/qa/generate-all-embeddings`,
+        { force: true }, // Force regeneration of all embeddings
+        getAuthHeaders()
+      );
+
+      toast.success(`Embeddings regenerated: ${response.data.processed} tickets processed`);
+    } catch (err) {
+      console.error('Error regenerating embeddings:', err);
+      toast.error('Failed to regenerate embeddings');
+    } finally {
+      setRegeneratingEmbeddings(false);
+    }
+  };
+
   const handleGradeTicket = async (id, qualityScorePercent) => {
     try {
       const response = await axios.post(
@@ -322,11 +477,6 @@ const QAManager = () => {
       console.error('Error updating feedback:', err);
       toast.error(err.response?.data?.message || 'Failed to save feedback');
     }
-  };
-
-  const handleAISearchTicketSelect = (ticket) => {
-    // Open ticket for viewing/editing
-    setTicketDialog({ open: true, mode: 'edit', data: ticket });
   };
 
   const handleExportMaestro = async (agentId) => {
@@ -369,6 +519,56 @@ const QAManager = () => {
       console.error('Error exporting Maestro report:', err);
       console.error('Error details:', err.response?.data);
       toast.error(err.response?.data?.message || 'Failed to export Maestro report');
+    }
+  };
+
+  const handleExportSelectedTickets = async () => {
+    try {
+      // Fetch all tickets that are not graded and not archived
+      // Use high limit to get all tickets, and filter by status='Selected'
+      const response = await axios.get(
+        `${API_URL}/api/qa/tickets?isArchived=false&status=Selected&limit=10000`,
+        getAuthHeaders()
+      );
+
+      // Get tickets array from response
+      const allTickets = response.data.tickets || response.data;
+
+      // Filter tickets: only those with status 'Selected' (not 'Graded')
+      const selectedTickets = allTickets.filter(
+        ticket => ticket.status === 'Selected'
+      );
+
+      if (selectedTickets.length === 0) {
+        toast.error('No selected tickets to export');
+        return;
+      }
+
+      // Create CSV content with only ticket IDs, one per line
+      let csvContent = 'Ticket ID\n';
+      selectedTickets.forEach(ticket => {
+        const ticketId = ticket.ticketId || ticket._id.slice(-6);
+        csvContent += `${ticketId}\n`;
+      });
+
+      // Create and download the CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `selected_tickets_${dateStr}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${selectedTickets.length} selected tickets`);
+    } catch (err) {
+      console.error('Error exporting selected tickets:', err);
+      toast.error(err.response?.data?.message || 'Failed to export selected tickets');
     }
   };
 
@@ -630,6 +830,17 @@ const QAManager = () => {
 
     return (
       <div className="space-y-6">
+        {/* Export Button */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleExportSelectedTickets}
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export Selected Tickets
+          </Button>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -765,12 +976,21 @@ const QAManager = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agents</h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage QA agents and assignments</p>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage QA agents for this week's grading</p>
           </div>
-          <Button onClick={() => setAgentDialog({ open: true, mode: 'create', data: null })}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            Add Agent
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => {
+              fetchAllExistingAgents();
+              setAddExistingAgentDialog({ open: true });
+            }}>
+              <Users className="w-4 h-4 mr-1.5" />
+              Add Existing Agent
+            </Button>
+            <Button onClick={() => setAgentDialog({ open: true, mode: 'create', data: null })}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add New Agent
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -868,16 +1088,14 @@ const QAManager = () => {
 
     return (
       <div className="space-y-4">
-        {/* AI Search Bar */}
-        {showAISearch && (
-          <div className="mb-4">
-            <QASearchBar
-              onTicketSelect={handleAISearchTicketSelect}
-              currentFilters={filters}
-              onFilterChange={setFilters}
-            />
-          </div>
-        )}
+        {/* Unified Search Bar with AI/Text toggle and filters */}
+        <div className="mb-4">
+          <QASearchBar
+            currentFilters={filters}
+            onFilterChange={setFilters}
+            agents={agentsForFilter}
+          />
+        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -886,105 +1104,12 @@ const QAManager = () => {
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowAISearch(!showAISearch)}
-            >
-              <Sparkles className="w-4 h-4 mr-1.5" />
-              {showAISearch ? 'Hide' : 'Show'} AI Search
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="w-4 h-4 mr-1.5" />
-              Filters
-            </Button>
             <Button onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
               <Plus className="w-4 h-4 mr-1.5" />
               Add Ticket
             </Button>
           </div>
         </div>
-
-        {/* Filters */}
-        {showFilters && (
-          <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Search</Label>
-                <Input
-                  placeholder="Search tickets..."
-                  value={filters.search}
-                  onChange={(e) => updateFilters({ ...filters, search: e.target.value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent</Label>
-                <select
-                  value={filters.agent}
-                  onChange={(e) => updateFilters({ ...filters, agent: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">All agents</option>
-                  {agents.map(agent => (
-                    <option key={agent._id} value={agent._id}>{agent.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => updateFilters({ ...filters, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">All statuses</option>
-                  <option value="Selected">Selected</option>
-                  <option value="Graded">Graded</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date From</Label>
-                <DatePicker
-                  value={filters.dateFrom}
-                  onChange={(value) => updateFilters({ ...filters, dateFrom: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date To</Label>
-                <DatePicker
-                  value={filters.dateTo}
-                  onChange={(value) => updateFilters({ ...filters, dateTo: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateFilters({
-                    agent: '',
-                    status: '',
-                    isArchived: false,
-                    dateFrom: '',
-                    dateTo: '',
-                    scoreMin: 0,
-                    scoreMax: 100,
-                    search: ''
-                  })}
-                  className="w-full"
-                >
-                  <X className="w-4 h-4 mr-1.5" />
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bulk Actions */}
         {selectedTickets.length > 0 && (
@@ -1072,8 +1197,8 @@ const QAManager = () => {
                         className="rounded border-gray-300 dark:border-neutral-600"
                       />
                     </td>
-                    <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                    <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400" onClick={(e) => e.stopPropagation()}>{ticket.ticketId || ticket._id.slice(-6)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white" onClick={(e) => e.stopPropagation()}>
                       {ticket.agent?.name || ticket.agentName || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
@@ -1150,131 +1275,71 @@ const QAManager = () => {
 
   // Archive Tab
   const renderArchive = () => {
-    const sortedTickets = getSortedData(tickets);
+    // For AI search, tickets are already sorted by relevance, don't re-sort
+    const isAISearch = filters.searchMode === 'ai' && filters.search && filters.search.trim().length > 0;
+    const sortedTickets = isAISearch ? tickets : getSortedData(tickets);
 
     return (
       <div className="space-y-4">
-        {/* AI Search Bar */}
-        {showAISearch && (
-          <div className="mb-4">
-            <QASearchBar
-              onTicketSelect={handleAISearchTicketSelect}
-              currentFilters={{ ...filters, isArchived: true }}
-              onFilterChange={setFilters}
-            />
-          </div>
-        )}
+        {/* Unified Search Bar with AI/Text toggle and filters */}
+        <div className="mb-4">
+          <QASearchBar
+            currentFilters={{ ...filters, isArchived: true }}
+            onFilterChange={setFilters}
+            agents={agentsForFilter}
+          />
+        </div>
 
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Archive</h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Archived tickets from all QA agents</p>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+              {isAISearch
+                ? `Found ${tickets.length} semantically similar tickets`
+                : 'Archived tickets from all QA agents'}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowAISearch(!showAISearch)}
-            >
-              <Sparkles className="w-4 h-4 mr-1.5" />
-              {showAISearch ? 'Hide' : 'Show'} AI Search
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="w-4 h-4 mr-1.5" />
-              Filters
-            </Button>
-          </div>
+          {/* Regenerate Embeddings Button - useful when switching models or updating ticket content */}
+          <button
+            onClick={handleRegenerateEmbeddings}
+            disabled={regeneratingEmbeddings}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg
+              bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300
+              hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors
+              disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Regenerate AI embeddings for better semantic search"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            {regeneratingEmbeddings ? 'Regenerating...' : 'Refresh AI Index'}
+          </button>
         </div>
 
-        {/* Filters */}
-        {showFilters && (
-          <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Search</Label>
-                <Input
-                  placeholder="Search tickets..."
-                  value={filters.search}
-                  onChange={(e) => updateFilters({ ...filters, search: e.target.value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent</Label>
-                <select
-                  value={filters.agent}
-                  onChange={(e) => updateFilters({ ...filters, agent: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">All agents</option>
-                  {agents.map(agent => (
-                    <option key={agent._id} value={agent._id}>{agent.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => updateFilters({ ...filters, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">All statuses</option>
-                  <option value="Selected">Selected</option>
-                  <option value="Graded">Graded</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date From</Label>
-                <DatePicker
-                  value={filters.dateFrom}
-                  onChange={(value) => updateFilters({ ...filters, dateFrom: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date To</Label>
-                <DatePicker
-                  value={filters.dateTo}
-                  onChange={(value) => updateFilters({ ...filters, dateTo: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateFilters({
-                    agent: '',
-                    status: '',
-                    isArchived: false,
-                    dateFrom: '',
-                    dateTo: '',
-                    scoreMin: 0,
-                    scoreMax: 100,
-                    search: ''
-                  })}
-                  className="w-full"
-                >
-                  <X className="w-4 h-4 mr-1.5" />
-                  Clear Filters
-                </Button>
+        {loading ? (
+          isAISearch ? (
+            // Custom AI search loading state
+            <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-12">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="relative">
+                  <Sparkles className="w-8 h-8 text-purple-500 animate-pulse" />
+                  <div className="absolute inset-0 w-8 h-8 border-2 border-purple-500/30 rounded-full animate-ping" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">Searching with AI...</p>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Finding semantically similar tickets</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {loading ? (
-          <LoadingSkeleton />
+          ) : (
+            <LoadingSkeleton />
+          )
         ) : tickets.length === 0 ? (
           <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg">
             <EmptyState
               icon={Archive}
-              title="No archived tickets"
-              description="Archived tickets will appear here."
+              title={isAISearch ? "No matching tickets found" : "No archived tickets"}
+              description={isAISearch
+                ? "Try different search terms or check if tickets have embeddings generated."
+                : "Archived tickets will appear here."}
             />
           </div>
         ) : (
@@ -1282,6 +1347,9 @@ const QAManager = () => {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
                 <tr>
+                  {isAISearch && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Match</th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Agent</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Status</th>
@@ -1303,6 +1371,23 @@ const QAManager = () => {
                       setViewDialog({ open: true, ticket });
                     }}
                   >
+                    {isAISearch && (
+                      <td className="px-4 py-4">
+                        <div
+                          className="flex items-center gap-1.5 cursor-help"
+                          title={`Hybrid: ${ticket.relevanceScore}%\nSemantic: ${ticket.semanticScore || '-'}%\nKeyword: ${ticket.keywordScore || '-'}%`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                          <span className={`text-xs font-semibold ${
+                            ticket.relevanceScore >= 70 ? 'text-green-600 dark:text-green-400' :
+                            ticket.relevanceScore >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-gray-500 dark:text-neutral-400'
+                          }`}>
+                            {ticket.relevanceScore}%
+                          </span>
+                        </div>
+                      </td>
+                    )}
                     <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{ticket.agent?.name || 'Unknown'}</td>
                     <td className="px-6 py-4">
@@ -1482,6 +1567,151 @@ const QAManager = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Add Existing Agent Dialog Component
+  const AddExistingAgentDialog = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredAgents = allExistingAgents.filter(agent =>
+      !agents.some(a => a._id === agent._id) && // Not already in user's list
+      agent.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <Dialog open={addExistingAgentDialog.open} onOpenChange={(open) => setAddExistingAgentDialog({ open })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Add Existing Agent</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-neutral-300 mb-2">Search agents</Label>
+              <Input
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {filteredAgents.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-neutral-400 text-center py-4">
+                  No agents found
+                </p>
+              ) : (
+                filteredAgents.map(agent => (
+                  <button
+                    key={agent._id}
+                    onClick={() => handleAddExistingAgent(agent._id)}
+                    className="w-full p-3 text-left border border-gray-200 dark:border-neutral-800 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                        {agent.name?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{agent.name}</p>
+                        {agent.position && (
+                          <p className="text-xs text-gray-500 dark:text-neutral-400">{agent.position}</p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setAddExistingAgentDialog({ open: false })}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Similar Agent Confirmation Dialog
+  const SimilarAgentDialog = () => {
+    const [selectedAgent, setSelectedAgent] = useState(null);
+
+    return (
+      <Dialog open={similarAgentDialog.open} onOpenChange={(open) => setSimilarAgentDialog({ ...similarAgentDialog, open })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Similar Agent Found</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-neutral-400">
+              We found similar agents in the system. Did you want to add one of these existing agents?
+            </p>
+            <div className="space-y-2">
+              {similarAgentDialog.similarAgents.map(agent => (
+                <label
+                  key={agent._id}
+                  className="flex items-center gap-3 p-3 border border-gray-200 dark:border-neutral-800 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="similarAgent"
+                    value={agent._id}
+                    checked={selectedAgent === agent._id}
+                    onChange={() => setSelectedAgent(agent._id)}
+                    className="text-black dark:text-white"
+                  />
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                      {agent.name?.charAt(0) || '?'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{agent.name}</p>
+                      {agent.position && (
+                        <p className="text-xs text-gray-500 dark:text-neutral-400">{agent.position}</p>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 p-3 border border-gray-200 dark:border-neutral-800 rounded-lg">
+              <input
+                type="radio"
+                name="similarAgent"
+                value="create-new"
+                checked={selectedAgent === 'create-new'}
+                onChange={() => setSelectedAgent('create-new')}
+                className="text-black dark:text-white"
+              />
+              <label className="text-sm text-gray-700 dark:text-neutral-300 cursor-pointer">
+                No, create new agent: <strong>{similarAgentDialog.newAgentName}</strong>
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => {
+              setSimilarAgentDialog({ open: false, similarAgents: [], newAgentName: '', formData: null });
+              setSelectedAgent(null);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedAgent === 'create-new') {
+                  handleConfirmSimilarAgent(null);
+                } else if (selectedAgent) {
+                  handleConfirmSimilarAgent(selectedAgent);
+                }
+                setSelectedAgent(null);
+              }}
+              disabled={!selectedAgent}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
@@ -1893,17 +2123,28 @@ const QAManager = () => {
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent className="bg-white dark:bg-neutral-900 max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Delete</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+              {deleteDialog.type === 'agent' ? 'Remove from Grading List' : 'Confirm Delete'}
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600 dark:text-neutral-400">
-            Are you sure you want to delete <strong className="text-gray-900 dark:text-white">{deleteDialog.name}</strong>? This action cannot be undone.
+            {deleteDialog.type === 'agent' ? (
+              <>
+                Are you sure you want to remove <strong className="text-gray-900 dark:text-white">{deleteDialog.name}</strong> from your grading list?
+                The agent and their tickets will remain in the system.
+              </>
+            ) : (
+              <>
+                Are you sure you want to delete <strong className="text-gray-900 dark:text-white">{deleteDialog.name}</strong>? This action cannot be undone.
+              </>
+            )}
           </p>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDeleteDialog({ open: false, type: null, id: null, name: '' })}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Delete
+              {deleteDialog.type === 'agent' ? 'Remove' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1952,6 +2193,12 @@ const QAManager = () => {
                 <BarChart3 className="w-4 h-4 inline mr-1.5" />
                 Analytics
               </TabsTrigger>
+              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+                <TabsTrigger value="all-agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                  <UsersRound className="w-4 h-4 inline mr-1.5" />
+                  All Agents
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
         </div>
@@ -1968,12 +2215,17 @@ const QAManager = () => {
             <TabsContent value="analytics">
               <QAAnalyticsDashboard />
             </TabsContent>
+            <TabsContent value="all-agents">
+              <QAAllAgents />
+            </TabsContent>
           </Tabs>
         </div>
       </div>
 
       {/* Dialogs */}
       {agentDialog.open && <AgentDialogContent />}
+      {addExistingAgentDialog.open && <AddExistingAgentDialog />}
+      {similarAgentDialog.open && <SimilarAgentDialog />}
       {ticketDialog.open && <TicketDialogContent />}
       {gradeDialog.open && <GradeDialogContent />}
       {feedbackDialog.open && <FeedbackDialogContent />}

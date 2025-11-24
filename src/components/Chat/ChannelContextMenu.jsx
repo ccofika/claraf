@@ -29,6 +29,7 @@ const ChannelContextMenu = ({
   const menuRef = useRef(null);
   const [showMuteSubmenu, setShowMuteSubmenu] = useState(false);
   const [showSectionSubmenu, setShowSectionSubmenu] = useState(false);
+  const [adjustedPosition, setAdjustedPosition] = useState(position);
 
   // Close menu on click outside
   useEffect(() => {
@@ -53,6 +54,46 @@ const ChannelContextMenu = ({
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
+
+  // Adjust menu position to avoid going off-screen
+  useEffect(() => {
+    if (!menuRef.current) return;
+
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const windowWidth = window.innerWidth;
+
+    let newX = position.x;
+    let newY = position.y;
+
+    // Check if menu goes beyond bottom edge
+    if (position.y + menuRect.height > windowHeight) {
+      // Position menu above cursor instead of below
+      newY = position.y - menuRect.height;
+
+      // If it still doesn't fit above, position it at the bottom of viewport
+      if (newY < 0) {
+        newY = windowHeight - menuRect.height - 10;
+      }
+    }
+
+    // Check if menu goes beyond right edge
+    if (position.x + menuRect.width > windowWidth) {
+      newX = windowWidth - menuRect.width - 10;
+    }
+
+    // Check if menu goes beyond left edge
+    if (newX < 0) {
+      newX = 10;
+    }
+
+    // Check if menu goes beyond top edge
+    if (newY < 0) {
+      newY = 10;
+    }
+
+    setAdjustedPosition({ x: newX, y: newY });
+  }, [position, showMuteSubmenu, showSectionSubmenu]);
 
   const handleAction = async (action, ...args) => {
     try {
@@ -123,10 +164,10 @@ const ChannelContextMenu = ({
   ];
 
   const muteOptions = [
+    { label: 'For 15 minutes', duration: 0.25 },
     { label: 'For 1 hour', duration: 1 },
-    { label: 'For 2 hours', duration: 2 },
     { label: 'For 8 hours', duration: 8 },
-    { label: 'Until tomorrow', duration: 24 },
+    { label: 'For 24 hours', duration: 24 },
     { label: 'Forever', duration: -1 }
   ];
 
@@ -135,8 +176,8 @@ const ChannelContextMenu = ({
       ref={menuRef}
       className="fixed z-50 w-64 bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-neutral-700 shadow-lg py-1"
       style={{
-        top: `${position.y}px`,
-        left: `${position.x}px`,
+        top: `${adjustedPosition.y}px`,
+        left: `${adjustedPosition.x}px`,
       }}
     >
       {menuItems.map((item, index) => {
@@ -183,7 +224,14 @@ const ChannelContextMenu = ({
             {/* Mute Submenu */}
             {item.label === 'Mute notifications' && item.hasSubmenu && showMuteSubmenu && (
               <div
-                className="absolute left-full top-0 ml-1 w-56 bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-neutral-700 shadow-lg py-1"
+                className="absolute w-56 bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-neutral-700 shadow-lg py-1"
+                style={{
+                  left: adjustedPosition.x + 256 + 56 > window.innerWidth ? 'auto' : '100%',
+                  right: adjustedPosition.x + 256 + 56 > window.innerWidth ? '100%' : 'auto',
+                  top: 0,
+                  marginLeft: adjustedPosition.x + 256 + 56 > window.innerWidth ? 0 : '4px',
+                  marginRight: adjustedPosition.x + 256 + 56 > window.innerWidth ? '4px' : 0,
+                }}
               >
                 {isMuted ? (
                   <button
@@ -211,7 +259,14 @@ const ChannelContextMenu = ({
             {/* Section Submenu */}
             {item.label === 'Add to section' && item.hasSubmenu && showSectionSubmenu && (
               <div
-                className="absolute left-full top-0 ml-1 w-56 bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-neutral-700 shadow-lg py-1"
+                className="absolute w-56 bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-neutral-700 shadow-lg py-1"
+                style={{
+                  left: adjustedPosition.x + 256 + 56 > window.innerWidth ? 'auto' : '100%',
+                  right: adjustedPosition.x + 256 + 56 > window.innerWidth ? '100%' : 'auto',
+                  top: 0,
+                  marginLeft: adjustedPosition.x + 256 + 56 > window.innerWidth ? 0 : '4px',
+                  marginRight: adjustedPosition.x + 256 + 56 > window.innerWidth ? '4px' : 0,
+                }}
               >
                 {sections.map((section) => (
                   <button

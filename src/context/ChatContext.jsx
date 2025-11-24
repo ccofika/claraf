@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import axios from 'axios';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
+import { useNotification } from './NotificationContext';
 import { toast } from 'sonner';
 
 const ChatContext = createContext();
@@ -17,6 +18,7 @@ export const useChat = () => {
 export const ChatProvider = ({ children }) => {
   const { user, token } = useAuth();
   const { socket, isConnected } = useSocket();
+  const { showMessageNotification, showMentionNotification, permission } = useNotification();
 
   // State
   const [channels, setChannels] = useState([]);
@@ -34,6 +36,7 @@ export const ChatProvider = ({ children }) => {
   const [starredChannels, setStarredChannels] = useState([]);
   const [recentChannels, setRecentChannels] = useState([]);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+  const [mutedChannels, setMutedChannels] = useState([]); // Track muted channels
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -51,6 +54,35 @@ export const ChatProvider = ({ children }) => {
     const total = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
     setTotalUnreadCount(total);
   }, [unreadCounts]);
+
+  // Fetch muted channels
+  const fetchMutedChannels = useCallback(async () => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
+
+    try {
+      const { data } = await axios.get(`${API_URL}/api/chat/muted`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      setMutedChannels(data.mutedChannels.map(mc => mc.channel._id || mc.channel));
+    } catch (error) {
+      console.error('Error fetching muted channels:', error);
+    }
+  }, [API_URL]);
+
+  // Check if channel is muted
+  const isChannelMuted = useCallback((channelId) => {
+    return mutedChannels.includes(channelId);
+  }, [mutedChannels]);
+
+  // Check if message mentions current user
+  const messageHasMention = useCallback((message) => {
+    if (!message?.content || !user?.name) return false;
+
+    // Check for @username or @all mentions
+    const mentionPattern = new RegExp(`@(${user.name}|all)\\b`, 'i');
+    return mentionPattern.test(message.content);
+  }, [user]);
 
   // Fetch channels
   const fetchChannels = useCallback(async () => {
@@ -156,10 +188,13 @@ export const ChatProvider = ({ children }) => {
 
       // Emit socket event for real-time delivery to OTHER users
       if (socket && isConnected) {
+        console.log('📡 Emitting chat:message:send', { channelId, messageId: response.data._id });
         socket.emit('chat:message:send', {
           channelId,
           message: response.data
         });
+      } else {
+        console.warn('⚠️ Socket not connected, cannot emit message', { socket: !!socket, isConnected });
       }
 
       return response.data;
@@ -687,21 +722,32 @@ export const ChatProvider = ({ children }) => {
       // Fetch channels immediately
       fetchChannels();
       setIsChatInitialized(true);
-
-      // Also initialize socket if available
-      if (socket && isConnected) {
-        socket.emit('chat:init');
-
-        socket.on('chat:init:success', () => {
-          console.log('✅ Chat socket initialized successfully');
-        });
-
-        return () => {
-          socket.off('chat:init:success');
-        };
-      }
     }
-  }, [user, socket, isConnected, isChatInitialized, fetchChannels]);
+  }, [user, isChatInitialized, fetchChannels]);
+
+  // Listen for chat initialization success
+  useEffect(() => {
+    if (!socket || !isConnected || !isChatInitialized) return;
+
+    // Note: chat:init is now emitted automatically in SocketContext after 'authenticated' event
+    // This ensures it happens on both initial connection AND reconnections
+
+    const handleInitSuccess = (data) => {
+      console.log('✅ Chat socket initialized - joined all channels', data);
+    };
+
+    const handleChatError = (error) => {
+      console.error('❌ Chat error:', error);
+    };
+
+    socket.on('chat:init:success', handleInitSuccess);
+    socket.on('chat:error', handleChatError);
+
+    return () => {
+      socket.off('chat:init:success', handleInitSuccess);
+      socket.off('chat:error', handleChatError);
+    };
+  }, [socket, isConnected, isChatInitialized]);
 
   // Restore active channel after channels are loaded (after refresh)
   useEffect(() => {
@@ -734,12 +780,62 @@ export const ChatProvider = ({ children }) => {
     }
   }, [activeChannel]);
 
+  // Create activity entry (must be before socket listeners that use it)
+  const createActivity = useCallback(async (message, channel, type = 'message') => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
+
+    try {
+      await axios.post(
+        `${API_URL}/api/activities`,
+        {
+          type,
+          channelId: channel._id,
+          messageId: message._id,
+          triggeredById: message.sender._id,
+          metadata: {
+            excerpt: message.content?.substring(0, 200) || '',
+            emoji: type === 'reaction' ? message.metadata?.emoji : undefined
+          }
+        },
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+    } catch (error) {
+      console.error('Error creating activity:', error);
+    }
+  }, [API_URL]);
+
+  // Refs for stable values in socket handlers
+  const channelsRef = React.useRef(channels);
+  const activeChannelRef = React.useRef(activeChannel);
+  const userRef = React.useRef(user);
+  const permissionRef = React.useRef(permission);
+
+  React.useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
+
+  React.useEffect(() => {
+    activeChannelRef.current = activeChannel;
+  }, [activeChannel]);
+
+  React.useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  React.useEffect(() => {
+    permissionRef.current = permission;
+  }, [permission]);
+
   // Socket event listeners
   useEffect(() => {
     if (!socket || !isConnected) return;
 
+    console.log('🎧 Registering socket event listeners...');
+
     // Message received
-    socket.on('chat:message:received', (data) => {
+    const handleMessageReceived = (data) => {
+      console.log('🔔 SOCKET EVENT: chat:message:received', data);
       const { channelId, message } = data;
 
       setMessages(prev => {
@@ -749,22 +845,62 @@ export const ChatProvider = ({ children }) => {
         const messageExists = existingMessages.some(msg => msg._id === message._id);
 
         if (messageExists) {
-          console.log('⚠️ Message already exists, skipping duplicate:', message._id);
+          // Don't log if it's from the sender (expected duplicate from local add + socket echo)
+          if (message.sender?._id !== userRef.current?._id) {
+            console.log('⚠️ Message already exists, skipping duplicate:', message._id);
+          }
           return prev;
         }
 
+        console.log('✅ Adding new message to state:', message._id);
         return {
           ...prev,
           [channelId]: [...existingMessages, message]
         };
       });
 
+      // Find the channel for this message
+      const channel = channelsRef.current.find(ch => ch._id === channelId);
+
       // Update unread count if not in active channel
-      if (!activeChannel || activeChannel._id !== channelId) {
+      const isInActiveChannel = activeChannelRef.current && activeChannelRef.current._id === channelId;
+      if (!isInActiveChannel) {
         setUnreadCounts(prev => ({
           ...prev,
           [channelId]: (prev[channelId] || 0) + 1
         }));
+
+        // Show browser notification if:
+        // 1. Channel is not muted
+        // 2. Message is from another user (not self)
+        // 3. Permission is granted
+        // Note: forceShow=true allows notifications even when window is focused (for cross-channel messages)
+        if (channel && !isChannelMuted(channelId) && message.sender?._id !== userRef.current?._id && permissionRef.current === 'granted') {
+          const hasMention = messageHasMention(message);
+
+          console.log('🔔 Showing browser notification for message in channel:', channelId);
+
+          // Show mention notification (higher priority) or regular message notification
+          if (hasMention) {
+            showMentionNotification(message, channel, () => {
+              // On click, switch to this channel
+              setActiveChannel(channel);
+            }, true); // forceShow=true for mentions
+          } else if (channel.type === 'dm') {
+            // Always notify for DMs
+            showMessageNotification(message, channel, () => {
+              setActiveChannel(channel);
+            }, true); // forceShow=true for DMs
+          } else if (channel.type === 'group') {
+            // Notify for group messages
+            showMessageNotification(message, channel, () => {
+              setActiveChannel(channel);
+            }, true); // forceShow=true for group messages in inactive channels
+          }
+
+          // Activity creation is handled by backend automatically
+          // No need to call from frontend
+        }
       }
 
       // Update channel's last message
@@ -776,7 +912,9 @@ export const ChatProvider = ({ children }) => {
             : ch;
         })
       );
-    });
+    };
+
+    socket.on('chat:message:received', handleMessageReceived);
 
     // Message edited
     socket.on('chat:message:edited', (data) => {
@@ -862,7 +1000,8 @@ export const ChatProvider = ({ children }) => {
     });
 
     return () => {
-      socket.off('chat:message:received');
+      console.log('🔌 Cleaning up socket event listeners...');
+      socket.off('chat:message:received', handleMessageReceived);
       socket.off('chat:message:edited');
       socket.off('chat:message:deleted');
       socket.off('chat:typing:update');
@@ -872,18 +1011,11 @@ export const ChatProvider = ({ children }) => {
       socket.off('chat:channel:updated');
       socket.off('chat:channel:deleted');
     };
-  }, [socket, isConnected, activeChannel, fetchMessages]);
+  }, [socket, isConnected]); // Minimal dependencies to avoid re-registering
 
-  // Join/leave channel rooms
-  useEffect(() => {
-    if (!socket || !isConnected || !activeChannel) return;
-
-    socket.emit('chat:channel:join', activeChannel._id);
-
-    return () => {
-      socket.emit('chat:channel:leave', activeChannel._id);
-    };
-  }, [socket, isConnected, activeChannel]);
+  // Note: Users are automatically joined to ALL their channels via chat:init on backend
+  // No need to join/leave individual channel rooms when switching views
+  // This ensures users receive real-time messages from all channels, not just the active one
 
   // Fetch messages when active channel changes
   useEffect(() => {
@@ -896,15 +1028,6 @@ export const ChatProvider = ({ children }) => {
     }
   }, [activeChannel]);
 
-  // Mark as read when active channel changes
-  useEffect(() => {
-    if (activeChannel) {
-      markAsRead(activeChannel._id);
-      // Track as recent channel
-      updateRecentChannels(activeChannel);
-    }
-  }, [activeChannel, markAsRead]);
-
   // Update recent channels when active channel changes
   const updateRecentChannels = useCallback((channel) => {
     setRecentChannels(prev => {
@@ -914,6 +1037,15 @@ export const ChatProvider = ({ children }) => {
       return [channel, ...filtered].slice(0, 10); // Keep max 10 recent
     });
   }, []);
+
+  // Mark as read when active channel changes
+  useEffect(() => {
+    if (activeChannel) {
+      markAsRead(activeChannel._id);
+      // Track as recent channel
+      updateRecentChannels(activeChannel);
+    }
+  }, [activeChannel?._id, markAsRead, updateRecentChannels]); // Include stable callback dependencies
 
   // Star/Unstar channel
   const toggleStarChannel = useCallback(async (channelId) => {
@@ -1063,8 +1195,9 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       fetchStarredChannels();
+      fetchMutedChannels();
     }
-  }, [user, fetchStarredChannels]);
+  }, [user, fetchStarredChannels, fetchMutedChannels]);
 
   const value = {
     // State
@@ -1105,7 +1238,9 @@ export const ChatProvider = ({ children }) => {
     getChannelById: (id) => channels.find(ch => ch._id === id),
     getUnreadCount: (id) => unreadCounts[id] || 0,
     getUserPresence: (userId) => userPresence[userId] || { status: 'offline' },
-    isChannelStarred: (id) => starredChannels.some(ch => ch._id === id)
+    isChannelStarred: (id) => starredChannels.some(ch => ch._id === id),
+    isChannelMuted,
+    fetchMutedChannels
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useSocket } from '../../context/SocketContext';
-import { Send, Paperclip, Smile, X, Loader2, File, Plus, FileText, Folder } from 'lucide-react';
+import { Send, Paperclip, Smile, X, Loader2, Plus, FileText, Folder } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
+import { File as FileIcon } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import FormattingToolbar from './FormattingToolbar';
 import MentionDropdown from './MentionDropdown';
@@ -13,10 +15,20 @@ const ChatInput = () => {
   const { activeChannel, sendMessage, replyingTo, setReplyingTo } = useChat();
   const { socket, isConnected } = useSocket();
   const [content, setContent] = useState('');
+  // Load draft messages from localStorage on mount
+  const [draftMessages, setDraftMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('chatDrafts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showAddContentModal, setShowAddContentModal] = useState(false);
@@ -65,6 +77,98 @@ const ChatInput = () => {
     };
   }, [socket, isConnected, activeChannel, isTyping]);
 
+  // Save draft message when content changes
+  useEffect(() => {
+    if (activeChannel?._id) {
+      setDraftMessages(prev => ({
+        ...prev,
+        [activeChannel._id]: content
+      }));
+    }
+  }, [content, activeChannel?._id]);
+
+  // Load draft message when channel changes
+  useEffect(() => {
+    if (activeChannel?._id) {
+      const draft = draftMessages[activeChannel._id] || '';
+      setContent(draft);
+    }
+  }, [activeChannel?._id]);
+
+  // Persist draft messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatDrafts', JSON.stringify(draftMessages));
+    } catch (error) {
+      console.error('Failed to save drafts to localStorage:', error);
+    }
+  }, [draftMessages]);
+
+  // Handle clipboard paste (for screenshots)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      // Only handle paste when input area is focused or when textarea is focused
+      if (!activeChannel) return;
+
+      const isTextareaFocused = document.activeElement === inputRef.current;
+
+      // Only process if textarea is focused
+      if (!isTextareaFocused) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Look for image in clipboard
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault();
+
+          const blob = item.getAsFile();
+          if (!blob) continue;
+
+          // Create a File object with a proper name
+          const timestamp = new Date().getTime();
+          const file = new File([blob], `screenshot-${timestamp}.png`, {
+            type: blob.type,
+            lastModified: timestamp
+          });
+
+          console.log('📋 Pasted image from clipboard:', file.name);
+          setSelectedFile(file);
+          toast.success('Screenshot pasted! Ready to send.');
+          break;
+        }
+      }
+    };
+
+    // Add paste listener to document (captures all paste events)
+    document.addEventListener('paste', handlePaste);
+
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [activeChannel]);
+
+  // Create preview URL for selected file (if it's an image)
+  useEffect(() => {
+    if (selectedFile) {
+      // Check if file is an image
+      if (selectedFile.type.startsWith('image/')) {
+        const url = URL.createObjectURL(selectedFile);
+        setFilePreviewUrl(url);
+
+        // Cleanup URL when component unmounts or file changes
+        return () => URL.revokeObjectURL(url);
+      } else {
+        setFilePreviewUrl(null);
+      }
+    } else {
+      setFilePreviewUrl(null);
+    }
+  }, [selectedFile]);
+
   const handleSend = async () => {
     if (!content.trim() || !activeChannel) return;
 
@@ -74,6 +178,11 @@ const ChatInput = () => {
 
       await sendMessage(activeChannel._id, content.trim(), 'text', metadata);
       setContent('');
+      // Clear draft for this channel
+      setDraftMessages(prev => ({
+        ...prev,
+        [activeChannel._id]: ''
+      }));
       setIsTyping(false);
       setReplyingTo(null); // Clear reply after sending
 
@@ -119,7 +228,11 @@ const ChatInput = () => {
 
     const beforeMention = content.substring(0, mentionStartPos);
     const afterMention = content.substring(inputRef.current.selectionStart);
-    const newContent = `${beforeMention}@${member.name} ${afterMention}`;
+
+    // Wrap mention with invisible zero-width markers to identify exact boundaries
+    // \u200B = zero-width space (invisible but detectable)
+    const mentionText = `\u200B@${member.name}\u200B`;
+    const newContent = `${beforeMention}${mentionText} ${afterMention}`;
 
     setContent(newContent);
     setShowMentionDropdown(false);
@@ -272,6 +385,11 @@ const ChatInput = () => {
 
       // Clear inputs
       setContent('');
+      // Clear draft for this channel
+      setDraftMessages(prev => ({
+        ...prev,
+        [activeChannel._id]: ''
+      }));
       setSelectedFile(null);
       setSelectedElement(null);
       setSelectedTicket(null);
@@ -357,21 +475,37 @@ const ChatInput = () => {
 
         {/* Selected File Preview */}
         {selectedFile && (
-          <div className="mb-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-[#1164A3] flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <File className="w-4 h-4 text-[#1164A3] flex-shrink-0" />
+          <div className="mb-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-[#1164A3] flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 flex-1 min-w-0">
+              {filePreviewUrl ? (
+                // Image thumbnail preview
+                <div className="flex-shrink-0">
+                  <img
+                    src={filePreviewUrl}
+                    alt="Preview"
+                    className="w-16 h-16 object-cover rounded border border-[#1164A3]/20"
+                  />
+                </div>
+              ) : (
+                // File icon for non-images
+                <FileIcon className="w-4 h-4 text-[#1164A3] flex-shrink-0 mt-1" />
+              )}
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
-                  {selectedFile.name}
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {filePreviewUrl && <ImageIcon className="w-3.5 h-3.5 text-[#1164A3]" />}
+                  <div className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
+                    {selectedFile.name}
+                  </div>
                 </div>
                 <div className="text-[11px] text-gray-600 dark:text-neutral-400">
                   {(selectedFile.size / 1024).toFixed(2)} KB
+                  {filePreviewUrl && ' • Image'}
                 </div>
               </div>
             </div>
             <button
               onClick={handleRemoveFile}
-              className="ml-2 p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+              className="flex-shrink-0 p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
             >
               <X className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
             </button>
@@ -450,7 +584,7 @@ const ChatInput = () => {
               {/* Mention Dropdown */}
               {showMentionDropdown && activeChannel?.members && (
                 <MentionDropdown
-                  members={activeChannel.members}
+                  members={activeChannel.members.map(m => m.userId || m).filter(u => u && u._id)}
                   onSelect={handleMentionSelect}
                   searchQuery={mentionSearchQuery}
                 />

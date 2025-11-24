@@ -25,6 +25,7 @@ export const SocketProvider = ({ children }) => {
     if (!user) {
       // Clean up socket if user logs out
       if (socketRef.current) {
+        console.log('🔌 Disconnecting socket (user logged out)');
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);
@@ -32,6 +33,14 @@ export const SocketProvider = ({ children }) => {
       }
       return;
     }
+
+    // Only create socket once when user first logs in
+    if (socketRef.current) {
+      console.log('🔌 Socket already exists, skipping creation');
+      return;
+    }
+
+    console.log('🔌 Creating new socket connection for user:', user.email);
 
     // Create socket connection
     const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
@@ -47,24 +56,38 @@ export const SocketProvider = ({ children }) => {
 
     // Connection event handlers
     newSocket.on('connect', () => {
-      console.log('🔌 Socket connected');
+      console.log('🔌 Socket connected (ID:', newSocket.id, ')');
       setIsConnected(true);
 
       // Authenticate socket
       const token = localStorage.getItem('token');
       if (token) {
+        console.log('🔐 Sending authentication...');
         newSocket.emit('authenticate', { token });
       }
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('🔌 Socket disconnected');
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected - Reason:', reason);
       setIsConnected(false);
       setWorkspaceUsers([]);
     });
 
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+    });
+
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 Socket reconnection attempt:', attemptNumber);
+    });
+
     newSocket.on('authenticated', (data) => {
       console.log('🔐 Socket authenticated:', data);
+
+      // IMPORTANT: Re-initialize chat on every authentication (including reconnections)
+      // This ensures user rejoins all chat channels after reconnection
+      console.log('🔄 Emitting chat:init after authentication...');
+      newSocket.emit('chat:init');
     });
 
     newSocket.on('auth_error', (error) => {
@@ -96,10 +119,11 @@ export const SocketProvider = ({ children }) => {
 
     return () => {
       if (newSocket) {
+        console.log('🔌 Cleaning up socket (component unmount)');
         newSocket.disconnect();
       }
     };
-  }, [user]);
+  }, [user?._id]); // Only depend on user ID, not entire user object
 
   // Join workspace
   const joinWorkspace = useCallback((workspaceId) => {

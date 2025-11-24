@@ -6,11 +6,14 @@ const MentionDropdown = ({ members, onSelect, position, searchQuery }) => {
 
   // Filter members based on search query
   const filteredMembers = members.filter((member) => {
+    // Safety check - skip if member doesn't have required fields
+    if (!member || !member.name) return false;
+
     const query = searchQuery.toLowerCase();
-    return (
-      member.name.toLowerCase().includes(query) ||
-      member.email.toLowerCase().includes(query)
-    );
+    const name = (member.name || '').toLowerCase();
+    const email = (member.email || '').toLowerCase();
+
+    return name.includes(query) || email.includes(query);
   });
 
   // Close on click outside

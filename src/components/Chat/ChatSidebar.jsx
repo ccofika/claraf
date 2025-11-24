@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
-import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive, Star, MessageSquare, Bell, BellOff } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive, Star, MessageSquare, Bell, BellOff, MoreVertical } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import PresenceIndicator from './PresenceIndicator';
 import ChannelContextMenu from './ChannelContextMenu';
@@ -11,6 +12,7 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onChatViewChange }) => {
+  const { user } = useAuth();
   const {
     channels,
     activeChannel,
@@ -215,22 +217,33 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
           break;
 
         case 'copyLink':
-          const link = `${window.location.origin}/chat?channel=${channelId}`;
+          const link = `${window.location.origin}/chat/${channelId}`;
           navigator.clipboard.writeText(link);
           break;
 
         case 'addToSection':
           const sectionId = args[0];
-          await axios.post(
+          console.log('📌 Adding channel to section:', { channelId, sectionId });
+
+          const addResponse = await axios.post(
             `${API_URL}/api/sections/${sectionId}/channels`,
             { channelId },
             { headers: { Authorization: `Bearer ${token}` } }
           );
+
+          console.log('✅ Channel added to section:', addResponse.data);
+
           // Refresh sections to show updated channel list
           const { data } = await axios.get(`${API_URL}/api/sections`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           setSections(data.sections || []);
+
+          // Show success message
+          const addedSection = sections.find(s => s._id === sectionId);
+          if (addedSection) {
+            alert(`Channel added to section "${addedSection.name}"`);
+          }
           break;
 
         default:
@@ -302,9 +315,9 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
   const getChannelName = (channel) => {
     if (channel.name) return channel.name;
 
-    // For DMs, show other user's name
-    if (channel.type === 'dm' && channel.members?.length === 2) {
-      const otherMember = channel.members.find(m => m.userId._id !== channel._id);
+    // For DMs, show other user's name (not the current user)
+    if (channel.type === 'dm' && channel.members?.length >= 2 && user?._id) {
+      const otherMember = channel.members.find(m => m.userId?._id && m.userId._id !== user._id);
       return otherMember?.userId?.name || 'Unknown User';
     }
 
@@ -342,11 +355,12 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
     const unreadCount = getUnreadCount(channel._id);
     const isStarred = isChannelStarred(channel._id);
     const isMuted = isChannelMuted(channel._id);
+    const [isHovered, setIsHovered] = useState(false);
 
     // Get other user ID for DM channels
     const getOtherUserId = () => {
-      if (channel.type === 'dm' && channel.members?.length === 2) {
-        const otherMember = channel.members.find(m => m.userId._id !== channel._id);
+      if (channel.type === 'dm' && channel.members?.length >= 2 && user?._id) {
+        const otherMember = channel.members.find(m => m.userId?._id && m.userId._id !== user._id);
         return otherMember?.userId?._id;
       }
       return null;
@@ -354,11 +368,22 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
 
     const handleStarClick = (e) => {
       e.stopPropagation(); // Prevent channel selection
+      e.preventDefault();
       toggleStarChannel(channel._id);
     };
 
+    const handleMenuClick = (e) => {
+      e.stopPropagation(); // Prevent channel selection
+      e.preventDefault();
+      handleContextMenu(e, channel);
+    };
+
     return (
-      <div className="group relative">
+      <div
+        className="relative group/channel"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <button
           onClick={() => setActiveChannel(channel)}
           onContextMenu={(e) => handleContextMenu(e, channel)}
@@ -385,13 +410,11 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 {/* Star icon (always visible for starred, on hover for others) */}
-                <button
+                <span
                   onClick={handleStarClick}
-                  className={`flex-shrink-0 ${
-                    isStarred
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  } transition-opacity`}
+                  className={`flex-shrink-0 transition-opacity cursor-pointer ${
+                    isStarred || isHovered ? 'opacity-100' : 'opacity-0'
+                  }`}
                 >
                   <Star
                     className={`w-3.5 h-3.5 ${
@@ -402,7 +425,7 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
                         : 'text-gray-400 dark:text-neutral-500 hover:text-yellow-400'
                     }`}
                   />
-                </button>
+                </span>
 
                 <span className={`text-[15px] truncate ${
                   isActive ? 'text-white font-bold' : 'font-normal'
@@ -418,13 +441,29 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
                 )}
               </div>
 
-              {channel.lastMessage?.timestamp && (
-                <span className={`text-[11px] flex-shrink-0 ${
-                  isActive ? 'text-white/80' : 'text-gray-500 dark:text-neutral-500'
-                }`}>
-                  {formatTime(channel.lastMessage.timestamp)}
+              <div className="flex items-center gap-1">
+                {channel.lastMessage?.timestamp && (
+                  <span className={`text-[11px] flex-shrink-0 ${
+                    isActive ? 'text-white/80' : 'text-gray-500 dark:text-neutral-500'
+                  }`}>
+                    {formatTime(channel.lastMessage.timestamp)}
+                  </span>
+                )}
+                {/* 3-dot menu button */}
+                <span
+                  onClick={handleMenuClick}
+                  className={`flex-shrink-0 p-0.5 rounded transition-opacity cursor-pointer ${
+                    isHovered ? 'opacity-100' : 'opacity-0'
+                  } ${
+                    isActive
+                      ? 'hover:bg-white/20 text-white'
+                      : 'hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-600 dark:text-neutral-400'
+                  }`}
+                  title="More options"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
                 </span>
-              )}
+              </div>
             </div>
 
             {channel.lastMessage?.content && (
@@ -611,8 +650,6 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
                   );
                   const isCollapsed = collapsedSections[section._id];
 
-                  if (sectionChannels.length === 0) return null;
-
                   return (
                     <div key={section._id} className="mb-3">
                       <SectionHeader
@@ -628,9 +665,20 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
                       />
                       {!isCollapsed && (
                         <div>
-                          {sectionChannels.map(channel => (
-                            <ChannelItem key={channel._id} channel={channel} />
-                          ))}
+                          {sectionChannels.length === 0 ? (
+                            <div className="px-4 py-3">
+                              <p className="text-[13px] text-gray-500 dark:text-neutral-500 italic text-center">
+                                No channels in this section
+                              </p>
+                              <p className="text-[11px] text-gray-400 dark:text-neutral-600 mt-1 text-center">
+                                Right-click a channel and select "Add to section"
+                              </p>
+                            </div>
+                          ) : (
+                            sectionChannels.map(channel => (
+                              <ChannelItem key={channel._id} channel={channel} />
+                            ))
+                          )}
                         </div>
                       )}
                     </div>

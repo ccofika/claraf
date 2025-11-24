@@ -45,27 +45,60 @@ const KYC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      console.log('⚠️ No token found - Socket.io not initialized');
+      return;
+    }
 
+    console.log('🔌 Initializing Socket.io connection...');
     const socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
       auth: { token },
       transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
+      console.log('✅ Socket.io connected', {
+        socketId: socket.id,
+        connected: socket.connected,
+        transport: socket.io.engine.transport.name
+      });
+
       const token = localStorage.getItem('token');
       if (token) {
+        console.log('🔐 Sending authentication...');
         socket.emit('authenticate', { token });
       }
     });
 
+    socket.on('authenticated', (data) => {
+      console.log('✅ Socket authenticated successfully:', data);
+    });
+
+    socket.on('auth_error', (error) => {
+      console.error('❌ Socket authentication failed:', error);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('🔌 Socket.io disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket.io connection error:', error);
+    });
+
     socket.on('thread-reply', (data) => {
+      console.log('🔔 Received thread-reply event:', {
+        threadTs: data.threadTs,
+        messageId: data.messageId,
+        replyText: data.reply?.text?.substring(0, 50) + '...'
+      });
       handleThreadReply(data);
     });
 
     socketRef.current = socket;
 
     return () => {
+      console.log('🔌 Disconnecting Socket.io...');
       socket.disconnect();
     };
   }, []);
@@ -232,25 +265,72 @@ const KYC = () => {
   };
 
   const handleThreadReply = (data) => {
+    console.log('🎯 Processing thread reply:', {
+      threadTs: data.threadTs,
+      messageId: data.messageId,
+      replyText: data.reply?.text?.substring(0, 50),
+      isFirstReply: data.isFirstReply
+    });
+
+    let messageUpdated = false;
+
     setMessages(prev => {
+      console.log('📋 Current messages in state:', prev.map(m => ({
+        id: m.id,
+        username: m.username,
+        threadTs: m.threadTs,
+        status: m.status
+      })));
+
+      // First try to find by messageId
       let targetMessage = prev.find(msg => msg.id === data.messageId);
 
+      // If not found by ID, search by threadTs
       if (!targetMessage) {
-        const messagesInThread = prev.filter(msg => msg.threadTs === data.threadTs);
+        console.log('ℹ️ Message not found by ID, searching by threadTs...');
+        const messagesInThread = prev.filter(msg => {
+          const match = msg.threadTs === data.threadTs;
+          console.log(`🔍 Comparing: msg.threadTs="${msg.threadTs}" vs data.threadTs="${data.threadTs}" => ${match}`);
+          return match;
+        });
+
+        console.log(`✅ Found ${messagesInThread.length} message(s) with threadTs ${data.threadTs}`);
+
+        // Find the latest pending message in this thread
         targetMessage = messagesInThread
           .filter(msg => msg.status === 'pending')
           .sort((a, b) => b.sentAt - a.sentAt)[0];
 
+        // If no pending messages, find the latest message (may already be answered)
+        if (!targetMessage && messagesInThread.length > 0) {
+          targetMessage = messagesInThread.sort((a, b) => b.sentAt - a.sentAt)[0];
+          console.log('ℹ️ No pending messages, using latest message:', targetMessage.status);
+        }
+
         if (!targetMessage) {
+          console.log('❌ No matching messages found!');
           return prev;
         }
+      }
+
+      // Check if this message is already answered/resolved
+      if (targetMessage.status === 'answered' || targetMessage.status === 'resolved') {
+        console.log('ℹ️ Message already has status:', targetMessage.status, '- updating reply only');
+      } else {
+        console.log('✅ Updating message to answered:', {
+          id: targetMessage.id,
+          username: targetMessage.username,
+          previousStatus: targetMessage.status,
+          newStatus: 'answered'
+        });
+        messageUpdated = true;
       }
 
       const updated = prev.map(msg => {
         if (msg.id === targetMessage.id) {
           return {
             ...msg,
-            status: 'answered',
+            status: targetMessage.status === 'resolved' ? 'resolved' : 'answered',
             reply: {
               text: data.reply.text,
               user: data.reply.user,
@@ -261,9 +341,17 @@ const KYC = () => {
         return msg;
       });
 
+      console.log('📊 Update complete. Total answered messages:',
+        updated.filter(m => m.status === 'answered').length
+      );
+
       return updated;
     });
-    toast.success('Reply received!');
+
+    // Only show toast if this actually updated a pending message
+    if (messageUpdated) {
+      toast.success('Reply received!');
+    }
   };
 
   const openThreadModal = async (msg) => {

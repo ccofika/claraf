@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import AppSidebar from '../components/AppSidebar';
@@ -9,12 +9,14 @@ import ChatMemberList from '../components/Chat/ChatMemberList';
 import QuickSwitcher from '../components/Chat/QuickSwitcher';
 import ActivityTab from '../components/Chat/ActivityTab';
 import ThreadPanel from '../components/Chat/ThreadPanel';
+import NotificationPrompt from '../components/Chat/NotificationPrompt';
 import axios from 'axios';
 
 const Chat = () => {
   const navigate = useNavigate();
+  const { channelId } = useParams();
   const { user } = useAuth();
-  const { activeChannel, threadMessage, setThreadMessage } = useChat();
+  const { activeChannel, threadMessage, setThreadMessage, channels, setActiveChannel } = useChat();
   const [showMemberList, setShowMemberList] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('chat');
@@ -66,6 +68,30 @@ const Chat = () => {
     // Navigate directly to section's route (VIP Calculator, Quick Links, etc.)
     navigate(`/${section}`);
   };
+
+  // Update active channel when URL channelId changes
+  useEffect(() => {
+    if (channelId && channels.length > 0) {
+      const channel = channels.find(ch => ch._id === channelId);
+      if (channel && (!activeChannel || activeChannel._id !== channelId)) {
+        console.log('📍 Setting active channel from URL:', channelId);
+        setActiveChannel(channel);
+      }
+    }
+  }, [channelId, channels]);
+
+  // Update URL when active channel changes
+  useEffect(() => {
+    if (activeChannel?._id) {
+      const currentPath = window.location.pathname;
+      const expectedPath = `/chat/${activeChannel._id}`;
+
+      if (currentPath !== expectedPath) {
+        console.log('📍 Updating URL to:', expectedPath);
+        navigate(expectedPath, { replace: true });
+      }
+    }
+  }, [activeChannel, navigate]);
 
   // Keyboard shortcut handler for Ctrl+K / Cmd+K
   useEffect(() => {
@@ -169,6 +195,9 @@ const Chat = () => {
         isOpen={showQuickSwitcher}
         onClose={() => setShowQuickSwitcher(false)}
       />
+
+      {/* Notification Permission Prompt */}
+      <NotificationPrompt />
     </div>
   );
 };

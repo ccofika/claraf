@@ -156,6 +156,26 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
         </div>
       )}
 
+      {/* Typing Indicator */}
+      {typingUsers && typingUsers.length > 0 && (
+        <div className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 bg-gray-50 dark:bg-[#1A1D21] border-t border-gray-200/60 dark:border-neutral-800/60">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              <span className="w-2 h-2 bg-gray-400 dark:bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-2 h-2 bg-gray-400 dark:bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-2 h-2 bg-gray-400 dark:bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+            </div>
+            <span>
+              {typingUsers.length === 1
+                ? `${typingUsers[0].name} is typing...`
+                : typingUsers.length === 2
+                ? `${typingUsers[0].name} and ${typingUsers[1].name} are typing...`
+                : `${typingUsers.length} people are typing...`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Chat Input */}
       <div className="flex-shrink-0">
         <ChatInput />
