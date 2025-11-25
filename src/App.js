@@ -26,6 +26,7 @@ import AffiliateBonusFinder from './pages/AffiliateBonusFinder';
 import KYC from './pages/KYC';
 import DeveloperDashboard from './pages/DeveloperDashboard';
 import QAManager from './pages/QAManager';
+import KYCAgentStats from './pages/KYCAgentStats';
 
 function App() {
   return (
@@ -120,6 +121,17 @@ function App() {
                       <PrivateRoute>
                         <PageLayout activeSection="qa-manager">
                           <QAManager />
+                        </PageLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/kyc-agent-stats"
+                    element={
+                      <PrivateRoute>
+                        <PageLayout activeSection="kyc-agent-stats">
+                          <KYCAgentStats />
                         </PageLayout>
                       </PrivateRoute>
                     }

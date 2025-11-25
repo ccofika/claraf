@@ -32,6 +32,7 @@ import {
   Time,
   CloseFilled,
   Chat as ChatBubble,
+  Analytics,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -113,6 +114,12 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
       icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />,
       label: 'QA Manager',
       isExternal: true // Flag to indicate this navigates externally
+    });
+    navItems.push({
+      id: 'kyc-agent-stats',
+      icon: <Analytics size={16} className="text-gray-900 dark:text-neutral-50" />,
+      label: 'KYC Agent Stats',
+      isExternal: true
     });
   }
 
