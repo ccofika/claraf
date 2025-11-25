@@ -499,15 +499,33 @@ const QAManager = () => {
         { ...getAuthHeaders(), responseType: 'blob' }
       );
 
-      const blob = new Blob([response.data], { type: 'text/csv' });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
 
-      const agent = agents.find(a => a._id === agentId);
-      const agentName = agent ? agent.name.replace(/\s+/g, '_') : 'agent';
-      const dateStr = `${weekStart.getMonth() + 1}-${weekStart.getDate()}-${weekStart.getFullYear()}`;
-      link.download = `${agentName}_maestro_${dateStr}.csv`;
+      // Get filename from Content-Disposition header if available
+      const contentDisposition = response.headers['content-disposition'];
+      let filename;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      if (!filename) {
+        const agent = agents.find(a => a._id === agentId);
+        const agentName = agent ? agent.name.replace(/\s+/g, '_') : 'agent';
+        const formatDate = (date) => {
+          const d = String(date.getDate()).padStart(2, '0');
+          const m = String(date.getMonth() + 1).padStart(2, '0');
+          const y = date.getFullYear();
+          return `${d}.${m}.${y}`;
+        };
+        filename = `${agentName}_${formatDate(weekStart)}_${formatDate(weekEnd)}.csv`;
+      }
+      link.download = filename;
 
       document.body.appendChild(link);
       link.click();
