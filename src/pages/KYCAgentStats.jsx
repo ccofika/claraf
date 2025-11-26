@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2,
   Calendar, Filter, RefreshCw, UserPlus, Settings, BarChart3,
-  Timer, Zap, Sun, Moon, Sunset
+  Timer, Zap, Sun, Moon, Sunset, MessageSquare, Activity,
+  ChevronDown, ChevronRight, Eye, MessageCircle, Hourglass
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -29,6 +30,13 @@ const KYCAgentStats = () => {
   const [shiftStats, setShiftStats] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [agentDetails, setAgentDetails] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  // Real-time state
+  const [isLive, setIsLive] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const pollingIntervalRef = useRef(null);
 
   // Filter state
   const [dateRange, setDateRange] = useState({
@@ -36,11 +44,17 @@ const KYCAgentStats = () => {
     endDate: getDateString(new Date())
   });
   const [selectedShift, setSelectedShift] = useState('');
+  const [activityFilter, setActivityFilter] = useState('all'); // all, ticket_taken, thread_reply
+  const [selectedAgentFilter, setSelectedAgentFilter] = useState('');
 
   // Dialog state
   const [addAgentDialog, setAddAgentDialog] = useState({ open: false });
   const [agentDetailDialog, setAgentDetailDialog] = useState({ open: false });
+  const [activityDetailDialog, setActivityDetailDialog] = useState({ open: false, activity: null });
   const [newAgent, setNewAgent] = useState({ name: '', email: '' });
+
+  // Expanded activities for showing details inline
+  const [expandedActivities, setExpandedActivities] = useState(new Set());
 
   // Helper function for date string
   function getDateString(date) {
@@ -61,6 +75,21 @@ const KYCAgentStats = () => {
     return `${hours}h ${mins}m`;
   }
 
+  // Format relative time
+  function formatRelativeTime(date) {
+    const now = new Date();
+    const diff = now - new Date(date);
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  }
+
   // Get shift label
   function getShiftLabel(shift) {
     switch (shift) {
@@ -78,6 +107,26 @@ const KYCAgentStats = () => {
       case 'afternoon': return <Sunset className="w-4 h-4 text-orange-500" />;
       case 'night': return <Moon className="w-4 h-4 text-blue-500" />;
       default: return null;
+    }
+  }
+
+  // Get activity type icon
+  function getActivityIcon(type) {
+    switch (type) {
+      case 'ticket_taken': return <Hourglass className="w-4 h-4 text-blue-500" />;
+      case 'thread_reply': return <MessageCircle className="w-4 h-4 text-green-500" />;
+      case 'message_sent': return <MessageSquare className="w-4 h-4 text-purple-500" />;
+      default: return <Activity className="w-4 h-4 text-gray-500" />;
+    }
+  }
+
+  // Get activity type label
+  function getActivityLabel(type) {
+    switch (type) {
+      case 'ticket_taken': return 'Took Ticket';
+      case 'thread_reply': return 'Replied';
+      case 'message_sent': return 'Sent Message';
+      default: return type;
     }
   }
 
@@ -109,25 +158,26 @@ const KYCAgentStats = () => {
   };
 
   // Fetch overview
-  const fetchOverview = async () => {
+  const fetchOverview = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/api/kyc-stats/overview`, {
         headers: { Authorization: `Bearer ${token}` },
         params: dateRange
       });
       setOverview(res.data.overview);
+      setLastUpdate(new Date());
     } catch (err) {
       console.error('Error fetching overview:', err);
-      toast.error('Failed to fetch overview');
+      if (showLoading) toast.error('Failed to fetch overview');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, [API_URL, dateRange]);
 
   // Fetch leaderboard
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/api/kyc-stats/leaderboard`, {
@@ -138,10 +188,10 @@ const KYCAgentStats = () => {
     } catch (err) {
       console.error('Error fetching leaderboard:', err);
     }
-  };
+  }, [API_URL, dateRange]);
 
   // Fetch shift stats
-  const fetchShiftStats = async () => {
+  const fetchShiftStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/api/kyc-stats/by-shift`, {
@@ -152,7 +202,31 @@ const KYCAgentStats = () => {
     } catch (err) {
       console.error('Error fetching shift stats:', err);
     }
-  };
+  }, [API_URL, dateRange, selectedShift]);
+
+  // Fetch activity feed
+  const fetchActivityFeed = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setActivityLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/api/kyc-stats/activity-feed`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          ...dateRange,
+          activityType: activityFilter !== 'all' ? activityFilter : undefined,
+          agentId: selectedAgentFilter || undefined,
+          limit: 100
+        }
+      });
+      setActivityFeed(res.data.activities || []);
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error('Error fetching activity feed:', err);
+      // Don't show error toast for background updates
+    } finally {
+      if (showLoading) setActivityLoading(false);
+    }
+  }, [API_URL, dateRange, activityFilter, selectedAgentFilter]);
 
   // Fetch agent details
   const fetchAgentDetails = async (agentId) => {
@@ -163,7 +237,8 @@ const KYCAgentStats = () => {
         params: dateRange
       });
       setAgentDetails(res.data);
-      setAgentDetailDialog({ open: true });
+      setSelectedAgent(agentId);
+      setActiveTab('agent-details');
     } catch (err) {
       console.error('Error fetching agent details:', err);
       toast.error('Failed to fetch agent details');
@@ -207,20 +282,72 @@ const KYCAgentStats = () => {
     }
   };
 
-  // Effects
+  // Toggle activity expansion
+  const toggleActivityExpansion = (activityId) => {
+    setExpandedActivities(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(activityId)) {
+        newSet.delete(activityId);
+      } else {
+        newSet.add(activityId);
+      }
+      return newSet;
+    });
+  };
+
+  // Refresh all data
+  const refreshAllData = useCallback(() => {
+    fetchOverview(false);
+    fetchLeaderboard();
+    fetchShiftStats();
+    if (activeTab === 'activity') {
+      fetchActivityFeed(false);
+    }
+    if (activeTab === 'agent-details' && selectedAgent) {
+      fetchAgentDetails(selectedAgent);
+    }
+  }, [fetchOverview, fetchLeaderboard, fetchShiftStats, fetchActivityFeed, activeTab, selectedAgent]);
+
+  // Setup polling for real-time updates
+  useEffect(() => {
+    if (isLive) {
+      // Initial fetch
+      refreshAllData();
+
+      // Setup polling every 10 seconds
+      pollingIntervalRef.current = setInterval(() => {
+        refreshAllData();
+      }, 10000);
+
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+        }
+      };
+    } else {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    }
+  }, [isLive, refreshAllData]);
+
+  // Initial fetch
   useEffect(() => {
     fetchConfigStatus();
     fetchAgents();
   }, []);
 
+  // Fetch data when tab changes
   useEffect(() => {
     if (activeTab === 'overview') {
       fetchOverview();
       fetchLeaderboard();
     } else if (activeTab === 'shifts') {
       fetchShiftStats();
+    } else if (activeTab === 'activity') {
+      fetchActivityFeed();
     }
-  }, [activeTab, dateRange, selectedShift]);
+  }, [activeTab, dateRange, selectedShift, activityFilter, selectedAgentFilter]);
 
   // Calculate totals
   const totals = overview.reduce((acc, item) => ({
@@ -242,6 +369,24 @@ const KYCAgentStats = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Live indicator */}
+            <button
+              onClick={() => setIsLive(!isLive)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors ${
+                isLive
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-neutral-400'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+              {isLive ? 'Live' : 'Paused'}
+            </button>
+
+            {/* Last update */}
+            <span className="text-xs text-gray-400 dark:text-neutral-500">
+              Updated {formatRelativeTime(lastUpdate)}
+            </span>
+
             {/* Config Status */}
             {configStatus && (
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
@@ -252,25 +397,22 @@ const KYCAgentStats = () => {
                 {configStatus.slackConnected ? (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Connected to Slack</span>
+                    <span>Connected</span>
                   </>
                 ) : (
                   <>
                     <AlertCircle className="w-4 h-4" />
-                    <span>Slack not configured</span>
+                    <span>Not configured</span>
                   </>
                 )}
               </div>
             )}
+
             <button
-              onClick={() => {
-                fetchOverview();
-                fetchLeaderboard();
-                fetchShiftStats();
-              }}
+              onClick={refreshAllData}
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             <button
@@ -402,6 +544,10 @@ const KYCAgentStats = () => {
               <BarChart3 className="w-4 h-4" />
               Overview
             </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Activity Feed
+            </TabsTrigger>
             <TabsTrigger value="leaderboard" className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
               Leaderboard
@@ -410,6 +556,12 @@ const KYCAgentStats = () => {
               <Clock className="w-4 h-4" />
               By Shift
             </TabsTrigger>
+            {selectedAgent && (
+              <TabsTrigger value="agent-details" className="flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                Agent Details
+              </TabsTrigger>
+            )}
             <TabsTrigger value="agents" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Manage Agents
@@ -449,7 +601,8 @@ const KYCAgentStats = () => {
                       overview.map((item) => (
                         <tr
                           key={item.agent._id}
-                          className="border-b border-gray-100 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                          className="border-b border-gray-100 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800/50 cursor-pointer"
+                          onClick={() => fetchAgentDetails(item.agent._id)}
                         >
                           <td className="p-4">
                             <div>
@@ -490,7 +643,10 @@ const KYCAgentStats = () => {
                           </td>
                           <td className="p-4 text-center">
                             <button
-                              onClick={() => fetchAgentDetails(item.agent._id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchAgentDetails(item.agent._id);
+                              }}
                               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                             >
                               View Details
@@ -505,6 +661,168 @@ const KYCAgentStats = () => {
             </div>
           </TabsContent>
 
+          {/* Activity Feed Tab */}
+          <TabsContent value="activity">
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-neutral-400">Filter:</span>
+                  </div>
+
+                  {/* Activity Type Filter */}
+                  <select
+                    value={activityFilter}
+                    onChange={(e) => setActivityFilter(e.target.value)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-neutral-800 rounded-lg border-0 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Activities</option>
+                    <option value="ticket_taken">Tickets Taken</option>
+                    <option value="thread_reply">Thread Replies</option>
+                  </select>
+
+                  {/* Agent Filter */}
+                  <select
+                    value={selectedAgentFilter}
+                    onChange={(e) => setSelectedAgentFilter(e.target.value)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-neutral-800 rounded-lg border-0 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Agents</option>
+                    {agents.map(agent => (
+                      <option key={agent._id} value={agent._id}>{agent.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Activity List */}
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800">
+                {activityLoading ? (
+                  <div className="p-8 text-center text-gray-500">Loading activities...</div>
+                ) : activityFeed.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">No activities found for this period</div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                    {activityFeed.map((activity, index) => (
+                      <div key={activity._id || index} className="p-4">
+                        <div
+                          className="flex items-start gap-4 cursor-pointer"
+                          onClick={() => toggleActivityExpansion(activity._id)}
+                        >
+                          {/* Activity Icon */}
+                          <div className={`p-2 rounded-lg ${
+                            activity.activityType === 'ticket_taken'
+                              ? 'bg-blue-100 dark:bg-blue-900/30'
+                              : 'bg-green-100 dark:bg-green-900/30'
+                          }`}>
+                            {getActivityIcon(activity.activityType)}
+                          </div>
+
+                          {/* Activity Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {activity.agentName || 'Unknown Agent'}
+                              </span>
+                              <Badge variant={activity.activityType === 'ticket_taken' ? 'default' : 'secondary'}>
+                                {getActivityLabel(activity.activityType)}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-xs text-gray-400">
+                                {getShiftIcon(activity.shift)}
+                                <span>{getShiftLabel(activity.shift)}</span>
+                              </div>
+                            </div>
+
+                            {/* Message Preview */}
+                            {activity.messagePreview && (
+                              <p className="text-sm text-gray-600 dark:text-neutral-400 truncate">
+                                {activity.messagePreview}
+                              </p>
+                            )}
+
+                            {/* Response Time */}
+                            {activity.responseTimeSeconds > 0 && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Timer className="w-3 h-3 text-gray-400" />
+                                <span className={`text-xs ${
+                                  activity.responseTimeSeconds < 300
+                                    ? 'text-green-600'
+                                    : activity.responseTimeSeconds < 600
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
+                                }`}>
+                                  Response time: {formatTime(activity.responseTimeSeconds)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Timestamp & Expand */}
+                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <span>{formatRelativeTime(activity.createdAt)}</span>
+                            {expandedActivities.has(activity._id) ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded Details */}
+                        {expandedActivities.has(activity._id) && (
+                          <div className="mt-4 ml-12 p-4 bg-gray-50 dark:bg-neutral-800 rounded-lg space-y-3">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500 dark:text-neutral-400">Thread ID:</span>
+                                <span className="ml-2 text-gray-900 dark:text-white font-mono text-xs">
+                                  {activity.threadTs}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 dark:text-neutral-400">Date:</span>
+                                <span className="ml-2 text-gray-900 dark:text-white">
+                                  {new Date(activity.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              {activity.reactionAddedAt && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-neutral-400">Ticket Taken At:</span>
+                                  <span className="ml-2 text-gray-900 dark:text-white">
+                                    {new Date(activity.reactionAddedAt).toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+                              {activity.firstReplyAt && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-neutral-400">First Reply At:</span>
+                                  <span className="ml-2 text-gray-900 dark:text-white">
+                                    {new Date(activity.firstReplyAt).toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Full Message */}
+                            {activity.messagePreview && (
+                              <div>
+                                <span className="text-gray-500 dark:text-neutral-400 text-sm">Message:</span>
+                                <p className="mt-1 p-3 bg-white dark:bg-neutral-900 rounded border border-gray-200 dark:border-neutral-700 text-sm text-gray-900 dark:text-white">
+                                  {activity.messagePreview}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
           {/* Leaderboard Tab */}
           <TabsContent value="leaderboard">
             <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
@@ -515,15 +833,16 @@ const KYCAgentStats = () => {
                 {leaderboard.map((item, index) => (
                   <div
                     key={item.agent._id}
-                    className={`flex items-center gap-4 p-4 rounded-lg ${
+                    className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors ${
                       index === 0
-                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/30'
                         : index === 1
-                        ? 'bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700'
+                        ? 'bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-700'
                         : index === 2
-                        ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800'
-                        : 'bg-gray-50 dark:bg-neutral-800/50'
+                        ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30'
+                        : 'bg-gray-50 dark:bg-neutral-800/50 hover:bg-gray-100 dark:hover:bg-neutral-800'
                     }`}
+                    onClick={() => fetchAgentDetails(item.agent._id)}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                       index === 0
@@ -674,6 +993,133 @@ const KYCAgentStats = () => {
             </div>
           </TabsContent>
 
+          {/* Agent Details Tab */}
+          <TabsContent value="agent-details">
+            {agentDetails && (
+              <div className="space-y-6">
+                {/* Agent Header */}
+                <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {agentDetails.agent.name}
+                      </h2>
+                      <p className="text-gray-500 dark:text-neutral-400">{agentDetails.agent.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedAgent(null);
+                        setAgentDetails(null);
+                        setActiveTab('overview');
+                      }}
+                      className="text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    >
+                      Back to Overview
+                    </button>
+                  </div>
+                </div>
+
+                {/* Overall Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {agentDetails.overallStats.map((stat) => (
+                    <div key={stat._id} className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
+                      <p className="text-sm text-gray-500 dark:text-neutral-400 capitalize mb-2">
+                        {stat._id.replace('_', ' ')}
+                      </p>
+                      <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {stat.count}
+                      </p>
+                      {stat.avgResponseTime > 0 && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Avg response: {formatTime(Math.round(stat.avgResponseTime))}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Shift Breakdown */}
+                <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Performance by Shift</h3>
+                  <div className="space-y-3">
+                    {agentDetails.shiftStats.map((shift) => (
+                      <div
+                        key={shift._id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-neutral-800 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          {getShiftIcon(shift._id)}
+                          <span className="font-medium text-gray-700 dark:text-neutral-300">
+                            {getShiftLabel(shift._id)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          {shift.activities.map((act) => (
+                            <div key={act.type} className="text-center">
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{act.count}</p>
+                              <p className="text-xs text-gray-500 capitalize">{act.type.replace('_', ' ')}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Activities */}
+                <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Recent Activities</h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {agentDetails.recentActivities.map((activity, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-neutral-800 rounded-lg"
+                      >
+                        <div className={`p-2 rounded-lg ${
+                          activity.activityType === 'ticket_taken'
+                            ? 'bg-blue-100 dark:bg-blue-900/30'
+                            : 'bg-green-100 dark:bg-green-900/30'
+                        }`}>
+                          {getActivityIcon(activity.activityType)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={activity.activityType === 'ticket_taken' ? 'default' : 'secondary'}>
+                              {getActivityLabel(activity.activityType)}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              {getShiftIcon(activity.shift)}
+                              <span>{activity.shift}</span>
+                            </div>
+                          </div>
+                          {activity.messagePreview && (
+                            <p className="text-sm text-gray-600 dark:text-neutral-400">
+                              {activity.messagePreview}
+                            </p>
+                          )}
+                          {activity.responseTimeSeconds > 0 && (
+                            <p className={`text-xs mt-1 ${
+                              activity.responseTimeSeconds < 300
+                                ? 'text-green-600'
+                                : activity.responseTimeSeconds < 600
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                            }`}>
+                              Response time: {formatTime(activity.responseTimeSeconds)}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-400 whitespace-nowrap">
+                          {new Date(activity.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
           {/* Manage Agents Tab */}
           <TabsContent value="agents">
             <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
@@ -681,18 +1127,13 @@ const KYCAgentStats = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Tracked Agents
                 </h3>
-                <button
-                  onClick={seedAgents}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  Seed Initial Agents
-                </button>
               </div>
               <div className="space-y-3">
                 {agents.map((agent) => (
                   <div
                     key={agent._id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-neutral-800 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-neutral-800 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700 cursor-pointer transition-colors"
+                    onClick={() => fetchAgentDetails(agent._id)}
                   >
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">{agent.name}</p>
@@ -751,88 +1192,6 @@ const KYCAgentStats = () => {
                 Add Agent
               </button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Agent Detail Dialog */}
-        <Dialog open={agentDetailDialog.open} onOpenChange={(open) => setAgentDetailDialog({ open })}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {agentDetails?.agent?.name} - Detailed Statistics
-              </DialogTitle>
-            </DialogHeader>
-            {agentDetails && (
-              <div className="space-y-6 py-4">
-                {/* Overall Stats */}
-                <div className="grid grid-cols-3 gap-4">
-                  {agentDetails.overallStats.map((stat) => (
-                    <div key={stat._id} className="bg-gray-50 dark:bg-neutral-800 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-neutral-400 capitalize">
-                        {stat._id.replace('_', ' ')}
-                      </p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {stat.count}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Shift Breakdown */}
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">By Shift</h4>
-                  <div className="space-y-2">
-                    {agentDetails.shiftStats.map((shift) => (
-                      <div
-                        key={shift._id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          {getShiftIcon(shift._id)}
-                          <span className="text-gray-700 dark:text-neutral-300">
-                            {getShiftLabel(shift._id)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {shift.activities.map((act) => (
-                            <span key={act.type} className="text-sm text-gray-500">
-                              {act.type}: {act.count}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recent Activities */}
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">Recent Activities</h4>
-                  <div className="max-h-60 overflow-y-auto space-y-2">
-                    {agentDetails.recentActivities.slice(0, 10).map((activity, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 text-sm border-b border-gray-100 dark:border-neutral-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge variant={activity.activityType === 'ticket_taken' ? 'default' : 'secondary'}>
-                            {activity.activityType.replace('_', ' ')}
-                          </Badge>
-                          {activity.messagePreview && (
-                            <span className="text-gray-500 truncate max-w-xs">
-                              {activity.messagePreview}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-gray-400">
-                          {new Date(activity.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </DialogContent>
         </Dialog>
       </div>
