@@ -2,17 +2,572 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
-  Users, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2,
+  Users, Clock, Trophy, TrendingUp, TrendingDown, AlertCircle, CheckCircle2,
   Calendar, Filter, RefreshCw, UserPlus, Settings, BarChart3,
   Timer, Zap, Sun, Moon, Sunset, MessageSquare, Activity,
-  ChevronDown, ChevronRight, Eye, MessageCircle, Hourglass
+  ChevronDown, ChevronRight, Eye, MessageCircle, Hourglass, PieChart as PieChartIcon, Target
 } from 'lucide-react';
+import {
+  LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+
+// Chart colors
+const COLORS = {
+  primary: '#3b82f6',
+  secondary: '#6b7280',
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  purple: '#8b5cf6',
+  blue: '#3b82f6',
+  orange: '#f97316',
+  cyan: '#06b6d4',
+  pink: '#ec4899',
+};
+
+const DARK_COLORS = {
+  primary: '#60a5fa',
+  secondary: '#9ca3af',
+  success: '#34d399',
+  warning: '#fbbf24',
+  danger: '#f87171',
+  purple: '#a78bfa',
+  blue: '#60a5fa',
+  orange: '#fb923c',
+  cyan: '#22d3ee',
+  pink: '#f472b6',
+};
+
+const SHIFT_COLORS = {
+  morning: '#f59e0b',
+  afternoon: '#f97316',
+  night: '#3b82f6',
+};
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-neutral-900 border-2 border-gray-200 dark:border-neutral-700 rounded-lg p-3 shadow-xl">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-xs text-gray-600 dark:text-neutral-400">
+            <span style={{ color: entry.color }}>{entry.name}:</span> {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// Metric card component
+const MetricCard = ({ title, value, subtitle, icon: Icon, trend, trendValue, color = 'blue' }) => {
+  const colorClasses = {
+    blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    green: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
+    orange: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
+    purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+    red: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
+  };
+
+  return (
+    <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+          {subtitle && (
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">{subtitle}</p>
+          )}
+          {trend !== undefined && (
+            <div className={`flex items-center gap-1 mt-2 text-xs ${
+              trend === 'up' ? 'text-green-600 dark:text-green-400' :
+              trend === 'down' ? 'text-red-600 dark:text-red-400' :
+              'text-gray-600 dark:text-neutral-400'
+            }`}>
+              {trend === 'up' ? <TrendingUp className="w-3 h-3" /> :
+               trend === 'down' ? <TrendingDown className="w-3 h-3" /> : null}
+              <span>{trendValue}</span>
+            </div>
+          )}
+        </div>
+        <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Statistics Tab Component
+const StatisticsTab = ({ statistics, loading, agents, dateRange, formatTime, getShiftIcon, getShiftLabel }) => {
+  const isDark = document.documentElement.classList.contains('dark');
+  const colors = isDark ? DARK_COLORS : COLORS;
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-28 bg-gray-200 dark:bg-neutral-800 rounded-xl"></div>
+          ))}
+        </div>
+        <div className="h-80 bg-gray-200 dark:bg-neutral-800 rounded-xl"></div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-72 bg-gray-200 dark:bg-neutral-800 rounded-xl"></div>
+          <div className="h-72 bg-gray-200 dark:bg-neutral-800 rounded-xl"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!statistics) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-neutral-500">
+        <AlertCircle className="w-12 h-12 mb-3" />
+        <p className="text-sm">No statistics data available</p>
+        <p className="text-xs mt-1">Try selecting a different date range</p>
+      </div>
+    );
+  }
+
+  const {
+    summary,
+    dailyTrend,
+    shiftDistribution,
+    responseTimeDistribution,
+    agentComparison,
+    rankings,
+    hourlyActivity,
+    weekdayDistribution,
+    performanceMetrics,
+    agentEfficiencyMatrix
+  } = statistics;
+
+  // Get quadrant colors for efficiency matrix
+  const getQuadrantColor = (quadrant) => {
+    switch (quadrant) {
+      case 'Star': return colors.success;
+      case 'Workhorse': return colors.warning;
+      case 'Potential': return colors.blue;
+      case 'Needs Attention': return colors.danger;
+      default: return colors.secondary;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Metrics - Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Tickets"
+          value={summary?.totalTickets || 0}
+          subtitle={`${summary?.avgTicketsPerDay || 0} per day · ${summary?.prevTickets || 0} prev period`}
+          icon={CheckCircle2}
+          color="green"
+          trend={summary?.ticketChangeDirection === 'up' ? 'up' : summary?.ticketChangeDirection === 'down' ? 'down' : undefined}
+          trendValue={summary?.ticketChange ? `${summary.ticketChange > 0 ? '+' : ''}${summary.ticketChange}%` : undefined}
+        />
+        <MetricCard
+          title="Total Messages"
+          value={summary?.totalMessages || 0}
+          subtitle={`${summary?.avgMessagesPerDay || 0} per day · ${summary?.prevMessages || 0} prev period`}
+          icon={MessageSquare}
+          color="purple"
+          trend={summary?.messageChangeDirection === 'up' ? 'up' : summary?.messageChangeDirection === 'down' ? 'down' : undefined}
+          trendValue={summary?.messageChange ? `${summary.messageChange > 0 ? '+' : ''}${summary.messageChange}%` : undefined}
+        />
+        <MetricCard
+          title="Avg Response Time"
+          value={formatTime(summary?.avgResponseTime || 0)}
+          subtitle={`Median: ${formatTime(summary?.medianResponseTime || 0)} · Prev: ${formatTime(summary?.prevAvgResponseTime || 0)}`}
+          icon={Timer}
+          color="orange"
+          trend={summary?.responseTimeChangeDirection === 'improved' ? 'up' : summary?.responseTimeChangeDirection === 'slower' ? 'down' : undefined}
+          trendValue={summary?.responseTimeChange ? `${Math.abs(summary.responseTimeChange)}% ${summary?.responseTimeChangeDirection}` : undefined}
+        />
+        <MetricCard
+          title="Active Agents"
+          value={summary?.activeAgents || 0}
+          subtitle={`${summary?.avgTicketsPerAgent || 0} tickets/agent avg`}
+          icon={Users}
+          color="blue"
+        />
+      </div>
+
+      {/* Summary Metrics - Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Fastest Response"
+          value={formatTime(summary?.minResponseTime || 0)}
+          subtitle={performanceMetrics?.fastestAgent ? `by ${performanceMetrics.fastestAgent}` : undefined}
+          icon={Zap}
+          color="green"
+        />
+        <MetricCard
+          title="Slowest Response"
+          value={formatTime(summary?.maxResponseTime || 0)}
+          subtitle={performanceMetrics?.slowestAgent ? `by ${performanceMetrics.slowestAgent}` : undefined}
+          icon={Clock}
+          color="red"
+        />
+        <MetricCard
+          title="Under 1 Minute"
+          value={performanceMetrics?.totalResponsesUnder1Min || 0}
+          subtitle={summary?.totalTickets > 0 ? `${Math.round((performanceMetrics?.totalResponsesUnder1Min || 0) / summary.totalTickets * 100)}% of tickets` : undefined}
+          icon={TrendingUp}
+          color="green"
+        />
+        <MetricCard
+          title="Over 10 Minutes"
+          value={performanceMetrics?.totalResponsesOver10Min || 0}
+          subtitle={summary?.totalTickets > 0 ? `${Math.round((performanceMetrics?.totalResponsesOver10Min || 0) / summary.totalTickets * 100)}% of tickets` : undefined}
+          icon={TrendingDown}
+          color="red"
+        />
+      </div>
+
+      {/* Daily Activity Trend with Response Time */}
+      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Daily Activity Trend</h3>
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Tickets, messages, and response times per day</p>
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={dailyTrend || []}>
+            <defs>
+              <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={colors.success} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={colors.success} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={colors.purple} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={colors.purple} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.secondary} opacity={0.2} />
+            <XAxis dataKey="date" stroke={colors.secondary} style={{ fontSize: '11px' }} />
+            <YAxis yAxisId="left" stroke={colors.secondary} style={{ fontSize: '11px' }} />
+            <YAxis yAxisId="right" orientation="right" stroke={colors.warning} style={{ fontSize: '11px' }} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            <Area yAxisId="left" type="monotone" dataKey="tickets" name="Tickets" stroke={colors.success} strokeWidth={2} fillOpacity={1} fill="url(#colorTickets)" />
+            <Area yAxisId="left" type="monotone" dataKey="messages" name="Messages" stroke={colors.purple} strokeWidth={2} fillOpacity={1} fill="url(#colorMessages)" />
+            <Line yAxisId="right" type="monotone" dataKey="avgResponseTime" name="Avg Response (s)" stroke={colors.warning} strokeWidth={2} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Rankings Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* By Tickets */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-4">
+          <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-yellow-500" /> By Volume
+          </h4>
+          <div className="space-y-2">
+            {(rankings?.byTickets || []).slice(0, 5).map((agent, i) => (
+              <div key={agent.name} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    i === 0 ? 'bg-yellow-500 text-white' : i === 1 ? 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
+                  }`}>{i + 1}</span>
+                  <span className="text-gray-700 dark:text-neutral-300 truncate max-w-[80px]">{agent.name.split(' ')[0]}</span>
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-white">{agent.tickets}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* By Speed */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-4">
+          <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-green-500" /> By Speed
+          </h4>
+          <div className="space-y-2">
+            {(rankings?.bySpeed || []).slice(0, 5).map((agent, i) => (
+              <div key={agent.name} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    i === 0 ? 'bg-green-500 text-white' : i === 1 ? 'bg-green-400 text-white' : i === 2 ? 'bg-green-300 text-green-800' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
+                  }`}>{i + 1}</span>
+                  <span className="text-gray-700 dark:text-neutral-300 truncate max-w-[80px]">{agent.name.split(' ')[0]}</span>
+                </div>
+                <span className="font-semibold text-green-600 dark:text-green-400">{formatTime(agent.avgResponseTime)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* By Consistency */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-4">
+          <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <Target className="w-4 h-4 text-blue-500" /> By Consistency
+          </h4>
+          <div className="space-y-2">
+            {(rankings?.byConsistency || []).slice(0, 5).map((agent, i) => (
+              <div key={agent.name} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    i === 0 ? 'bg-blue-500 text-white' : i === 1 ? 'bg-blue-400 text-white' : i === 2 ? 'bg-blue-300 text-blue-800' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
+                  }`}>{i + 1}</span>
+                  <span className="text-gray-700 dark:text-neutral-300 truncate max-w-[80px]">{agent.name.split(' ')[0]}</span>
+                </div>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{agent.consistencyScore}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Agent Efficiency Matrix */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-4">
+          <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-purple-500" /> Performance Matrix
+          </h4>
+          <div className="space-y-2">
+            {(agentEfficiencyMatrix || []).map((agent) => (
+              <div key={agent.name} className="flex items-center justify-between text-xs">
+                <span className="text-gray-700 dark:text-neutral-300 truncate max-w-[80px]">{agent.name.split(' ')[0]}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                  agent.quadrant === 'Star' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                  agent.quadrant === 'Workhorse' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                  agent.quadrant === 'Potential' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                  'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                }`}>
+                  {agent.quadrant}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Shift Distribution with Details */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity by Shift</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Performance breakdown by shift</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={shiftDistribution || []}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  fill={colors.primary}
+                  dataKey="value"
+                >
+                  {(shiftDistribution || []).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={SHIFT_COLORS[entry.shift] || colors.primary} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="space-y-3">
+              {(shiftDistribution || []).map((shift) => (
+                <div key={shift.shift} className="text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: SHIFT_COLORS[shift.shift] }}></div>
+                      <span className="text-gray-700 dark:text-neutral-300">{shift.name}</span>
+                    </div>
+                    <span className="font-semibold text-gray-900 dark:text-white">{shift.percentage}%</span>
+                  </div>
+                  <div className="pl-4 text-[10px] text-gray-500 dark:text-neutral-500 space-y-0.5">
+                    <div>{shift.value} tickets · {formatTime(shift.avgResponseTime)} avg</div>
+                    <div>{shift.activeAgents} agents · {shift.avgTicketsPerDay}/day</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Response Time Distribution */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Response Time Distribution</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">How fast agents respond to tickets</p>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={responseTimeDistribution || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.secondary} opacity={0.2} />
+              <XAxis dataKey="range" stroke={colors.secondary} style={{ fontSize: '9px' }} angle={-45} textAnchor="end" height={50} />
+              <YAxis stroke={colors.secondary} style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" name="Tickets" radius={[4, 4, 0, 0]}>
+                {(responseTimeDistribution || []).map((entry, index) => {
+                  let fill = colors.success;
+                  if (entry.range.includes('10') || entry.range.includes('15') || entry.range.includes('30')) fill = colors.danger;
+                  else if (entry.range.includes('3-5') || entry.range.includes('5-10')) fill = colors.warning;
+                  else if (entry.range.includes('1-2') || entry.range.includes('2-3')) fill = colors.blue;
+                  return <Cell key={`cell-${index}`} fill={fill} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Agent Detailed Comparison Table */}
+      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Agent Performance Comparison</h3>
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Detailed metrics for each agent</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-neutral-800">
+                <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Agent</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Tickets</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Messages</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Avg Time</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Best</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Worst</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Consistency</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Morning</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Afternoon</th>
+                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-neutral-400">Night</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(agentComparison || []).map((agent, index) => (
+                <tr key={agent.name} className={`border-b border-gray-100 dark:border-neutral-800 ${index === 0 ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}`}>
+                  <td className="py-2 px-3 font-medium text-gray-900 dark:text-white">{agent.name}</td>
+                  <td className="py-2 px-3 text-center font-semibold text-gray-900 dark:text-white">{agent.tickets}</td>
+                  <td className="py-2 px-3 text-center text-gray-600 dark:text-neutral-400">{agent.messages}</td>
+                  <td className={`py-2 px-3 text-center font-medium ${
+                    agent.avgResponseTime < 180 ? 'text-green-600 dark:text-green-400' :
+                    agent.avgResponseTime < 300 ? 'text-yellow-600 dark:text-yellow-400' :
+                    'text-red-600 dark:text-red-400'
+                  }`}>{formatTime(agent.avgResponseTime)}</td>
+                  <td className="py-2 px-3 text-center text-green-600 dark:text-green-400">{formatTime(agent.minResponseTime)}</td>
+                  <td className="py-2 px-3 text-center text-red-600 dark:text-red-400">{formatTime(agent.maxResponseTime)}</td>
+                  <td className="py-2 px-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <div className="w-12 h-1.5 bg-gray-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${
+                          agent.consistencyScore >= 70 ? 'bg-green-500' :
+                          agent.consistencyScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`} style={{ width: `${agent.consistencyScore}%` }}></div>
+                      </div>
+                      <span className="text-gray-600 dark:text-neutral-400">{agent.consistencyScore}%</span>
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-center text-yellow-600 dark:text-yellow-400">{agent.shiftBreakdown?.morning || 0}</td>
+                  <td className="py-2 px-3 text-center text-orange-600 dark:text-orange-400">{agent.shiftBreakdown?.afternoon || 0}</td>
+                  <td className="py-2 px-3 text-center text-blue-600 dark:text-blue-400">{agent.shiftBreakdown?.night || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Hourly Activity */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity by Hour</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+              Peak hours: {performanceMetrics?.peakHours?.join(', ') || 'N/A'} · Quiet: {performanceMetrics?.quietHours?.join(', ') || 'N/A'}
+            </p>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={hourlyActivity || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.secondary} opacity={0.2} />
+              <XAxis dataKey="hour" stroke={colors.secondary} style={{ fontSize: '9px' }} interval={2} />
+              <YAxis stroke={colors.secondary} style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+              <Bar dataKey="tickets" name="Tickets" fill={colors.success} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="messages" name="Messages" fill={colors.purple} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Weekday Distribution */}
+        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity by Weekday</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+              Busiest: {performanceMetrics?.busiestDay || 'N/A'} ({performanceMetrics?.busiestDayCount || 0} tickets)
+            </p>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={weekdayDistribution || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.secondary} opacity={0.2} />
+              <XAxis dataKey="day" stroke={colors.secondary} style={{ fontSize: '11px' }} />
+              <YAxis yAxisId="left" stroke={colors.secondary} style={{ fontSize: '11px' }} />
+              <YAxis yAxisId="right" orientation="right" stroke={colors.warning} style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+              <Bar yAxisId="left" dataKey="tickets" name="Tickets" fill={colors.blue} radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey="avgResponseTime" name="Avg Response (s)" stroke={colors.warning} strokeWidth={2} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Performance Insights */}
+      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-xl p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Insights</h3>
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Key findings and highlights</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <p className="text-xs font-medium text-green-800 dark:text-green-300">Fastest Agent</p>
+            </div>
+            <p className="text-lg font-semibold text-green-700 dark:text-green-400">{performanceMetrics?.fastestAgent || 'N/A'}</p>
+            <p className="text-xs text-green-600 dark:text-green-500 mt-1">Best: {formatTime(performanceMetrics?.fastestTime || 0)}</p>
+          </div>
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+              <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Most Active</p>
+            </div>
+            <p className="text-lg font-semibold text-yellow-700 dark:text-yellow-400">{performanceMetrics?.mostActiveAgent || 'N/A'}</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">{performanceMetrics?.mostActiveCount || 0} tickets handled</p>
+          </div>
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Most Consistent</p>
+            </div>
+            <p className="text-lg font-semibold text-blue-700 dark:text-blue-400">{performanceMetrics?.mostConsistentAgent || 'N/A'}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">{performanceMetrics?.consistencyScore || 0}% consistency score</p>
+          </div>
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <p className="text-xs font-medium text-purple-800 dark:text-purple-300">Busiest Shift</p>
+            </div>
+            <p className="text-lg font-semibold text-purple-700 dark:text-purple-400">{performanceMetrics?.busiestShift || 'N/A'}</p>
+            <p className="text-xs text-purple-600 dark:text-purple-500 mt-1">Peak hours: {performanceMetrics?.peakHours?.[0] || 'N/A'}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const KYCAgentStats = () => {
   const { user } = useAuth();
@@ -32,6 +587,8 @@ const KYCAgentStats = () => {
   const [agentDetails, setAgentDetails] = useState(null);
   const [activityFeed, setActivityFeed] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [statistics, setStatistics] = useState(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
 
   // Real-time state
   const [isLive, setIsLive] = useState(true);
@@ -228,6 +785,24 @@ const KYCAgentStats = () => {
     }
   }, [API_URL, dateRange, activityFilter, selectedAgentFilter]);
 
+  // Fetch statistics
+  const fetchStatistics = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setStatisticsLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/api/kyc-stats/statistics`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: dateRange
+      });
+      setStatistics(res.data);
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+    } finally {
+      if (showLoading) setStatisticsLoading(false);
+    }
+  }, [API_URL, dateRange]);
+
   // Fetch agent details
   const fetchAgentDetails = async (agentId) => {
     try {
@@ -303,10 +878,13 @@ const KYCAgentStats = () => {
     if (activeTab === 'activity') {
       fetchActivityFeed(false);
     }
+    if (activeTab === 'statistics') {
+      fetchStatistics(false);
+    }
     if (activeTab === 'agent-details' && selectedAgent) {
       fetchAgentDetails(selectedAgent);
     }
-  }, [fetchOverview, fetchLeaderboard, fetchShiftStats, fetchActivityFeed, activeTab, selectedAgent]);
+  }, [fetchOverview, fetchLeaderboard, fetchShiftStats, fetchActivityFeed, fetchStatistics, activeTab, selectedAgent]);
 
   // Setup polling for real-time updates
   useEffect(() => {
@@ -356,8 +934,10 @@ const KYCAgentStats = () => {
       fetchShiftStats();
     } else if (activeTab === 'activity') {
       fetchActivityFeed();
+    } else if (activeTab === 'statistics') {
+      fetchStatistics();
     }
-  }, [activeTab, dateRange, selectedShift, activityFilter, selectedAgentFilter, user]);
+  }, [activeTab, dateRange, selectedShift, activityFilter, selectedAgentFilter, user, fetchStatistics]);
 
   // Calculate totals
   const totals = overview.reduce((acc, item) => ({
@@ -565,6 +1145,10 @@ const KYCAgentStats = () => {
             <TabsTrigger value="shifts" className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
               By Shift
+            </TabsTrigger>
+            <TabsTrigger value="statistics" className="flex items-center gap-2">
+              <PieChartIcon className="w-4 h-4" />
+              Statistics
             </TabsTrigger>
             {selectedAgent && (
               <TabsTrigger value="agent-details" className="flex items-center gap-2">
@@ -1001,6 +1585,19 @@ const KYCAgentStats = () => {
                 </div>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Statistics Tab */}
+          <TabsContent value="statistics">
+            <StatisticsTab
+              statistics={statistics}
+              loading={statisticsLoading}
+              agents={agents}
+              dateRange={dateRange}
+              formatTime={formatTime}
+              getShiftIcon={getShiftIcon}
+              getShiftLabel={getShiftLabel}
+            />
           </TabsContent>
 
           {/* Agent Details Tab */}
