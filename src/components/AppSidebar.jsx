@@ -85,7 +85,8 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
       icon: <ChatBubble size={16} className="text-gray-900 dark:text-neutral-50" />,
       label: 'Chat'
     },
-    { id: 'affiliate-bonus-finder', icon: <Gift size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Affiliate Bonus Finder' },
+    // Temporarily disabled - Google Sheets OAuth consent screen issue
+    // { id: 'affiliate-bonus-finder', icon: <Gift size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Affiliate Bonus Finder' },
     { id: 'kyc', icon: <CheckmarkFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Management' },
     { id: 'countries-restrictions', icon: <EarthFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Countries & Restrictions' },
   ];

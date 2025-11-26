@@ -22,7 +22,8 @@ import PageLayout from './components/PageLayout';
 import VIPProgressCalculator from './pages/VIPProgressCalculator';
 import HashExplorerFinder from './pages/HashExplorerFinder';
 import QuickLinks from './pages/QuickLinks';
-import AffiliateBonusFinder from './pages/AffiliateBonusFinder';
+// Temporarily disabled - Google Sheets OAuth consent screen issue
+// import AffiliateBonusFinder from './pages/AffiliateBonusFinder';
 import KYC from './pages/KYC';
 import DeveloperDashboard from './pages/DeveloperDashboard';
 import QAManager from './pages/QAManager';
@@ -82,6 +83,7 @@ function App() {
                     }
                   />
 
+                  {/* Temporarily disabled - Google Sheets OAuth consent screen issue
                   <Route
                     path="/affiliate-bonus-finder"
                     element={
@@ -92,6 +94,7 @@ function App() {
                       </PrivateRoute>
                     }
                   />
+                  */}
 
                   <Route
                     path="/kyc"
