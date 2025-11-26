@@ -310,6 +310,10 @@ const KYCAgentStats = () => {
 
   // Setup polling for real-time updates
   useEffect(() => {
+    // Only start polling if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token || !user) return;
+
     if (isLive) {
       // Initial fetch
       refreshAllData();
@@ -329,16 +333,22 @@ const KYCAgentStats = () => {
         clearInterval(pollingIntervalRef.current);
       }
     }
-  }, [isLive, refreshAllData]);
+  }, [isLive, refreshAllData, user]);
 
-  // Initial fetch
+  // Initial fetch - only when user is authenticated
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !user) return;
+
     fetchConfigStatus();
     fetchAgents();
-  }, []);
+  }, [user]);
 
-  // Fetch data when tab changes
+  // Fetch data when tab changes - only when user is authenticated
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !user) return;
+
     if (activeTab === 'overview') {
       fetchOverview();
       fetchLeaderboard();
@@ -347,7 +357,7 @@ const KYCAgentStats = () => {
     } else if (activeTab === 'activity') {
       fetchActivityFeed();
     }
-  }, [activeTab, dateRange, selectedShift, activityFilter, selectedAgentFilter]);
+  }, [activeTab, dateRange, selectedShift, activityFilter, selectedAgentFilter, user]);
 
   // Calculate totals
   const totals = overview.reduce((acc, item) => ({
