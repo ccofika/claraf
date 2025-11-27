@@ -16,12 +16,13 @@ const Chat = () => {
   const navigate = useNavigate();
   const { channelId } = useParams();
   const { user } = useAuth();
-  const { activeChannel, threadMessage, setThreadMessage, channels, setActiveChannel } = useChat();
+  const { activeChannel, threadMessage, setThreadMessage, channels, setActiveChannel, unreadCounts } = useChat();
   const [showMemberList, setShowMemberList] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('chat');
   const [workspaces, setWorkspaces] = useState([]);
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [chatView, setChatView] = useState('messages'); // 'messages' or 'activity'
 
   // Fetch workspaces for navigation
@@ -93,19 +94,58 @@ const Chat = () => {
     }
   }, [activeChannel, navigate]);
 
-  // Keyboard shortcut handler for Ctrl+K / Cmd+K
+  // Jump to first unread channel
+  const jumpToUnread = () => {
+    // Find first channel with unread messages
+    const unreadChannel = channels.find(ch => (unreadCounts[ch._id] || 0) > 0);
+    if (unreadChannel) {
+      setActiveChannel(unreadChannel);
+    }
+  };
+
+  // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't trigger if user is typing in an input/textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        // Allow Ctrl+/ even in inputs
+        if (!((e.ctrlKey || e.metaKey) && e.key === '/')) {
+          return;
+        }
+      }
+
       // Ctrl+K or Cmd+K for Quick Switcher
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setShowQuickSwitcher(true);
+        return;
+      }
+
+      // Ctrl+/ for Keyboard Shortcuts Help
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShowKeyboardShortcuts(prev => !prev);
+        return;
+      }
+
+      // Ctrl+Shift+M for Activity/Mentions
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        setChatView(prev => prev === 'activity' ? 'messages' : 'activity');
+        return;
+      }
+
+      // Ctrl+J for Jump to Unread
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        jumpToUnread();
+        return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [channels, unreadCounts]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-black">
@@ -198,6 +238,122 @@ const Chat = () => {
 
       {/* Notification Permission Prompt */}
       <NotificationPrompt />
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardShortcuts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowKeyboardShortcuts(false)}>
+          <div className="bg-white dark:bg-[#1A1D21] rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowKeyboardShortcuts(false)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+              {/* Navigation */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Navigation</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Quick switcher</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+K</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Jump to unread</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+J</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Activity/Mentions</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+Shift+M</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Show shortcuts</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+/</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formatting */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Formatting</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Bold</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+B</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Italic</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+I</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Strikethrough</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+Shift+X</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Code block</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+Shift+C</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Link</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Ctrl+Shift+U</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Messages</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Send message</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Enter</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">New line</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Shift+Enter</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Edit last message</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">↑</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* On Hovered Message */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">On Hovered Message</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Edit message</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">E</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Add reaction</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">R</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Open thread</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">T</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Pin/Unpin</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">P</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[14px] text-gray-700 dark:text-neutral-300">Delete message</span>
+                    <kbd className="px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded text-[12px] font-mono text-gray-600 dark:text-neutral-400">Delete</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

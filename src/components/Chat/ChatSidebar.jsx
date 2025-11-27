@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive, Star, MessageSquare, Bell, BellOff, MoreVertical } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Hash, User, Users, Archive, Star, MessageSquare, Bell, BellOff, MoreVertical, MessagesSquare } from 'lucide-react';
 import CreateChannelModal from './CreateChannelModal';
 import PresenceIndicator from './PresenceIndicator';
 import ChannelContextMenu from './ChannelContextMenu';
 import SectionHeader from './SectionHeader';
 import SectionModal from './SectionModal';
+import ThreadsList from './ThreadsList';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -33,6 +34,27 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
   const [collapsedSections, setCollapsedSections] = useState({});
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
+  const [unreadThreadCount, setUnreadThreadCount] = useState(0);
+
+  // Fetch unread thread count
+  useEffect(() => {
+    const fetchUnreadThreadCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const { data } = await axios.get(`${API_URL}/api/chat/threads/unread-count`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUnreadThreadCount(data.unreadCount || 0);
+      } catch (error) {
+        console.error('Error fetching unread thread count:', error);
+      }
+    };
+    fetchUnreadThreadCount();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadThreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch muted channels
   useEffect(() => {
@@ -538,28 +560,47 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
         {/* Header with View Switcher */}
         <div className="border-b border-gray-200/60 dark:border-neutral-800/60">
           <div className="h-14 px-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => onChatViewChange?.('messages')}
-                className={`flex items-center gap-2 px-2 py-1 transition-colors ${
+                className={`flex items-center gap-1.5 px-2 py-1 transition-colors ${
                   chatView === 'messages'
                     ? 'text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
+                title="Messages"
               >
-                <MessageSquare className="w-5 h-5" />
-                <span className="text-[16px] font-bold">Messages</span>
+                <MessageSquare className="w-4 h-4" />
+                <span className="text-[14px] font-semibold">Messages</span>
+              </button>
+              <button
+                onClick={() => onChatViewChange?.('threads')}
+                className={`flex items-center gap-1.5 px-2 py-1 transition-colors relative ${
+                  chatView === 'threads'
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+                title="Threads"
+              >
+                <MessagesSquare className="w-4 h-4" />
+                <span className="text-[14px] font-semibold">Threads</span>
+                {unreadThreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#E01E5A] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {unreadThreadCount > 9 ? '9+' : unreadThreadCount}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => onChatViewChange?.('activity')}
-                className={`flex items-center gap-2 px-2 py-1 transition-colors ${
+                className={`flex items-center gap-1.5 px-2 py-1 transition-colors ${
                   chatView === 'activity'
                     ? 'text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
+                title="Activity"
               >
-                <Bell className="w-5 h-5" />
-                <span className="text-[16px] font-bold">Activity</span>
+                <Bell className="w-4 h-4" />
+                <span className="text-[14px] font-semibold">Activity</span>
               </button>
             </div>
             <div className="flex items-center gap-1">
@@ -625,6 +666,11 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
               ))}
             </div>
           </>
+        )}
+
+        {/* Threads List (only show for threads view) */}
+        {chatView === 'threads' && (
+          <ThreadsList />
         )}
 
         {/* Channel List (only show for messages view) */}

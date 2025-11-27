@@ -1,20 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useSocket } from '../../context/SocketContext';
-import { Send, Paperclip, Smile, X, Loader2, Plus, FileText, Folder } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Send, Paperclip, Smile, X, Loader2, Plus, FileText, Folder, Pencil } from 'lucide-react';
 import { Image as ImageIcon } from 'lucide-react';
 import { File as FileIcon } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import FormattingToolbar from './FormattingToolbar';
 import MentionDropdown from './MentionDropdown';
+import ChatRichTextInput from './ChatRichTextInput';
 import axios from 'axios';
 import { toast } from 'sonner';
 import AddContentModal from './AddContentModal';
 
 const ChatInput = () => {
-  const { activeChannel, sendMessage, replyingTo, setReplyingTo } = useChat();
+  const { activeChannel, sendMessage, replyingTo, setReplyingTo, messages, editMessage } = useChat();
   const { socket, isConnected } = useSocket();
+  const { user } = useAuth();
   const [content, setContent] = useState('');
+  const [editingMessage, setEditingMessage] = useState(null);
   // Load draft messages from localStorage on mount
   const [draftMessages, setDraftMessages] = useState(() => {
     try {
@@ -169,14 +173,30 @@ const ChatInput = () => {
     }
   }, [selectedFile]);
 
+  // Helper to check if HTML content is empty
+  const isContentEmpty = (html) => {
+    if (!html) return true;
+    // Remove HTML tags and check if remaining text is empty
+    const text = html.replace(/<[^>]*>/g, '').trim();
+    return text.length === 0;
+  };
+
+  // Helper to get plain text from HTML
+  const getPlainText = (html) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+
   const handleSend = async () => {
-    if (!content.trim() || !activeChannel) return;
+    if (isContentEmpty(content) || !activeChannel) return;
 
     try {
       // Include reply metadata if replying
       const metadata = replyingTo ? { replyTo: replyingTo._id } : {};
 
-      await sendMessage(activeChannel._id, content.trim(), 'text', metadata);
+      await sendMessage(activeChannel._id, content, 'text', metadata);
       setContent('');
       // Clear draft for this channel
       setDraftMessages(prev => ({
@@ -196,19 +216,20 @@ const ChatInput = () => {
     }
   };
 
-  // Detect @ mentions
-  const handleContentChange = (e) => {
-    const newContent = e.target.value;
-    setContent(newContent);
+  // Handle content change (receives HTML string from ChatRichTextInput)
+  const handleContentChange = (newContent) => {
+    // Handle both string (from ChatRichTextInput) and event object (fallback)
+    const htmlContent = typeof newContent === 'string' ? newContent : newContent?.target?.value || '';
+    setContent(htmlContent);
 
-    const cursorPos = e.target.selectionStart;
-    const textBeforeCursor = newContent.substring(0, cursorPos);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    // For mentions, we need to get plain text
+    const plainText = getPlainText(htmlContent);
+    const lastAtIndex = plainText.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      const textAfterAt = plainText.substring(lastAtIndex + 1);
       // Check if there's no space after @ (still typing mention)
-      if (!textAfterAt.includes(' ')) {
+      if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
         setShowMentionDropdown(true);
         setMentionSearchQuery(textAfterAt);
         setMentionStartPos(lastAtIndex);
@@ -247,14 +268,79 @@ const ChatInput = () => {
     }, 0);
   };
 
+  // Handle saving edited message
+  const handleSaveEdit = async () => {
+    if (!editingMessage || isContentEmpty(content)) return;
+
+    try {
+      await editMessage(editingMessage._id, content);
+      setEditingMessage(null);
+      setContent('');
+      toast.success('Message edited');
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      toast.error('Failed to edit message');
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setContent('');
+    inputRef.current?.focus();
+  };
+
   const handleKeyDown = (e) => {
+    // Send message or save edit
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
-    } else if (e.key === 'Escape' && showMentionDropdown) {
-      e.preventDefault();
-      setShowMentionDropdown(false);
+      if (editingMessage) {
+        handleSaveEdit();
+      } else if (selectedFile || selectedElement || selectedTicket) {
+        handleSendWithFile();
+      } else {
+        handleSend();
+      }
+      return;
     }
+
+    // Cancel edit or close mention dropdown
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (editingMessage) {
+        handleCancelEdit();
+      } else if (showMentionDropdown) {
+        setShowMentionDropdown(false);
+      }
+      return;
+    }
+
+    // Arrow Up - Edit last own message (when input is empty and cursor at start)
+    if (e.key === 'ArrowUp' && isContentEmpty(content) && !editingMessage) {
+      const cursorPos = inputRef.current?.selectionStart || 0;
+      if (cursorPos === 0) {
+        e.preventDefault();
+        // Find the last message from current user
+        const ownMessages = messages.filter(msg =>
+          msg.sender?._id === user?._id &&
+          msg.type === 'text' &&
+          !msg.isDeleted
+        );
+        if (ownMessages.length > 0) {
+          const lastOwnMessage = ownMessages[ownMessages.length - 1];
+          setEditingMessage(lastOwnMessage);
+          setContent(lastOwnMessage.content);
+          // Position cursor at end of content
+          setTimeout(() => {
+            inputRef.current?.focus();
+            const len = lastOwnMessage.content.length;
+            inputRef.current?.setSelectionRange(len, len);
+          }, 0);
+        }
+      }
+      return;
+    }
+    // Note: Formatting shortcuts (Ctrl+B, Ctrl+I, etc.) are handled by ChatRichTextInput
   };
 
   const handleEmojiSelect = (emoji) => {
@@ -301,7 +387,7 @@ const ChatInput = () => {
   };
 
   const handleSendWithFile = async () => {
-    if (!selectedFile && !content.trim() && !selectedElement && !selectedTicket) return;
+    if (!selectedFile && isContentEmpty(content) && !selectedElement && !selectedTicket) return;
 
     setUploadingFile(true);
     try {
@@ -316,7 +402,7 @@ const ChatInput = () => {
       }
 
       // Determine message content and type
-      let messageContent = content.trim() || '';
+      let messageContent = isContentEmpty(content) ? '' : content;
       let messageType = 'text';
 
       // Build metadata
@@ -453,8 +539,29 @@ const ChatInput = () => {
   return (
     <div className="border-t border-gray-200/60 dark:border-neutral-800/60 px-4 py-3">
       <div className="max-w-none">
+        {/* Editing Preview */}
+        {editingMessage && (
+          <div className="mb-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-yellow-500 flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-[13px] font-semibold text-yellow-700 dark:text-yellow-400">
+                <Pencil className="w-3.5 h-3.5" />
+                Editing message
+              </div>
+              <div className="text-[12px] text-gray-500 dark:text-neutral-500 mt-0.5">
+                Press Enter to save • Escape to cancel
+              </div>
+            </div>
+            <button
+              onClick={handleCancelEdit}
+              className="ml-2 p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+            </button>
+          </div>
+        )}
+
         {/* Reply Preview */}
-        {replyingTo && (
+        {replyingTo && !editingMessage && (
           <div className="mb-2 px-3 py-2 bg-gray-100 dark:bg-neutral-900/50 border-l-2 border-gray-400 dark:border-neutral-600 flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-gray-900 dark:text-white">
@@ -563,7 +670,7 @@ const ChatInput = () => {
           <div className="flex items-end gap-2">
             {/* Text Input */}
             <div className="flex-1 relative">
-              <textarea
+              <ChatRichTextInput
                 ref={inputRef}
                 value={content}
                 onChange={handleContentChange}
@@ -571,14 +678,6 @@ const ChatInput = () => {
                 placeholder={`Message ${activeChannel.name || 'chat'}...`}
                 rows={1}
                 className="w-full px-3 py-2 bg-white dark:bg-[#1A1D21] text-[15px] text-gray-900 dark:text-neutral-50 placeholder-gray-500 dark:placeholder-neutral-500 focus:outline-none resize-none max-h-32 overflow-y-auto"
-                style={{
-                  minHeight: '40px',
-                  height: 'auto'
-                }}
-                onInput={(e) => {
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
               />
 
               {/* Mention Dropdown */}

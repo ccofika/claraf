@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import axios from 'axios';
 
 const SocketContext = createContext();
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 export const useSocket = () => {
   const context = useContext(SocketContext);
@@ -19,6 +22,34 @@ export const SocketProvider = ({ children }) => {
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
   const [workspaceUsers, setWorkspaceUsers] = useState([]);
   const socketRef = useRef(null);
+  const heartbeatIntervalRef = useRef(null);
+  const tokenRefreshIntervalRef = useRef(null);
+  const visibilityHandlerRef = useRef(null);
+
+  // Function to refresh token and re-authenticate socket
+  const refreshTokenAndReauth = useCallback(async () => {
+    try {
+      // Try to refresh the token
+      const response = await axios.post(
+        `${API_URL}/api/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+
+      const newToken = response.data.token;
+      if (newToken) {
+        localStorage.setItem('token', newToken);
+
+        // Re-authenticate socket with new token
+        if (socketRef.current && socketRef.current.connected) {
+          console.log('🔄 Re-authenticating socket with refreshed token...');
+          socketRef.current.emit('authenticate', { token: newToken });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh token for socket:', error);
+    }
+  }, []);
 
   // Initialize socket connection
   useEffect(() => {
@@ -31,6 +62,17 @@ export const SocketProvider = ({ children }) => {
         setSocket(null);
         setIsConnected(false);
       }
+
+      // Clear intervals
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      if (tokenRefreshIntervalRef.current) {
+        clearInterval(tokenRefreshIntervalRef.current);
+        tokenRefreshIntervalRef.current = null;
+      }
+
       return;
     }
 
@@ -42,13 +84,20 @@ export const SocketProvider = ({ children }) => {
 
     console.log('🔌 Creating new socket connection for user:', user.email);
 
-    // Create socket connection
+    // Create socket connection with improved settings for background tabs
     const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
       autoConnect: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity, // Never stop trying to reconnect
+      timeout: 20000,
+      // Prevent socket from being throttled in background tabs
+      transports: ['websocket', 'polling'], // Prefer WebSocket
+      upgrade: true,
+      // Keep connection alive with ping/pong
+      pingInterval: 25000, // Send ping every 25 seconds
+      pingTimeout: 60000, // Wait 60 seconds for pong before disconnect
     });
 
     socketRef.current = newSocket;
@@ -71,14 +120,39 @@ export const SocketProvider = ({ children }) => {
       console.log('🔌 Socket disconnected - Reason:', reason);
       setIsConnected(false);
       setWorkspaceUsers([]);
+
+      // If disconnected due to transport error or ping timeout, try to reconnect immediately
+      if (reason === 'transport error' || reason === 'ping timeout') {
+        console.log('🔄 Attempting immediate reconnection...');
+        newSocket.connect();
+      }
     });
 
     newSocket.on('reconnect', (attemptNumber) => {
       console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+
+      // Re-authenticate after reconnection
+      const token = localStorage.getItem('token');
+      if (token) {
+        console.log('🔐 Re-authenticating after reconnect...');
+        newSocket.emit('authenticate', { token });
+      }
     });
 
     newSocket.on('reconnect_attempt', (attemptNumber) => {
       console.log('🔄 Socket reconnection attempt:', attemptNumber);
+    });
+
+    newSocket.on('reconnect_error', (error) => {
+      console.error('❌ Socket reconnection error:', error);
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('❌ Socket reconnection failed after all attempts');
+      // Try to refresh token and reconnect
+      refreshTokenAndReauth().then(() => {
+        newSocket.connect();
+      });
     });
 
     newSocket.on('authenticated', (data) => {
@@ -90,8 +164,14 @@ export const SocketProvider = ({ children }) => {
       newSocket.emit('chat:init');
     });
 
-    newSocket.on('auth_error', (error) => {
+    newSocket.on('auth_error', async (error) => {
       console.error('❌ Socket auth error:', error);
+
+      // If auth error, try to refresh token
+      if (error.message === 'jwt expired' || error.message === 'Authentication failed') {
+        console.log('🔄 Token expired, attempting refresh...');
+        await refreshTokenAndReauth();
+      }
     });
 
     newSocket.on('error', (error) => {
@@ -117,13 +197,83 @@ export const SocketProvider = ({ children }) => {
       setWorkspaceUsers(prev => prev.filter(u => u.userId !== data.userId));
     });
 
+    // Set up custom heartbeat to keep connection alive in background tabs
+    // Browsers throttle setInterval in background tabs, but we use a longer interval
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (newSocket.connected) {
+        // Send a lightweight ping to keep connection alive
+        newSocket.emit('heartbeat', { timestamp: Date.now() });
+      } else {
+        // Try to reconnect if disconnected
+        console.log('💓 Heartbeat detected disconnect, reconnecting...');
+        newSocket.connect();
+      }
+    }, 30000); // Every 30 seconds
+
+    // Set up token refresh before expiry (every 10 minutes)
+    // Access token expires in 15 minutes, so refresh at 10 minutes to be safe
+    tokenRefreshIntervalRef.current = setInterval(() => {
+      console.log('🔄 Scheduled token refresh for socket...');
+      refreshTokenAndReauth();
+    }, 10 * 60 * 1000); // Every 10 minutes
+
+    // Handle visibility change - reconnect when tab becomes visible
+    visibilityHandlerRef.current = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ Tab became visible, checking socket connection...');
+
+        if (!newSocket.connected) {
+          console.log('🔄 Socket disconnected while tab was hidden, reconnecting...');
+          newSocket.connect();
+        } else {
+          // Re-authenticate to ensure token is still valid
+          const token = localStorage.getItem('token');
+          if (token) {
+            newSocket.emit('authenticate', { token });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', visibilityHandlerRef.current);
+
+    // Handle online/offline events
+    const handleOnline = () => {
+      console.log('🌐 Network online, reconnecting socket...');
+      if (!newSocket.connected) {
+        newSocket.connect();
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('📵 Network offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     return () => {
       if (newSocket) {
         console.log('🔌 Cleaning up socket (component unmount)');
         newSocket.disconnect();
       }
+
+      // Clear intervals
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+      if (tokenRefreshIntervalRef.current) {
+        clearInterval(tokenRefreshIntervalRef.current);
+      }
+
+      // Remove event listeners
+      if (visibilityHandlerRef.current) {
+        document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+      }
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, [user?._id]); // Only depend on user ID, not entire user object
+  }, [user?._id, refreshTokenAndReauth]); // Only depend on user ID, not entire user object
 
   // Join workspace
   const joinWorkspace = useCallback((workspaceId) => {
@@ -181,6 +331,15 @@ export const SocketProvider = ({ children }) => {
     }
   }, [socket, isConnected, currentWorkspace]);
 
+  // Force reconnect (can be called manually if needed)
+  const forceReconnect = useCallback(() => {
+    if (socketRef.current) {
+      console.log('🔄 Force reconnecting socket...');
+      socketRef.current.disconnect();
+      socketRef.current.connect();
+    }
+  }, []);
+
   const value = {
     socket,
     isConnected,
@@ -194,6 +353,7 @@ export const SocketProvider = ({ children }) => {
     notifyElementCreated,
     notifyElementUpdated,
     notifyElementDeleted,
+    forceReconnect,
   };
 
   return (

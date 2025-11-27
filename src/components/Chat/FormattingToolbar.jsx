@@ -1,10 +1,17 @@
 import React from 'react';
-import { Bold, Italic, Code, Link, List, ListOrdered } from 'lucide-react';
+import { Bold, Italic, Code, Link, List, ListOrdered, Strikethrough, Quote, FileCode } from 'lucide-react';
 
 const FormattingToolbar = ({ onFormat, inputRef }) => {
   const handleFormat = (type) => {
-    if (!inputRef.current) return;
+    if (!inputRef?.current) return;
 
+    // Check if inputRef has applyFormat method (ChatRichTextInput)
+    if (typeof inputRef.current.applyFormat === 'function') {
+      inputRef.current.applyFormat(type);
+      return;
+    }
+
+    // Fallback for regular textarea (legacy support)
     const textarea = inputRef.current;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -15,19 +22,29 @@ const FormattingToolbar = ({ onFormat, inputRef }) => {
     switch (type) {
       case 'bold':
         formattedText = `**${selectedText || 'bold text'}**`;
-        newCursorPos = start + (selectedText ? 2 : 2); // Position cursor inside **
+        newCursorPos = start + (selectedText ? 2 : 2);
         break;
       case 'italic':
         formattedText = `_${selectedText || 'italic text'}_`;
         newCursorPos = start + (selectedText ? 1 : 1);
+        break;
+      case 'strikethrough':
+        formattedText = `~~${selectedText || 'strikethrough'}~~`;
+        newCursorPos = start + (selectedText ? 2 : 2);
         break;
       case 'code':
         formattedText = `\`${selectedText || 'code'}\``;
         newCursorPos = start + (selectedText ? 1 : 1);
         break;
       case 'codeblock':
-        formattedText = `\`\`\`\n${selectedText || 'code block'}\n\`\`\``;
+        formattedText = `\`\`\`\n${selectedText || 'code'}\n\`\`\``;
         newCursorPos = start + 4;
+        break;
+      case 'quote':
+        formattedText = selectedText
+          ? selectedText.split('\n').map(line => `> ${line}`).join('\n')
+          : '> quote';
+        newCursorPos = start + 2;
         break;
       case 'link':
         formattedText = `[${selectedText || 'link text'}](url)`;
@@ -61,10 +78,8 @@ const FormattingToolbar = ({ onFormat, inputRef }) => {
     setTimeout(() => {
       textarea.focus();
       if (!selectedText) {
-        // If no text was selected, position cursor to allow typing inside formatting
         textarea.setSelectionRange(newCursorPos, newCursorPos);
       } else {
-        // If text was selected, position cursor after formatted text
         const endPos = start + formattedText.length;
         textarea.setSelectionRange(endPos, endPos);
       }
@@ -74,10 +89,13 @@ const FormattingToolbar = ({ onFormat, inputRef }) => {
   const buttons = [
     { icon: Bold, type: 'bold', tooltip: 'Bold (Ctrl+B)' },
     { icon: Italic, type: 'italic', tooltip: 'Italic (Ctrl+I)' },
+    { icon: Strikethrough, type: 'strikethrough', tooltip: 'Strikethrough (Ctrl+Shift+X)' },
     { icon: Code, type: 'code', tooltip: 'Inline code' },
+    { icon: FileCode, type: 'codeblock', tooltip: 'Code block (Ctrl+Shift+C)' },
+    { icon: Quote, type: 'quote', tooltip: 'Block quote' },
+    { icon: Link, type: 'link', tooltip: 'Link (Ctrl+Shift+U)' },
     { icon: List, type: 'list', tooltip: 'Bullet list' },
     { icon: ListOrdered, type: 'orderedList', tooltip: 'Numbered list' },
-    { icon: Link, type: 'link', tooltip: 'Link' },
   ];
 
   return (
@@ -97,7 +115,7 @@ const FormattingToolbar = ({ onFormat, inputRef }) => {
         );
       })}
       <div className="ml-auto text-[11px] text-gray-400 dark:text-neutral-500">
-        Markdown supported
+        Rich text
       </div>
     </div>
   );

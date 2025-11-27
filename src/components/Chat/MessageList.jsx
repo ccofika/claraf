@@ -1,14 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '../../context/ChatContext';
 import MessageBubble from './MessageBubble';
 import { Loader2 } from 'lucide-react';
 
 const MessageList = () => {
-  const { messages, activeChannel, fetchMessages } = useChat();
+  const { messages, activeChannel, fetchMessages, highlightedMessageId } = useChat();
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const messageRefs = useRef({});
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [localHighlightId, setLocalHighlightId] = useState(null);
 
   // Scroll to bottom on new messages
   const scrollToBottom = () => {
@@ -33,6 +35,50 @@ const MessageList = () => {
       scrollToBottom();
     }
   }, [messages.length]);
+
+  // Scroll to specific message function
+  const scrollToSpecificMessage = useCallback((messageId) => {
+    const messageElement = messageRefs.current[messageId];
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setLocalHighlightId(messageId);
+
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setLocalHighlightId(null);
+      }, 3000);
+    } else {
+      console.log('Message element not found for ID:', messageId);
+    }
+  }, []);
+
+  // Listen for scrollToMessage event
+  useEffect(() => {
+    const handleScrollToMessage = (event) => {
+      const { messageId } = event.detail;
+      console.log('📜 MessageList received scrollToMessage event:', messageId);
+
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        scrollToSpecificMessage(messageId);
+      }, 100);
+    };
+
+    window.addEventListener('scrollToMessage', handleScrollToMessage);
+
+    return () => {
+      window.removeEventListener('scrollToMessage', handleScrollToMessage);
+    };
+  }, [scrollToSpecificMessage]);
+
+  // Also respond to highlightedMessageId from context
+  useEffect(() => {
+    if (highlightedMessageId) {
+      setTimeout(() => {
+        scrollToSpecificMessage(highlightedMessageId);
+      }, 100);
+    }
+  }, [highlightedMessageId, scrollToSpecificMessage]);
 
   // Load more messages on scroll to top
   const handleScroll = async (e) => {
@@ -174,13 +220,23 @@ const MessageList = () => {
         const message = item.data;
         const previousItem = groupedMessages[index - 1];
         const isGrouped = shouldGroupWithPrevious(message, previousItem);
+        const isHighlighted = localHighlightId === message._id || highlightedMessageId === message._id;
 
         return (
-          <MessageBubble
+          <div
             key={message._id}
-            message={message}
-            isGrouped={isGrouped}
-          />
+            ref={(el) => { messageRefs.current[message._id] = el; }}
+            className={`transition-all duration-500 ${
+              isHighlighted
+                ? 'bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-400 dark:ring-blue-500 ring-inset rounded-lg'
+                : ''
+            }`}
+          >
+            <MessageBubble
+              message={message}
+              isGrouped={isGrouped}
+            />
+          </div>
         );
       })}
 

@@ -37,6 +37,7 @@ export const ChatProvider = ({ children }) => {
   const [recentChannels, setRecentChannels] = useState([]);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const [mutedChannels, setMutedChannels] = useState([]); // Track muted channels
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null); // For search navigation
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -154,37 +155,74 @@ export const ChatProvider = ({ children }) => {
 
     try {
       console.log('📤 Sending message to channel:', channelId);
+
+      // Extract thread-related data from metadata
+      const { parentMessageId, isThreadReply, alsoSendToChannel, ...restMetadata } = metadata;
+
       const response = await axios.post(
         `${API_URL}/api/chat/messages`,
-        { channelId, content, type, metadata },
+        {
+          channelId,
+          content,
+          type,
+          metadata: restMetadata,
+          parentMessageId: isThreadReply ? (parentMessageId || metadata.replyTo) : null,
+          sendToChannel: alsoSendToChannel
+        },
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
       console.log('✅ Message sent successfully:', response.data);
 
-      // Immediately add message to local state (don't wait for socket)
-      setMessages(prev => ({
-        ...prev,
-        [channelId]: [...(prev[channelId] || []), response.data]
-      }));
+      // Only add to channel messages if:
+      // 1. It's NOT a thread reply, OR
+      // 2. It IS a thread reply but "also send to channel" is checked
+      const shouldShowInChannel = !isThreadReply || alsoSendToChannel;
 
-      // Update channel's last message and unarchive if archived
-      setChannels(prev =>
-        prev.map(ch => {
-          if (!ch || !ch._id) return ch;
-          return ch._id === channelId
-            ? { ...ch,
-                isArchived: false, // Auto-unarchive when sending message
-                lastMessage: {
-                  content: content.substring(0, 100),
-                  sender: response.data.sender,
-                  timestamp: new Date(),
-                  type: type
+      if (shouldShowInChannel) {
+        // Immediately add message to local state (don't wait for socket)
+        setMessages(prev => ({
+          ...prev,
+          [channelId]: [...(prev[channelId] || []), response.data]
+        }));
+
+        // Update channel's last message and unarchive if archived
+        setChannels(prev =>
+          prev.map(ch => {
+            if (!ch || !ch._id) return ch;
+            return ch._id === channelId
+              ? { ...ch,
+                  isArchived: false, // Auto-unarchive when sending message
+                  lastMessage: {
+                    content: content.substring(0, 100),
+                    sender: response.data.sender,
+                    timestamp: new Date(),
+                    type: type
+                  }
                 }
-              }
-            : ch;
-        })
-      );
+              : ch;
+          })
+        );
+      }
+
+      // If it's a thread reply, update parent message's reply count in local state
+      if (isThreadReply && parentMessageId) {
+        setMessages(prev => {
+          const channelMessages = prev[channelId] || [];
+          return {
+            ...prev,
+            [channelId]: channelMessages.map(msg =>
+              msg._id === parentMessageId
+                ? {
+                    ...msg,
+                    replyCount: (msg.replyCount || 0) + 1,
+                    lastReplyAt: new Date().toISOString()
+                  }
+                : msg
+            )
+          };
+        });
+      }
 
       // Emit socket event for real-time delivery to OTHER users
       if (socket && isConnected) {
@@ -838,6 +876,38 @@ export const ChatProvider = ({ children }) => {
       console.log('🔔 SOCKET EVENT: chat:message:received', data);
       const { channelId, message } = data;
 
+      // Don't add pure thread replies to channel messages
+      // Thread replies should only appear in ThreadPanel
+      // Exception: if the reply was sent with "also send to channel" checked
+      if (message.isThreadReply && !message.metadata?.alsoSendToChannel) {
+        console.log('🧵 Thread reply received, not adding to channel messages:', message._id);
+
+        // Update parent message's reply count ONLY if message is from another user
+        // (sender already updated locally in sendMessage for instant feedback)
+        // Use toString() to ensure proper comparison regardless of type (string vs ObjectId)
+        const senderId = message.sender?._id?.toString?.() || message.sender?._id;
+        const currentUserId = userRef.current?._id?.toString?.() || userRef.current?._id;
+        const isFromCurrentUser = senderId === currentUserId;
+        if (message.parentMessage && !isFromCurrentUser) {
+          setMessages(prev => {
+            const channelMessages = prev[channelId] || [];
+            return {
+              ...prev,
+              [channelId]: channelMessages.map(msg =>
+                msg._id === message.parentMessage
+                  ? {
+                      ...msg,
+                      replyCount: (msg.replyCount || 0) + 1,
+                      lastReplyAt: new Date().toISOString()
+                    }
+                  : msg
+              )
+            };
+          });
+        }
+        return;
+      }
+
       setMessages(prev => {
         const existingMessages = prev[channelId] || [];
 
@@ -1199,11 +1269,62 @@ export const ChatProvider = ({ children }) => {
     }
   }, [user, fetchStarredChannels, fetchMutedChannels]);
 
+  // Scroll to message function - for search navigation
+  const scrollToMessage = useCallback(async (messageId, channelId = null) => {
+    console.log('🔍 scrollToMessage called:', { messageId, channelId });
+
+    // If channelId is provided and different from active, switch channel first
+    if (channelId && (!activeChannel || activeChannel._id !== channelId)) {
+      const targetChannel = channels.find(ch => ch._id === channelId);
+      if (targetChannel) {
+        console.log('📌 Switching to channel:', targetChannel.name || targetChannel._id);
+        setActiveChannel(targetChannel);
+
+        // Wait for channel switch and messages to load
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Fetch messages if not loaded
+        if (!messages[channelId] || messages[channelId].length === 0) {
+          await fetchMessages(channelId);
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+    }
+
+    // Set highlighted message
+    setHighlightedMessageId(messageId);
+
+    // Dispatch custom event for MessageList to handle scrolling
+    window.dispatchEvent(new CustomEvent('scrollToMessage', {
+      detail: { messageId, channelId }
+    }));
+
+    // Clear highlight after animation
+    setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 3000);
+  }, [activeChannel, channels, messages, fetchMessages]);
+
+  // Listen for scrollToMessage events from SearchModal
+  useEffect(() => {
+    const handleScrollToMessageEvent = (event) => {
+      const { messageId, channelId } = event.detail;
+      scrollToMessage(messageId, channelId);
+    };
+
+    window.addEventListener('navigateToMessage', handleScrollToMessageEvent);
+
+    return () => {
+      window.removeEventListener('navigateToMessage', handleScrollToMessageEvent);
+    };
+  }, [scrollToMessage]);
+
   const value = {
     // State
     channels,
     activeChannel,
     messages: messages[activeChannel?._id] || [],
+    allMessages: messages, // For search - access to all loaded messages
     pinnedMessages: pinnedMessages[activeChannel?._id] || [],
     typingUsers: typingUsers[activeChannel?._id] || [],
     unreadCounts,
@@ -1214,6 +1335,7 @@ export const ChatProvider = ({ children }) => {
     threadMessage,
     starredChannels,
     recentChannels,
+    highlightedMessageId,
 
     // Actions
     setActiveChannel,
@@ -1233,6 +1355,7 @@ export const ChatProvider = ({ children }) => {
     toggleArchiveChannel,
     toggleStarChannel,
     updateMyPresence,
+    scrollToMessage,
 
     // Helpers
     getChannelById: (id) => channels.find(ch => ch._id === id),

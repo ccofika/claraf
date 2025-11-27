@@ -8,12 +8,10 @@ import EmojiPicker from './EmojiPicker';
 import ElementPreviewModal from './ElementPreviewModal';
 import ImageViewer from './ImageViewer';
 import { useNavigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
-const MessageBubble = ({ message, isGrouped }) => {
+const MessageBubble = ({ message, isGrouped, isInThread = false }) => {
   const { user } = useAuth();
-  const { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, setReplyingTo, setThreadMessage } = useChat();
+  const { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, setReplyingTo, setThreadMessage, messages } = useChat();
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -176,6 +174,21 @@ const MessageBubble = ({ message, isGrouped }) => {
     });
   };
 
+  const formatRelativeTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const handleEdit = async () => {
     if (editContent.trim() && editContent !== message.content) {
       try {
@@ -212,7 +225,20 @@ const MessageBubble = ({ message, isGrouped }) => {
   const handleReply = () => {
     // Open thread panel instead of inline reply
     if (setThreadMessage) {
-      setThreadMessage(message);
+      // If this message has a threadParent (it's a "also send to channel" reply),
+      // open the original thread instead
+      if (message.metadata?.threadParent?.messageId) {
+        // Create a minimal parent message object to open the thread
+        const parentMessage = {
+          _id: message.metadata.threadParent.messageId,
+          content: message.metadata.threadParent.content,
+          sender: message.metadata.threadParent.sender,
+          channel: message.channel
+        };
+        setThreadMessage(parentMessage);
+      } else {
+        setThreadMessage(message);
+      }
     } else if (setReplyingTo) {
       // Fallback to inline reply
       setReplyingTo(message);
@@ -246,6 +272,52 @@ const MessageBubble = ({ message, isGrouped }) => {
     const hash = userId?.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || 0;
     return colors[hash % colors.length];
   };
+
+  // Keyboard shortcuts when message is hovered
+  React.useEffect(() => {
+    if (!isHovered || isEditing) return;
+
+    const handleKeyDown = (e) => {
+      // Don't trigger if user is typing in an input/textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'e': // Edit (only own messages)
+          if (isOwnMessage && message.type === 'text') {
+            e.preventDefault();
+            setIsEditing(true);
+            setEditContent(message.content);
+          }
+          break;
+        case 'r': // React
+          e.preventDefault();
+          setShowEmojiPicker(true);
+          break;
+        case 't': // Open thread
+          e.preventDefault();
+          handleReply();
+          break;
+        case 'p': // Pin/Unpin
+          e.preventDefault();
+          handlePin();
+          break;
+        case 'delete': // Delete (only own messages)
+        case 'backspace': // Also support backspace for delete
+          if (isOwnMessage && e.key.toLowerCase() === 'delete') {
+            e.preventDefault();
+            handleDelete();
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isHovered, isEditing, isOwnMessage, message]);
 
   return (
     <div
@@ -327,8 +399,51 @@ const MessageBubble = ({ message, isGrouped }) => {
               {/* Message Content - NO BUBBLE (Slack style) */}
               <div className="max-w-full">
                 <div className="transition-all duration-100">
-                  {/* Reply Preview (if replying to another message) */}
-                  {message.metadata?.replyTo && (
+                  {/* Thread Reply Indicator (for "also send to channel" messages) - hide when viewing in thread panel */}
+                  {message.metadata?.threadParent && !isInThread && (() => {
+                    // Find parent message to calculate newer replies
+                    const parentMsg = messages.find(m => m._id === message.metadata.threadParent.messageId);
+                    const myPosition = message.metadata.threadParent.replyPosition || 0;
+                    const totalReplies = parentMsg?.replyCount || myPosition;
+                    const newerReplies = totalReplies - myPosition;
+
+                    return (
+                      <div className="mb-2">
+                        <button
+                          onClick={handleReply}
+                          className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 dark:bg-neutral-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors group/thread-link"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-gray-500 dark:text-neutral-400" viewBox="0 0 16 16" fill="currentColor">
+                              <path d="M2.5 2a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-1 0v-11a.5.5 0 0 1 .5-.5zm2 2a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zm11 .5a.5.5 0 0 0-1 0v7a.5.5 0 0 0 1 0v-7zm-10-2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 11a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5z"/>
+                            </svg>
+                            <span className="text-[12px] text-gray-600 dark:text-neutral-400">
+                              Replied to a thread
+                            </span>
+                          </div>
+                          <span className="text-[12px] text-[#1264A3] dark:text-blue-400 font-medium group-hover/thread-link:underline truncate max-w-[200px]">
+                            {message.metadata.threadParent.content}
+                          </span>
+                        </button>
+
+                        {/* View newer replies button */}
+                        {newerReplies > 0 && (
+                          <button
+                            onClick={handleReply}
+                            className="flex items-center gap-1.5 mt-1 px-2 py-1 text-[12px] text-[#1264A3] dark:text-blue-400 font-medium hover:underline"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                            View {newerReplies} newer {newerReplies === 1 ? 'reply' : 'replies'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Reply Preview (if replying to another message - non-thread quote) */}
+                  {message.metadata?.replyTo && !message.metadata?.threadParent && (
                     <div className={`pb-2.5 mb-2.5 border-l-2 pl-3 ${
                       isOwnMessage
                         ? 'border-blue-300 dark:border-blue-600'
@@ -350,97 +465,10 @@ const MessageBubble = ({ message, isGrouped }) => {
                   )}
 
                   {/* Message Content */}
-                  <div className="text-[15px] leading-[1.47] break-words text-gray-900 dark:text-[#D1D2D3] prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        // Custom rendering for specific elements
-                        a: ({ node, ...props }) => (
-                          <a
-                            {...props}
-                            className="text-[#1164A3] dark:text-blue-400 hover:underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          />
-                        ),
-                        code: ({ node, inline, ...props }) =>
-                          inline ? (
-                            <code
-                              {...props}
-                              className="bg-gray-200 dark:bg-neutral-800 text-red-600 dark:text-red-400 px-1 py-0.5 rounded text-[14px] font-mono"
-                            />
-                          ) : (
-                            <code
-                              {...props}
-                              className="block bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 p-2 rounded text-[13px] font-mono overflow-x-auto"
-                            />
-                          ),
-                        pre: ({ node, ...props }) => (
-                          <pre
-                            {...props}
-                            className="bg-gray-100 dark:bg-neutral-900 p-3 rounded overflow-x-auto my-2"
-                          />
-                        ),
-                        ul: ({ node, ...props }) => (
-                          <ul {...props} className="list-disc list-inside my-1" />
-                        ),
-                        ol: ({ node, ...props }) => (
-                          <ol {...props} className="list-decimal list-inside my-1" />
-                        ),
-                        blockquote: ({ node, ...props }) => (
-                          <blockquote
-                            {...props}
-                            className="border-l-4 border-gray-300 dark:border-neutral-600 pl-4 italic text-gray-600 dark:text-neutral-400 my-2"
-                          />
-                        ),
-                        p: ({ node, children, ...props }) => {
-                          // Process children to highlight @mentions
-                          const processedChildren = React.Children.map(children, (child) => {
-                            if (typeof child === 'string') {
-                              // Match mentions wrapped in zero-width spaces: \u200B@Name\u200B
-                              // Also match @all mentions
-                              const mentionRegex = /\u200B(@[^\u200B]+)\u200B|(@all)(?=\s|$|[.,!?:;)])/g;
-
-                              const parts = [];
-                              let lastIndex = 0;
-                              let match;
-
-                              while ((match = mentionRegex.exec(child)) !== null) {
-                                // Add text before mention
-                                if (match.index > lastIndex) {
-                                  parts.push(child.substring(lastIndex, match.index));
-                                }
-
-                                // Get the mention text (without zero-width markers)
-                                const mention = match[1] || match[2];
-
-                                parts.push(
-                                  <span
-                                    key={match.index}
-                                    className="bg-blue-100 dark:bg-blue-900/30 text-[#1164A3] dark:text-blue-400 px-1 rounded font-medium"
-                                  >
-                                    {mention}
-                                  </span>
-                                );
-                                lastIndex = mentionRegex.lastIndex;
-                              }
-
-                              // Add remaining text
-                              if (lastIndex < child.length) {
-                                parts.push(child.substring(lastIndex));
-                              }
-
-                              return parts.length > 0 ? parts : child;
-                            }
-                            return child;
-                          });
-                          return <p {...props} className="my-1">{processedChildren}</p>;
-                        },
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
+                  <div
+                    className="text-[15px] leading-[1.47] break-words text-gray-900 dark:text-[#D1D2D3] max-w-none chat-message-content"
+                    dangerouslySetInnerHTML={{ __html: message.content }}
+                  />
 
                   {/* File Attachments */}
                   {message.metadata?.files && message.metadata.files.length > 0 && (
@@ -632,6 +660,51 @@ const MessageBubble = ({ message, isGrouped }) => {
                 );
               })}
             </div>
+          )}
+
+          {/* Thread Reply Count */}
+          {message.replyCount > 0 && (
+            <button
+              onClick={handleReply}
+              className="flex items-center gap-2 mt-2.5 px-2.5 py-2 rounded-lg border border-transparent hover:border-gray-200 dark:hover:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-all group/thread"
+            >
+              {/* Thread participants avatars */}
+              <div className="flex -space-x-1.5">
+                {(message.threadParticipants || []).slice(0, 3).map((participant, idx) => (
+                  <div
+                    key={participant._id || idx}
+                    className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-[#1A1D21] ${getAvatarColor(participant._id)}`}
+                  >
+                    {participant.name?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                ))}
+                {(message.threadParticipants?.length || 0) > 3 && (
+                  <div className="w-6 h-6 rounded bg-gray-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-neutral-400 border-2 border-white dark:border-[#1A1D21]">
+                    +{message.threadParticipants.length - 3}
+                  </div>
+                )}
+              </div>
+
+              {/* Reply count and view thread */}
+              <div className="flex flex-col items-start">
+                <span className="text-[13px] font-semibold text-[#1264A3] dark:text-blue-400 group-hover/thread:underline">
+                  {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+                </span>
+                {message.lastReplyAt && (
+                  <span className="text-[11px] text-gray-500 dark:text-neutral-500">
+                    Last reply {formatRelativeTime(message.lastReplyAt)}
+                  </span>
+                )}
+              </div>
+
+              {/* View thread arrow */}
+              <div className="ml-auto opacity-0 group-hover/thread:opacity-100 transition-opacity flex items-center gap-1 text-[12px] text-gray-500 dark:text-neutral-400">
+                <span>View thread</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
           )}
         </div>
       </div>
