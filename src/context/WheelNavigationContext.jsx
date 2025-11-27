@@ -27,9 +27,14 @@ export const WheelNavigationProvider = ({ children }) => {
 
   const toggleWheel = useCallback(() => {
     if (user) {
-      setIsOpen(prev => !prev);
+      if (isOpen) {
+        // Let the component handle the close animation
+        setIsOpen(false);
+      } else {
+        setIsOpen(true);
+      }
     }
-  }, [user]);
+  }, [user, isOpen]);
 
   // Global keyboard shortcut: Alt+N
   useEffect(() => {

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target,
-  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound
+  FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
+  Keyboard, RefreshCw
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -18,6 +19,7 @@ import QASearchBar from '../components/QASearchBar';
 import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
 import QAAllAgents from '../components/QAAllAgents';
+import QAShortcutsModal from '../components/QAShortcutsModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
 const QAManager = () => {
@@ -29,6 +31,10 @@ const QAManager = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [focusedTicketIndex, setFocusedTicketIndex] = useState(-1);
+  const searchInputRef = useRef(null);
+  const ticketListRef = useRef(null);
 
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
@@ -108,18 +114,159 @@ const QAManager = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keyboard shortcuts
-  useKeyboardShortcuts({
-    'open-command-palette': {
-      keys: 'cmd+k',
-      handler: (e) => {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      },
-      description: 'Open Command Palette',
-      enabled: true
+  // Comprehensive Keyboard Shortcuts (using Alt to avoid Chrome conflicts)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger shortcuts when typing in inputs (except for Ctrl+Enter to save)
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
+                       document.activeElement?.isContentEditable;
+
+      // Alt key shortcuts (avoid Chrome's Ctrl shortcuts)
+      if (e.altKey && !e.ctrlKey && !e.shiftKey) {
+        switch (e.key) {
+          // Tab Navigation: Alt+1/2/3/4
+          case '1':
+            e.preventDefault();
+            setActiveTab('dashboard');
+            return;
+          case '2':
+            e.preventDefault();
+            setActiveTab('agents');
+            return;
+          case '3':
+            e.preventDefault();
+            setActiveTab('tickets');
+            return;
+          case '4':
+            e.preventDefault();
+            setActiveTab('archive');
+            return;
+          // Quick Actions: Alt+T/A/E/S/K
+          case 't':
+          case 'T':
+            e.preventDefault();
+            setTicketDialog({ open: true, mode: 'create', data: null });
+            return;
+          case 'a':
+          case 'A':
+            if (!isTyping) {
+              e.preventDefault();
+              setAgentDialog({ open: true, mode: 'create', data: null });
+            }
+            return;
+          case 'e':
+          case 'E':
+            e.preventDefault();
+            handleExportSelectedTickets();
+            return;
+          case 's':
+          case 'S':
+            e.preventDefault();
+            // Toggle AI/Text search
+            setFilters(prev => ({
+              ...prev,
+              searchMode: prev.searchMode === 'ai' ? 'text' : 'ai'
+            }));
+            toast.success(`Switched to ${filters.searchMode === 'ai' ? 'Text' : 'AI'} search`);
+            return;
+          case 'k':
+          case 'K':
+            e.preventDefault();
+            setShowCommandPalette(true);
+            return;
+        }
+      }
+
+      // Single key shortcuts (only when not typing)
+      if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        switch (e.key) {
+          case '?':
+            e.preventDefault();
+            setShowShortcutsModal(true);
+            return;
+          case '/':
+            e.preventDefault();
+            searchInputRef.current?.focus();
+            return;
+          case 'Escape':
+            if (selectedTickets.length > 0) {
+              setSelectedTickets([]);
+              toast.info('Selection cleared');
+            }
+            setFocusedTicketIndex(-1);
+            return;
+          case 'r':
+          case 'R':
+            e.preventDefault();
+            if (activeTab === 'dashboard') fetchDashboardStats();
+            else if (activeTab === 'agents') fetchAgents();
+            else fetchTickets();
+            toast.success('Refreshing data...');
+            return;
+        }
+
+        // Ticket list navigation (J/K) - only in tickets/archive tabs
+        if ((activeTab === 'tickets' || activeTab === 'archive') && tickets.length > 0) {
+          switch (e.key.toLowerCase()) {
+            case 'j':
+              e.preventDefault();
+              setFocusedTicketIndex(prev => Math.min(prev + 1, tickets.length - 1));
+              return;
+            case 'k':
+              e.preventDefault();
+              setFocusedTicketIndex(prev => Math.max(prev - 1, 0));
+              return;
+            case 'enter':
+              if (focusedTicketIndex >= 0 && focusedTicketIndex < tickets.length) {
+                e.preventDefault();
+                setViewDialog({ open: true, ticket: tickets[focusedTicketIndex] });
+              }
+              return;
+            case 'g':
+              if (focusedTicketIndex >= 0 && focusedTicketIndex < tickets.length) {
+                const ticket = tickets[focusedTicketIndex];
+                if (ticket.status !== 'Graded') {
+                  e.preventDefault();
+                  setGradeDialog({ open: true, ticket });
+                }
+              }
+              return;
+            case 'f':
+              if (focusedTicketIndex >= 0 && focusedTicketIndex < tickets.length) {
+                e.preventDefault();
+                setFeedbackDialog({ open: true, ticket: tickets[focusedTicketIndex] });
+              }
+              return;
+            case 'a':
+              if (focusedTicketIndex >= 0 && focusedTicketIndex < tickets.length && activeTab === 'tickets') {
+                e.preventDefault();
+                handleArchiveTicket(tickets[focusedTicketIndex]._id);
+              }
+              return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, tickets, focusedTicketIndex, selectedTickets, filters.searchMode]);
+
+  // Scroll focused ticket into view
+  useEffect(() => {
+    if (focusedTicketIndex >= 0 && ticketListRef.current) {
+      const focusedRow = ticketListRef.current.querySelector(`[data-ticket-index="${focusedTicketIndex}"]`);
+      if (focusedRow) {
+        focusedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
-  });
+  }, [focusedTicketIndex]);
+
+  // Reset focused index when switching tabs or when tickets change
+  useEffect(() => {
+    setFocusedTicketIndex(-1);
+  }, [activeTab]);
+
   const getAuthHeaders = () => ({
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
   });
@@ -858,14 +1005,30 @@ const QAManager = () => {
 
     return (
       <div className="space-y-6">
-        {/* Export Button */}
-        <div className="flex justify-end">
+        {/* Action Bar */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShortcutsModal(true)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+            <button
+              onClick={fetchDashboardStats}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
           <Button
             onClick={handleExportSelectedTickets}
-            className="flex items-center gap-2"
+            size="sm"
           >
-            <Download className="w-4 h-4" />
-            Export Selected Tickets
+            <Download className="w-4 h-4 mr-1.5" />
+            Export Selected
           </Button>
         </div>
 
@@ -1007,16 +1170,16 @@ const QAManager = () => {
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage QA agents for this week's grading</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => {
+            <Button variant="secondary" size="sm" onClick={() => {
               fetchAllExistingAgents();
               setAddExistingAgentDialog({ open: true });
             }}>
               <Users className="w-4 h-4 mr-1.5" />
-              Add Existing Agent
+              Add Existing
             </Button>
-            <Button onClick={() => setAgentDialog({ open: true, mode: 'create', data: null })}>
+            <Button size="sm" onClick={() => setAgentDialog({ open: true, mode: 'create', data: null })}>
               <Plus className="w-4 h-4 mr-1.5" />
-              Add New Agent
+              New Agent
             </Button>
           </div>
         </div>
@@ -1043,60 +1206,62 @@ const QAManager = () => {
               <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
                 <tr>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                    className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <ArrowUpDown className="w-3.5 h-3.5" />
+                      <ArrowUpDown className="w-3 h-3" />
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Position</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Team</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Actions</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Position</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Team</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
+              <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
                 {sortedAgents.map((agent) => (
-                  <tr key={agent._id} className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr key={agent._id} className="group hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                        <div className="w-7 h-7 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
                           {agent.name?.charAt(0) || '?'}
                         </div>
                         <span className="text-sm font-medium text-gray-900 dark:text-white">{agent.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">{agent.position || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">{agent.team || '-'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.position || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.team || '-'}</td>
+                    <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                         agent.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
                       }`}>
                         {agent.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleExportMaestro(agent._id)}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                          title="Export Maestro"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Export"
                         >
-                          <Download className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Download className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                         <button
                           onClick={() => setAgentDialog({ open: true, mode: 'edit', data: agent })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Edit"
                         >
-                          <Edit className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Edit className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                         <button
                           onClick={() => setDeleteDialog({ open: true, type: 'agent', id: agent._id, name: agent.name })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Remove"
                         >
-                          <Trash2 className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Trash2 className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                       </div>
                     </td>
@@ -1131,12 +1296,10 @@ const QAManager = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tickets</h2>
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Add Ticket
-            </Button>
-          </div>
+          <Button size="sm" onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            New Ticket
+          </Button>
         </div>
 
         {/* Bulk Actions */}
@@ -1176,7 +1339,7 @@ const QAManager = () => {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
                 <tr>
-                  <th className="px-6 py-3 w-8">
+                  <th className="px-4 py-2.5 w-8">
                     <input
                       type="checkbox"
                       checked={selectedTickets.length === tickets.length && tickets.length > 0}
@@ -1190,28 +1353,34 @@ const QAManager = () => {
                       className="rounded border-gray-300 dark:border-neutral-600"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Agent</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Score</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Actions</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Agent</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Score</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
-                {sortedTickets.map((ticket) => (
+              <tbody className="divide-y divide-gray-100 dark:divide-neutral-800" ref={ticketListRef}>
+                {sortedTickets.map((ticket, index) => (
                   <tr
                     key={ticket._id}
-                    className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    data-ticket-index={index}
+                    className={`group transition-colors cursor-pointer ${
+                      focusedTicketIndex === index
+                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
+                    }`}
                     onClick={(e) => {
                       // Don't open dialog if clicking on checkbox or action buttons
                       if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) {
                         return;
                       }
+                      setFocusedTicketIndex(index);
                       setViewDialog({ open: true, ticket });
                     }}
                   >
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedTickets.includes(ticket._id)}
@@ -1225,63 +1394,50 @@ const QAManager = () => {
                         className="rounded border-gray-300 dark:border-neutral-600"
                       />
                     </td>
-                    <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400" onClick={(e) => e.stopPropagation()}>{ticket.ticketId || ticket._id.slice(-6)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                       {ticket.agent?.name || ticket.agentName || 'Unknown'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">
                       {new Date(ticket.dateEntered || ticket.createdAt || ticket.reviewDate).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <StatusBadge status={ticket.status} />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <QualityScoreBadge score={ticket.qualityScorePercent} />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         {ticket.status !== 'Graded' && (
                           <button
                             onClick={() => setGradeDialog({ open: true, ticket })}
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                            title="Grade ticket"
+                            className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                            title="Grade"
                           >
-                            <Target className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                            <Target className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                           </button>
                         )}
                         <button
                           onClick={() => setFeedbackDialog({ open: true, ticket })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                          title="Add feedback"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Feedback"
                         >
-                          <MessageSquare className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <MessageSquare className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                         <button
                           onClick={() => setTicketDialog({ open: true, mode: 'edit', data: ticket })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Edit"
                         >
-                          <Edit className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Edit className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <ShareButton
-                            item={{
-                              _id: ticket._id,
-                              title: ticket.title || `Ticket ${ticket.ticketId || ticket._id.slice(-6)}`,
-                              description: ticket.description,
-                              status: ticket.status,
-                              priority: ticket.priority,
-                              category: ticket.category
-                            }}
-                            type="ticket"
-                            variant="icon"
-                          />
-                        </div>
                         <button
                           onClick={() => handleArchiveTicket(ticket._id)}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
                           title="Archive"
                         >
-                          <Archive className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Archive className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                       </div>
                     </td>
@@ -1386,21 +1542,27 @@ const QAManager = () => {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
-                {sortedTickets.map((ticket) => (
+              <tbody className="divide-y divide-gray-100 dark:divide-neutral-800" ref={activeTab === 'archive' ? ticketListRef : undefined}>
+                {sortedTickets.map((ticket, index) => (
                   <tr
                     key={ticket._id}
-                    className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    data-ticket-index={index}
+                    className={`group transition-colors cursor-pointer ${
+                      focusedTicketIndex === index
+                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
+                    }`}
                     onClick={(e) => {
                       // Don't open dialog if clicking on action buttons
                       if (e.target.closest('button')) {
                         return;
                       }
+                      setFocusedTicketIndex(index);
                       setViewDialog({ open: true, ticket });
                     }}
                   >
                     {isAISearch && (
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <div
                           className="flex items-center gap-1.5 cursor-help"
                           title={`Hybrid: ${ticket.relevanceScore}%\nSemantic: ${ticket.semanticScore || '-'}%\nKeyword: ${ticket.keywordScore || '-'}%`}
@@ -1416,45 +1578,32 @@ const QAManager = () => {
                         </div>
                       </td>
                     )}
-                    <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{ticket.agent?.name || 'Unknown'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-neutral-400">{ticket.ticketId || ticket._id.slice(-6)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{ticket.agent?.name || 'Unknown'}</td>
+                    <td className="px-4 py-3">
                       <StatusBadge status={ticket.status} />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <QualityScoreBadge score={ticket.qualityScorePercent} />
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">
                       {ticket.archivedDate ? new Date(ticket.archivedDate).toLocaleDateString() : new Date(ticket.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleRestoreTicket(ticket._id)}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
                           title="Restore"
                         >
-                          <RotateCcw className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <RotateCcw className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <ShareButton
-                            item={{
-                              _id: ticket._id,
-                              title: ticket.title || `Ticket ${ticket.ticketId || ticket._id.slice(-6)}`,
-                              description: ticket.description,
-                              status: ticket.status,
-                              priority: ticket.priority,
-                              category: ticket.category
-                            }}
-                            type="ticket"
-                            variant="icon"
-                          />
-                        </div>
                         <button
                           onClick={() => setDeleteDialog({ open: true, type: 'ticket', id: ticket._id, name: ticket.ticketId })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Delete"
                         >
-                          <Trash2 className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+                          <Trash2 className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                       </div>
                     </td>
@@ -1476,6 +1625,7 @@ const QAManager = () => {
 
   // Agent Dialog Component
   const AgentDialogContent = () => {
+    const formRef = useRef(null);
     const [formData, setFormData] = useState({
       name: '',
       position: '',
@@ -1507,6 +1657,18 @@ const QAManager = () => {
       }
     }, [agentDialog.data]);
 
+    // Ctrl+Enter to save
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          formRef.current?.requestSubmit();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     const handleSubmit = (e) => {
       e.preventDefault();
       if (agentDialog.mode === 'create') {
@@ -1524,7 +1686,7 @@ const QAManager = () => {
               {agentDialog.mode === 'create' ? 'Create Agent' : 'Edit Agent'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Name <span className="text-red-600 dark:text-red-400">*</span></Label>
               <Input
@@ -1747,6 +1909,7 @@ const QAManager = () => {
 
   // Ticket Dialog Component
   const TicketDialogContent = () => {
+    const formRef = useRef(null);
     const [formData, setFormData] = useState({
       agent: '',
       ticketId: '',
@@ -1784,6 +1947,18 @@ const QAManager = () => {
       }
     }, [ticketDialog.data]);
 
+    // Ctrl+Enter to save
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          formRef.current?.requestSubmit();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     const handleSubmit = (e) => {
       e.preventDefault();
       if (ticketDialog.mode === 'create') {
@@ -1801,7 +1976,7 @@ const QAManager = () => {
               {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
@@ -1921,7 +2096,20 @@ const QAManager = () => {
 
   // Grade Dialog Component
   const GradeDialogContent = () => {
+    const formRef = useRef(null);
     const [score, setScore] = useState(gradeDialog.ticket?.qualityScorePercent || 80);
+
+    // Ctrl+Enter to save
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          formRef.current?.requestSubmit();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -1934,7 +2122,7 @@ const QAManager = () => {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Grade Ticket</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
               <Input
@@ -1967,7 +2155,20 @@ const QAManager = () => {
 
   // Feedback Dialog Component
   const FeedbackDialogContent = () => {
+    const formRef = useRef(null);
     const [feedback, setFeedback] = useState(feedbackDialog.ticket?.feedback || '');
+
+    // Ctrl+Enter to save
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          formRef.current?.requestSubmit();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -1980,7 +2181,7 @@ const QAManager = () => {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Add Feedback</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Feedback</Label>
               <textarea
@@ -2192,10 +2393,10 @@ const QAManager = () => {
           <button
             onClick={() => setShowCommandPalette(true)}
             className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg transition-colors"
+            title="Quick Search (Alt+K)"
           >
             <Search className="w-4 h-4" />
             Quick Search
-            <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded">⌘K</kbd>
           </button>
         </div>
       </div>
@@ -2269,6 +2470,12 @@ const QAManager = () => {
           setShowCommandPalette(false);
         }}
         currentFilters={filters}
+      />
+
+      {/* Shortcuts Modal */}
+      <QAShortcutsModal
+        open={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
       />
     </div>
   );

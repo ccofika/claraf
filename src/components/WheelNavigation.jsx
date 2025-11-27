@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import axios from 'axios';
@@ -38,14 +38,17 @@ const getPageConfig = (user) => {
     {
       id: 'workspaces',
       label: 'Workspaces',
+      description: 'Collaborative canvas',
       icon: Home,
-      path: null, // Dynamic - navigates to workspace
+      path: null,
+      pathMatch: '/workspace',
       hasSubpages: true,
       subpageType: 'workspaces',
     },
     {
       id: 'vip-calculator',
       label: 'VIP Calculator',
+      description: 'Calculate VIP progress',
       icon: Calculator,
       path: '/vip-calculator',
       hasSubpages: false,
@@ -53,6 +56,7 @@ const getPageConfig = (user) => {
     {
       id: 'hash-explorer',
       label: 'Hash Explorer',
+      description: 'Transaction lookup',
       icon: SearchIcon,
       path: '/hash-explorer',
       hasSubpages: false,
@@ -60,6 +64,7 @@ const getPageConfig = (user) => {
     {
       id: 'quick-links',
       label: 'Quick Links',
+      description: 'Saved bookmarks',
       icon: LinkIcon,
       path: '/quick-links',
       hasSubpages: false,
@@ -67,6 +72,7 @@ const getPageConfig = (user) => {
     {
       id: 'chat',
       label: 'Chat',
+      description: 'Team messaging',
       icon: ChatBubble,
       path: '/chat',
       hasSubpages: true,
@@ -75,6 +81,7 @@ const getPageConfig = (user) => {
     {
       id: 'kyc',
       label: 'KYC Management',
+      description: 'Verification requests',
       icon: CheckmarkFilled,
       path: '/kyc',
       hasSubpages: false,
@@ -82,17 +89,18 @@ const getPageConfig = (user) => {
     {
       id: 'countries-restrictions',
       label: 'Countries',
+      description: 'Geo restrictions',
       icon: EarthFilled,
       path: '/countries-restrictions',
       hasSubpages: false,
     },
   ];
 
-  // Add role-restricted pages
   if (isDeveloperOrAdmin) {
     pages.push({
       id: 'developer-dashboard',
       label: 'Dev Dashboard',
+      description: 'System analytics',
       icon: ChartLine,
       path: '/developer-dashboard',
       hasSubpages: false,
@@ -103,6 +111,7 @@ const getPageConfig = (user) => {
     pages.push({
       id: 'qa-manager',
       label: 'QA Manager',
+      description: 'Quality assurance',
       icon: Task,
       path: '/qa-manager',
       hasSubpages: true,
@@ -117,6 +126,7 @@ const getPageConfig = (user) => {
     pages.push({
       id: 'kyc-agent-stats',
       label: 'KYC Stats',
+      description: 'Agent analytics',
       icon: Analytics,
       path: '/kyc-agent-stats',
       hasSubpages: false,
@@ -126,25 +136,44 @@ const getPageConfig = (user) => {
   return pages;
 };
 
-// Animation timing
-const ANIMATION_DURATION = 300;
-const STAGGER_DELAY = 30;
-
 const WheelNavigation = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { recentChannels } = useChat();
 
   const [hoveredPage, setHoveredPage] = useState(null);
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [animationState, setAnimationState] = useState('closed');
   const [selectedItem, setSelectedItem] = useState(null);
   const [workspaceSubpages, setWorkspaceSubpages] = useState([]);
   const [chatSubpages, setChatSubpages] = useState([]);
   const hoverTimeoutRef = React.useRef(null);
 
-  // Handle hover with delay for subpages
+  const pages = useMemo(() => getPageConfig(user), [user]);
+
+  // Detect current page
+  const currentPageId = useMemo(() => {
+    const path = location.pathname;
+    for (const page of pages) {
+      if (page.path && path.startsWith(page.path)) return page.id;
+      if (page.pathMatch && path.startsWith(page.pathMatch)) return page.id;
+    }
+    return null;
+  }, [location.pathname, pages]);
+
+  // Handle animation states
+  useEffect(() => {
+    if (isOpen && animationState === 'closed') {
+      setAnimationState('opening');
+      setTimeout(() => setAnimationState('open'), 350);
+    } else if (!isOpen && (animationState === 'open' || animationState === 'opening')) {
+      setAnimationState('closing');
+      setTimeout(() => setAnimationState('closed'), 280);
+    }
+  }, [isOpen, animationState]);
+
+  // Hover handlers
   const handlePageMouseEnter = (pageId) => {
-    // Clear any pending timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -153,14 +182,10 @@ const WheelNavigation = ({ isOpen, onClose }) => {
   };
 
   const handlePageMouseLeave = () => {
-    // Set a timeout before hiding subpages (gives user time to reach them)
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredPage(null);
-    }, 800); // 800ms delay
+    hoverTimeoutRef.current = setTimeout(() => setHoveredPage(null), 500);
   };
 
   const handleSubpageMouseEnter = (pageId) => {
-    // Clear the timeout - user reached a subpage
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -169,40 +194,27 @@ const WheelNavigation = ({ isOpen, onClose }) => {
   };
 
   const handleSubpageMouseLeave = () => {
-    // Set a timeout before hiding
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredPage(null);
-    }, 400); // Shorter delay when leaving subpage
+    hoverTimeoutRef.current = setTimeout(() => setHoveredPage(null), 300);
   };
 
-  // Cleanup timeout on unmount
   React.useEffect(() => {
     return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
-
-  const pages = useMemo(() => getPageConfig(user), [user]);
 
   // Fetch workspace subpages
   useEffect(() => {
     const fetchWorkspaceSubpages = async () => {
       if (!user) return;
-
       try {
         const token = localStorage.getItem('token');
-
-        // Fetch recent workspaces
         const recentRes = await axios.get(
           `${API_URL}/api/users/recent/workspaces`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
         let subpages = [];
-
-        // Fetch all workspaces to find announcements
         const workspacesRes = await axios.get(
           `${API_URL}/api/workspaces`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -211,7 +223,6 @@ const WheelNavigation = ({ isOpen, onClose }) => {
         const announcements = workspacesRes.data.find(w => w.type === 'announcements');
 
         if (recentRes.data && recentRes.data.length > 0) {
-          // Use recent workspaces
           subpages = recentRes.data.slice(0, 3).map(w => ({
             id: w._id,
             label: w.name,
@@ -219,7 +230,6 @@ const WheelNavigation = ({ isOpen, onClose }) => {
             path: `/workspace/${w._id}`,
           }));
 
-          // Add announcements if not already in recent
           if (announcements && !subpages.find(s => s.id === announcements._id)) {
             subpages.unshift({
               id: announcements._id,
@@ -229,7 +239,6 @@ const WheelNavigation = ({ isOpen, onClose }) => {
             });
           }
         } else {
-          // No recent workspaces - use announcements + first 3 workspaces
           if (announcements) {
             subpages.push({
               id: announcements._id,
@@ -238,11 +247,9 @@ const WheelNavigation = ({ isOpen, onClose }) => {
               path: `/workspace/${announcements._id}`,
             });
           }
-
           const otherWorkspaces = workspacesRes.data
             .filter(w => w.type !== 'announcements')
             .slice(0, 3);
-
           otherWorkspaces.forEach(w => {
             subpages.push({
               id: w._id,
@@ -252,20 +259,16 @@ const WheelNavigation = ({ isOpen, onClose }) => {
             });
           });
         }
-
-        // Limit to 4 subpages
         setWorkspaceSubpages(subpages.slice(0, 4));
       } catch (err) {
         console.error('Error fetching workspace subpages:', err);
       }
     };
 
-    if (isOpen) {
-      fetchWorkspaceSubpages();
-    }
+    if (isOpen) fetchWorkspaceSubpages();
   }, [isOpen, user]);
 
-  // Update chat subpages from recent channels
+  // Update chat subpages
   useEffect(() => {
     if (recentChannels && recentChannels.length > 0) {
       const subpages = recentChannels.slice(0, 4).map(channel => ({
@@ -278,70 +281,66 @@ const WheelNavigation = ({ isOpen, onClose }) => {
     }
   }, [recentChannels]);
 
-  // Get subpages for a page
   const getSubpages = useCallback((page) => {
     if (!page.hasSubpages) return [];
-
     switch (page.subpageType) {
-      case 'workspaces':
-        return workspaceSubpages;
-      case 'chat':
-        return chatSubpages;
-      case 'qa':
-        return page.staticSubpages || [];
-      default:
-        return [];
+      case 'workspaces': return workspaceSubpages;
+      case 'chat': return chatSubpages;
+      case 'qa': return page.staticSubpages || [];
+      default: return [];
     }
   }, [workspaceSubpages, chatSubpages]);
 
-  // Handle navigation
+  // Navigate with animation
   const handleNavigate = useCallback((path, pageId, subpage = null) => {
     setSelectedItem({ pageId, subpageId: subpage?.id });
-    setIsAnimatingOut(true);
+    setAnimationState('navigating');
 
     setTimeout(() => {
-      // Set flag for page transition animation
-      sessionStorage.setItem('wheel-navigation', 'true');
-
       if (path) {
         navigate(path);
       } else if (pageId === 'workspaces' && workspaceSubpages.length > 0) {
-        // Navigate to first workspace if no specific path
         navigate(workspaceSubpages[0].path);
       }
 
-      onClose();
-      setIsAnimatingOut(false);
-      setSelectedItem(null);
-    }, ANIMATION_DURATION);
+      setTimeout(() => {
+        setAnimationState('closed');
+        onClose();
+        setSelectedItem(null);
+      }, 100);
+    }, 450);
   }, [navigate, onClose, workspaceSubpages]);
 
-  // Handle keyboard events
+  // Keyboard navigation (number keys)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen) {
-        setIsAnimatingOut(true);
-        setTimeout(() => {
-          onClose();
-          setIsAnimatingOut(false);
-        }, ANIMATION_DURATION);
+        setAnimationState('closing');
+        setTimeout(() => setAnimationState('closed'), 280);
+        return;
+      }
+
+      // Number key navigation (1-9)
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 9 && num <= pages.length) {
+        const page = pages[num - 1];
+        handleNavigate(page.path, page.id);
       }
     };
 
-    if (isOpen) {
+    if (animationState === 'open') {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, onClose]);
+  }, [animationState, isOpen, pages, handleNavigate]);
 
-  // Calculate positions for main pages in a circle
+  // Position calculations - LARGER RADIUS
   const getPagePosition = (index, total) => {
-    const startAngle = -90; // Start from top
+    const startAngle = -90;
     const angleStep = 360 / total;
     const angle = startAngle + (index * angleStep);
     const angleRad = (angle * Math.PI) / 180;
-    const radius = 180; // Main circle radius
-
+    const radius = 220; // Increased from 160
     return {
       x: Math.cos(angleRad) * radius,
       y: Math.sin(angleRad) * radius,
@@ -349,65 +348,126 @@ const WheelNavigation = ({ isOpen, onClose }) => {
     };
   };
 
-  // Calculate ABSOLUTE positions for subpages (from wheel center, outside main circle)
-  const getSubpagePosition = (index, total, parentAngle, parentX, parentY) => {
-    // Subpages fan out from the parent toward the outside of the wheel
-    const spreadAngle = 18; // Degrees between subpages
+  const getSubpagePosition = (index, total, parentAngle) => {
+    const spreadAngle = 16;
     const startOffset = -((total - 1) * spreadAngle) / 2;
     const angle = parentAngle + startOffset + (index * spreadAngle);
     const angleRad = (angle * Math.PI) / 180;
-
-    // Subpages are positioned at a larger radius than main pages (outside the main circle)
-    const subpageRadius = 250; // Main radius is 180, so this is outside
-
-    // Calculate absolute position from wheel center
+    const subpageRadius = 310; // Increased from 230
     return {
       x: Math.cos(angleRad) * subpageRadius,
       y: Math.sin(angleRad) * subpageRadius,
     };
   };
 
-  if (!isOpen && !isAnimatingOut) return null;
+  if (animationState === 'closed') return null;
+
+  const isClosing = animationState === 'closing';
+  const isOpening = animationState === 'opening';
+  const isNavigating = animationState === 'navigating';
+  const hoveredPageData = pages.find(p => p.id === hoveredPage);
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${
-        isAnimatingOut ? 'opacity-0' : 'opacity-100'
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-300 ${
+        isClosing || isNavigating ? 'opacity-0' : 'opacity-100'
       }`}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          setIsAnimatingOut(true);
-          setTimeout(() => {
-            onClose();
-            setIsAnimatingOut(false);
-          }, ANIMATION_DURATION);
+          setAnimationState('closing');
+          setTimeout(() => setAnimationState('closed'), 280);
         }
       }}
     >
-      {/* Backdrop */}
+      {/* Backdrop with blur */}
       <div
-        className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
-          isAnimatingOut ? 'opacity-0' : 'opacity-100'
+        className={`absolute inset-0 bg-black/80 backdrop-blur-xl transition-all duration-300 ${
+          isClosing ? 'opacity-0' : isOpening ? 'opacity-0 animate-fadeIn' : 'opacity-100'
         }`}
       />
 
-      {/* Wheel Container - large enough for subpages outside main circle */}
-      <div className="relative w-[600px] h-[600px]">
-        {/* Center indicator */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-          {/* Animated pulse rings */}
-          <div className="absolute top-1/2 left-1/2 w-28 h-28 rounded-full border border-white/10 animate-ping" style={{ animationDuration: '2s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-white/5" />
+      {/* Main container - LARGER */}
+      <div
+        className={`relative w-[720px] h-[720px] transition-all duration-400 ease-out ${
+          isNavigating ? 'scale-105' : isClosing ? 'scale-90 opacity-0' : isOpening ? 'scale-95' : 'scale-100'
+        }`}
+      >
+        {/* Decorative outer ring */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className={`w-[520px] h-[520px] rounded-full border border-neutral-800/50 transition-all duration-500 ${
+            isOpening ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
+          }`} />
+        </div>
 
-          {/* Main center circle */}
-          <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/20 flex flex-col items-center justify-center backdrop-blur-sm">
-            <span className="text-white/80 text-xs font-medium text-center px-2 leading-tight">
-              {hoveredPage ? pages.find(p => p.id === hoveredPage)?.label : 'Quick Nav'}
-            </span>
-            {!hoveredPage && (
-              <span className="text-white/40 text-[10px] mt-1">
-                Alt+N
-              </span>
+        {/* SVG Connecting lines */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          {/* Main circle path */}
+          <circle
+            cx="50%"
+            cy="50%"
+            r="220"
+            fill="none"
+            stroke="url(#circleGradient)"
+            strokeWidth="1"
+            strokeDasharray="8 6"
+            className={`transition-all duration-500 ${isOpening ? 'opacity-0' : 'opacity-30'}`}
+          />
+
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="circleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#525252" />
+              <stop offset="50%" stopColor="#737373" />
+              <stop offset="100%" stopColor="#525252" />
+            </linearGradient>
+          </defs>
+
+          {/* Connection lines to hovered page subpages */}
+          {hoveredPage && getSubpages(pages.find(p => p.id === hoveredPage) || {}).map((_, idx) => {
+            const page = pages.find(p => p.id === hoveredPage);
+            if (!page) return null;
+            const pageIndex = pages.indexOf(page);
+            const pos = getPagePosition(pageIndex, pages.length);
+            const subPos = getSubpagePosition(idx, getSubpages(page).length, pos.angle);
+
+            return (
+              <line
+                key={idx}
+                x1={360 + pos.x}
+                y1={360 + pos.y}
+                x2={360 + subPos.x}
+                y2={360 + subPos.y}
+                stroke="#525252"
+                strokeWidth="1"
+                strokeDasharray="4 4"
+                className="animate-drawLine"
+              />
+            );
+          })}
+        </svg>
+
+        {/* Center hub - LARGER */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+          <div className={`relative w-28 h-28 rounded-full bg-neutral-900/95 border border-neutral-700/80 flex flex-col items-center justify-center shadow-2xl shadow-black/50 transition-all duration-400 ${
+            isOpening ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
+          }`}>
+            {/* Glow effect */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-b from-neutral-700/20 to-transparent" />
+
+            {hoveredPageData ? (
+              <>
+                <span className="text-white text-sm font-semibold text-center leading-tight z-10">
+                  {hoveredPageData.label}
+                </span>
+                <span className="text-neutral-400 text-[10px] mt-1 text-center px-3 z-10">
+                  {hoveredPageData.description}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-neutral-200 text-sm font-medium z-10">Navigate</span>
+                <span className="text-neutral-500 text-[10px] mt-1 z-10">Alt+N</span>
+              </>
             )}
           </div>
         </div>
@@ -416,7 +476,8 @@ const WheelNavigation = ({ isOpen, onClose }) => {
         {pages.map((page, index) => {
           const pos = getPagePosition(index, pages.length);
           const isHovered = hoveredPage === page.id;
-          const isSelected = selectedItem?.pageId === page.id && !selectedItem?.subpageId;
+          const isSelected = selectedItem?.pageId === page.id;
+          const isCurrent = currentPageId === page.id;
           const subpages = getSubpages(page);
           const Icon = page.icon;
 
@@ -424,67 +485,77 @@ const WheelNavigation = ({ isOpen, onClose }) => {
             <React.Fragment key={page.id}>
               {/* Main Page Item */}
               <div
-                className={`absolute top-1/2 left-1/2 transition-all ${
-                  isAnimatingOut && isSelected ? 'duration-300 scale-150 opacity-0' : 'duration-300'
+                className={`absolute top-1/2 left-1/2 transition-all duration-300 ${
+                  isNavigating && isSelected ? 'z-50' : 'z-10'
                 }`}
                 style={{
-                  transform: `translate(-50%, -50%) translate(${pos.x}px, ${pos.y}px)`,
-                  animationDelay: `${index * STAGGER_DELAY}ms`,
+                  transform: `translate(-50%, -50%) translate(${pos.x}px, ${pos.y}px) ${
+                    isNavigating && isSelected ? 'scale(3)' : ''
+                  }`,
+                  opacity: isNavigating && !isSelected ? 0 : 1,
                 }}
                 onMouseEnter={() => handlePageMouseEnter(page.id)}
                 onMouseLeave={handlePageMouseLeave}
               >
                 <button
                   onClick={() => handleNavigate(page.path, page.id)}
-                  className={`group relative flex items-center justify-center w-14 h-14 rounded-full transition-all duration-200 ${
+                  className={`group relative flex items-center justify-center w-14 h-14 rounded-full transition-all duration-200 border-2 ${
                     isHovered
-                      ? 'bg-white text-gray-900 scale-110 shadow-lg shadow-white/20'
-                      : 'bg-white/10 text-white hover:bg-white/20'
-                  } ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+                      ? 'bg-white text-neutral-900 border-white scale-115 shadow-xl shadow-white/20'
+                      : isCurrent
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
+                      : 'bg-neutral-800/90 text-neutral-200 border-neutral-600/50 hover:bg-neutral-700 hover:border-neutral-500'
+                  } ${isSelected && isNavigating ? 'bg-white text-neutral-900 border-white' : ''}`}
                   style={{
-                    animation: !isAnimatingOut ? `wheelItemIn 0.3s ease-out ${index * STAGGER_DELAY}ms both` : undefined,
+                    animation: isOpening ? `scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 35}ms both` : undefined,
                   }}
                 >
-                  <Icon size={24} />
+                  <Icon size={22} />
 
-                  {/* Label tooltip */}
-                  <div className={`absolute whitespace-nowrap px-2 py-1 rounded bg-gray-900 text-white text-xs font-medium transition-all duration-200 pointer-events-none ${
-                    isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
-                  }`}
-                  style={{
-                    top: pos.y > 0 ? 'auto' : '100%',
-                    bottom: pos.y > 0 ? '100%' : 'auto',
-                    marginTop: pos.y > 0 ? undefined : '8px',
-                    marginBottom: pos.y > 0 ? '8px' : undefined,
-                  }}>
-                    {page.label}
+                  {/* Keyboard shortcut badge */}
+                  <div className={`absolute -top-1 -left-1 w-5 h-5 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center text-[10px] font-bold text-neutral-300 transition-opacity duration-200 ${
+                    isHovered ? 'opacity-100' : 'opacity-0'
+                  }`}>
+                    {index + 1}
                   </div>
 
                   {/* Subpage indicator */}
                   {page.hasSubpages && subpages.length > 0 && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all ${
+                      isHovered
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-blue-500 text-white'
+                    }`}>
                       {subpages.length}
                     </div>
+                  )}
+
+                  {/* Current page indicator ring */}
+                  {isCurrent && !isHovered && (
+                    <div className="absolute inset-0 rounded-full border-2 border-blue-400 animate-pulse" />
                   )}
                 </button>
               </div>
 
-              {/* Subpages - positioned OUTSIDE the main circle, at wheel container level */}
+              {/* Subpages */}
               {isHovered && subpages.length > 0 && subpages.map((subpage, subIndex) => {
-                const subPos = getSubpagePosition(subIndex, subpages.length, pos.angle, pos.x, pos.y);
+                const subPos = getSubpagePosition(subIndex, subpages.length, pos.angle);
                 const SubIcon = subpage.icon;
                 const isSubSelected = selectedItem?.pageId === page.id && selectedItem?.subpageId === subpage.id;
 
                 return (
                   <div
                     key={`${page.id}-${subpage.id}`}
-                    className="group/subpage absolute z-10"
+                    className={`group/sub absolute z-20 transition-all duration-300 ${
+                      isNavigating && isSubSelected ? 'z-50' : ''
+                    }`}
                     style={{
                       top: '50%',
                       left: '50%',
-                      transform: `translate(calc(-50% + ${subPos.x}px), calc(-50% + ${subPos.y}px))`,
-                      opacity: 0,
-                      animation: `fadeScaleIn 0.25s ease-out ${subIndex * 50}ms forwards`,
+                      transform: `translate(calc(-50% + ${subPos.x}px), calc(-50% + ${subPos.y}px)) ${
+                        isNavigating && isSubSelected ? 'scale(3)' : ''
+                      }`,
+                      opacity: isNavigating && !isSubSelected ? 0 : 1,
                     }}
                     onMouseEnter={() => handleSubpageMouseEnter(page.id)}
                     onMouseLeave={handleSubpageMouseLeave}
@@ -494,17 +565,21 @@ const WheelNavigation = ({ isOpen, onClose }) => {
                         e.stopPropagation();
                         handleNavigate(subpage.path || page.path, page.id, subpage);
                       }}
-                      className={`relative flex items-center justify-center w-10 h-10 rounded-full bg-white/90 text-gray-900 hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg ${
-                        isSubSelected ? 'ring-2 ring-blue-500' : ''
+                      className={`relative flex items-center justify-center w-11 h-11 rounded-full border-2 transition-all duration-200 shadow-xl ${
+                        isSubSelected && isNavigating
+                          ? 'bg-white text-neutral-900 border-white'
+                          : 'bg-neutral-800/95 text-neutral-200 border-neutral-600/50 hover:bg-neutral-700 hover:scale-110 hover:border-neutral-500'
                       }`}
+                      style={{
+                        animation: `popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) ${subIndex * 50}ms both`,
+                      }}
                     >
                       <SubIcon size={16} />
                     </button>
 
-                    {/* Subpage label - shows on hover */}
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 whitespace-nowrap px-2 py-1 rounded bg-gray-900 text-white text-[11px] font-medium opacity-0 group-hover/subpage:opacity-100 transition-all duration-200 pointer-events-none shadow-lg z-10 max-w-[120px] truncate">
+                    {/* Subpage label */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-neutral-800/95 border border-neutral-700 text-neutral-200 text-[11px] font-medium opacity-0 group-hover/sub:opacity-100 transition-all duration-150 pointer-events-none shadow-xl max-w-[120px] truncate backdrop-blur-sm">
                       {subpage.label}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900" />
                     </div>
                   </div>
                 );
@@ -514,17 +589,33 @@ const WheelNavigation = ({ isOpen, onClose }) => {
         })}
       </div>
 
-      {/* Keyboard hint */}
-      <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white/40 text-sm transition-opacity duration-300 ${
-        isAnimatingOut ? 'opacity-0' : 'opacity-100'
+      {/* Bottom hints */}
+      <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 transition-all duration-300 ${
+        isClosing || isNavigating ? 'opacity-0 translate-y-4' : isOpening ? 'opacity-0' : 'opacity-100'
       }`}>
-        <kbd className="px-2 py-1 rounded bg-white/10 text-xs">Esc</kbd>
-        <span>to close</span>
+        <div className="flex items-center gap-2">
+          <kbd className="px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-neutral-300 text-[11px] font-medium backdrop-blur-sm">
+            1-{pages.length}
+          </kbd>
+          <span className="text-neutral-500 text-xs">quick select</span>
+        </div>
+        <div className="w-px h-4 bg-neutral-700" />
+        <div className="flex items-center gap-2">
+          <kbd className="px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-neutral-300 text-[11px] font-medium backdrop-blur-sm">
+            Esc
+          </kbd>
+          <span className="text-neutral-500 text-xs">close</span>
+        </div>
       </div>
 
       {/* CSS Animations */}
       <style>{`
-        @keyframes wheelItemIn {
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
           from {
             opacity: 0;
             transform: scale(0.3);
@@ -535,10 +626,10 @@ const WheelNavigation = ({ isOpen, onClose }) => {
           }
         }
 
-        @keyframes fadeScaleIn {
+        @keyframes popIn {
           from {
             opacity: 0;
-            scale: 0.5;
+            scale: 0;
           }
           to {
             opacity: 1;
@@ -546,15 +637,25 @@ const WheelNavigation = ({ isOpen, onClose }) => {
           }
         }
 
-        @keyframes pulseRing {
-          0% {
-            transform: translate(-50%, -50%) scale(1);
-            opacity: 0.5;
+        @keyframes drawLine {
+          from {
+            stroke-dashoffset: 100;
           }
-          100% {
-            transform: translate(-50%, -50%) scale(1.5);
-            opacity: 0;
+          to {
+            stroke-dashoffset: 0;
           }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .animate-drawLine {
+          animation: drawLine 0.3s ease-out forwards;
+        }
+
+        .scale-115 {
+          transform: scale(1.15);
         }
       `}</style>
     </div>
