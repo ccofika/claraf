@@ -8,6 +8,8 @@ import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { SocketProvider } from './context/SocketContext';
 import { ChatProvider } from './context/ChatContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { WheelNavigationProvider } from './context/WheelNavigationContext';
+import WheelNavigationWrapper from './components/WheelNavigationWrapper';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -36,158 +38,161 @@ function App() {
         <SocketProvider>
           <NotificationProvider>
             <ChatProvider>
-              <CommandPaletteProvider>
-                <TextFormattingProvider>
-                  <Router>
-                    <Routes>
-                  {/* Public routes */}
-                  <Route path="/" element={<Navigate to="/login" />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/login/:username" element={<AutoLogin />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/auth/callback" element={<AuthCallback />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="/terms-of-service" element={<TermsOfService />} />
+              <WheelNavigationProvider>
+                <CommandPaletteProvider>
+                  <TextFormattingProvider>
+                    <Router>
+                      <WheelNavigationWrapper />
+                      <Routes>
+                        {/* Public routes */}
+                        <Route path="/" element={<Navigate to="/login" />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/login/:username" element={<AutoLogin />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/auth/callback" element={<AuthCallback />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                        <Route path="/terms-of-service" element={<TermsOfService />} />
 
-                  {/* Protected routes with PageLayout wrapper */}
-                  <Route
-                    path="/vip-calculator"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="vip-calculator">
-                          <VIPProgressCalculator />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        {/* Protected routes with PageLayout wrapper */}
+                        <Route
+                          path="/vip-calculator"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="vip-calculator">
+                                <VIPProgressCalculator />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/hash-explorer"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="hash-explorer">
-                          <HashExplorerFinder />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/hash-explorer"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="hash-explorer">
+                                <HashExplorerFinder />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/quick-links"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="quick-links">
-                          <QuickLinks />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/quick-links"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="quick-links">
+                                <QuickLinks />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  {/* Temporarily disabled - Google Sheets OAuth consent screen issue
-                  <Route
-                    path="/affiliate-bonus-finder"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="affiliate-bonus-finder">
-                          <AffiliateBonusFinder />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
-                  */}
+                        {/* Temporarily disabled - Google Sheets OAuth consent screen issue
+                        <Route
+                          path="/affiliate-bonus-finder"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="affiliate-bonus-finder">
+                                <AffiliateBonusFinder />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
+                        */}
 
-                  <Route
-                    path="/kyc"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="kyc">
-                          <KYC />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/kyc"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="kyc">
+                                <KYC />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/developer-dashboard"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="developer-dashboard">
-                          <DeveloperDashboard />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/developer-dashboard"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="developer-dashboard">
+                                <DeveloperDashboard />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/qa-manager"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="qa-manager">
-                          <QAManager />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/qa-manager"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="qa-manager">
+                                <QAManager />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/kyc-agent-stats"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="kyc-agent-stats">
-                          <KYCAgentStats />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/kyc-agent-stats"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="kyc-agent-stats">
+                                <KYCAgentStats />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  <Route
-                    path="/countries-restrictions"
-                    element={
-                      <PrivateRoute>
-                        <PageLayout activeSection="countries-restrictions">
-                          <CountriesRestrictions />
-                        </PageLayout>
-                      </PrivateRoute>
-                    }
-                  />
+                        <Route
+                          path="/countries-restrictions"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="countries-restrictions">
+                                <CountriesRestrictions />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
 
-                  {/* Workspace route - ONLY for canvas */}
-                  <Route
-                    path="/workspace/:workspaceId"
-                    element={
-                      <PrivateRoute>
-                        <Workspace />
-                      </PrivateRoute>
-                    }
-                  />
+                        {/* Workspace route - ONLY for canvas */}
+                        <Route
+                          path="/workspace/:workspaceId"
+                          element={
+                            <PrivateRoute>
+                              <Workspace />
+                            </PrivateRoute>
+                          }
+                        />
 
-                  {/* Chat routes */}
-                  <Route
-                    path="/chat"
-                    element={
-                      <PrivateRoute>
-                        <Chat />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/chat/:channelId"
-                    element={
-                      <PrivateRoute>
-                        <Chat />
-                      </PrivateRoute>
-                    }
-                  />
-                </Routes>
-              </Router>
-                  <Toaster
-                    position="top-center"
-                    richColors
-                    closeButton
-                    theme="system"
-                  />
-                </TextFormattingProvider>
-              </CommandPaletteProvider>
+                        {/* Chat routes */}
+                        <Route
+                          path="/chat"
+                          element={
+                            <PrivateRoute>
+                              <Chat />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/chat/:channelId"
+                          element={
+                            <PrivateRoute>
+                              <Chat />
+                            </PrivateRoute>
+                          }
+                        />
+                      </Routes>
+                      <Toaster
+                        position="top-center"
+                        richColors
+                        closeButton
+                        theme="system"
+                      />
+                    </Router>
+                  </TextFormattingProvider>
+                </CommandPaletteProvider>
+              </WheelNavigationProvider>
             </ChatProvider>
           </NotificationProvider>
         </SocketProvider>

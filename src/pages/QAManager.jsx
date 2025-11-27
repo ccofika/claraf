@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -22,11 +23,20 @@ import ShareButton from '../components/Chat/ShareButton';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
+  const [searchParams] = useSearchParams();
 
   // State
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+  // Watch for tab changes from URL (e.g., from wheel navigation)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   // Data state
   const [agents, setAgents] = useState([]);
