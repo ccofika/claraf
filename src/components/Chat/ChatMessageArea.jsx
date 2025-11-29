@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../../context/ChatContext';
-import { MoreVertical, Users, Search, Pin, Archive } from 'lucide-react';
+import { MoreVertical, Users, Search, Pin, Archive, Settings, Hash } from 'lucide-react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import SearchModal from './SearchModal';
 import PinnedMessagesModal from './PinnedMessagesModal';
+import ChannelSettingsModal from './ChannelSettingsModal';
 
 const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
   const { activeChannel, messages, pinnedMessages, typingUsers, toggleArchiveChannel } = useChat();
   const [showChannelMenu, setShowChannelMenu] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const getChannelName = (channel) => {
     if (channel.name) return channel.name;
@@ -44,15 +46,25 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#1A1D21]">
       {/* Channel Header */}
-      <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200/60 dark:border-neutral-800/60 flex-shrink-0">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200/60 dark:border-neutral-800/60 flex-shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex-1 min-w-0">
-            <h2 className="text-[15px] font-bold text-gray-900 dark:text-white truncate">
-              {getChannelName(activeChannel)}
-            </h2>
-            {getChannelDescription(activeChannel) && (
-              <p className="text-[13px] text-gray-600 dark:text-neutral-400 truncate">
-                {getChannelDescription(activeChannel)}
+            <div className="flex items-center gap-2">
+              {activeChannel.type !== 'dm' && (
+                <Hash className="w-4 h-4 text-gray-500 dark:text-neutral-500 flex-shrink-0" />
+              )}
+              <h2 className="text-[15px] font-bold text-gray-900 dark:text-white truncate">
+                {getChannelName(activeChannel)}
+              </h2>
+            </div>
+            {/* Show topic if available, otherwise show description */}
+            {(activeChannel.topic || getChannelDescription(activeChannel)) && (
+              <p
+                className="text-[13px] text-gray-600 dark:text-neutral-400 truncate cursor-pointer hover:text-gray-800 dark:hover:text-neutral-300"
+                onClick={() => setShowSettingsModal(true)}
+                title={activeChannel.topic || getChannelDescription(activeChannel)}
+              >
+                {activeChannel.topic || getChannelDescription(activeChannel)}
               </p>
             )}
           </div>
@@ -94,7 +106,17 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
             </button>
 
             {showChannelMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-900 border border-gray-200/60 dark:border-neutral-700 shadow-xl py-1 z-10">
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-neutral-900 border border-gray-200/60 dark:border-neutral-700 shadow-xl py-1 z-10">
+                <button
+                  onClick={() => {
+                    setShowSettingsModal(true);
+                    setShowChannelMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-[15px] text-gray-900 dark:text-neutral-300 hover:bg-[#1164A3] hover:text-white dark:hover:bg-[#1164A3] flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  {activeChannel.type === 'dm' ? 'Conversation Settings' : 'Channel Settings'}
+                </button>
                 <button
                   onClick={() => {
                     setShowPinnedModal(true);
@@ -105,6 +127,7 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
                   <Pin className="w-4 h-4" />
                   View Pinned Messages
                 </button>
+                <div className="my-1 border-t border-gray-200 dark:border-neutral-700" />
                 <button
                   onClick={async () => {
                     try {
@@ -187,6 +210,11 @@ const ChatMessageArea = ({ showMemberList, onToggleMemberList }) => {
         isOpen={showPinnedModal}
         onClose={() => setShowPinnedModal(false)}
         pinnedMessages={pinnedMessages[activeChannel._id] || []}
+      />
+      <ChannelSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        channel={activeChannel}
       />
     </div>
   );

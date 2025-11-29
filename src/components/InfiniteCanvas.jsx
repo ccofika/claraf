@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import CanvasElement from './CanvasElement';
@@ -18,6 +19,7 @@ import { getElementsInsideWrapper } from '../utils/wrapperUtils';
 const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUpdate, onElementCreate, onElementDelete, onRemoteElementUpdate, onRemoteElementCreate, onRemoteElementDelete, canEditContent = true, viewMode = 'view', onViewModeChange, workspaces = [], onElementNavigate, onBookmarkCreated, workspaceUsers = [], onViewportChange }) => {
   const [canvasElements, setCanvasElements] = useState(elements);
   const transformWrapperRef = useRef(null);
+  const location = useLocation();
   const { theme } = useTheme();
   const { isEditing } = useTextFormatting();
   const { socket, notifyElementCreated, notifyElementUpdated, notifyElementDeleted } = useSocket();
@@ -29,6 +31,7 @@ const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUp
   const panningTimeoutRef = useRef(null);
   const rafRef = useRef(null);
   const frozenCanvasBoundsRef = useRef(null);
+  const hasHandledUrlElement = useRef(null);
 
   // Determine if user is actually in edit mode (has permission AND in edit mode)
   const isInEditMode = canEditContent && viewMode === 'edit';
@@ -103,6 +106,11 @@ const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUp
   useEffect(() => {
     setCanvasElements(elements);
   }, [elements]);
+
+  // Reset URL element handler when workspace changes
+  useEffect(() => {
+    hasHandledUrlElement.current = null;
+  }, [workspaceId]);
 
   // Listen for real-time collaboration events
   useEffect(() => {
@@ -710,7 +718,7 @@ const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUp
       // Find the element in canvasElements if only _id is provided
       let targetElement = eventData;
       if (eventData._id && !eventData.position) {
-        targetElement = canvasElements.find(el => el._id === eventData._id);
+        targetElement = canvasElements.find(el => String(el._id) === String(eventData._id));
       }
 
       if (!targetElement) {
@@ -758,49 +766,62 @@ const InfiniteCanvas = ({ workspaceId, workspaceName, elements = [], onElementUp
 
   // Handle share link URL parameters
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const elementId = params.get('element');
 
-    if (elementId && canvasElements.length > 0 && transformWrapperRef.current) {
-      const targetElement = canvasElements.find(el => el._id === elementId);
-      if (targetElement && targetElement.position) {
-        // Wait for canvas to be ready, then zoom to element
-        setTimeout(() => {
-          const targetScale = 0.375;
-
-          // Calculate element center position
-          const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
-          const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
-
-          // Calculate transform position to center the element
-          let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
-          let targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
-
-          // Shift view right and down
-          const shiftRight = window.innerWidth * 0.25;  // 25% desno
-          const shiftDown = window.innerHeight * 0.075; // 7.5% dole
-          targetX -= shiftRight;
-          targetY -= shiftDown;
-
-          // Set transform
-          if (transformWrapperRef.current) {
-            transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
-          }
-
-          // Highlight element
-          setHighlightedElement(elementId);
-
-          // Remove highlight after 3 seconds
-          setTimeout(() => setHighlightedElement(null), 3000);
-
-          // Clean URL after zoom animation completes
-          setTimeout(() => {
-            window.history.replaceState({}, '', window.location.pathname);
-          }, 600);
-        }, 300);
-      }
+    // Skip if no element param or no elements loaded
+    if (!elementId || canvasElements.length === 0 || !transformWrapperRef.current) {
+      return;
     }
-  }, [canvasElements]);
+
+    // Skip if we already handled this exact element
+    if (hasHandledUrlElement.current === elementId) {
+      return;
+    }
+
+    // Find element by ID (compare as strings)
+    const targetElement = canvasElements.find(el => String(el._id) === String(elementId));
+
+    if (targetElement && targetElement.position) {
+      // Mark this element as handled
+      hasHandledUrlElement.current = elementId;
+
+      // Wait for canvas to be ready, then zoom to element
+      setTimeout(() => {
+        const targetScale = 0.375;
+
+        // Calculate element center position
+        const elementCenterX = targetElement.position.x + (targetElement.dimensions?.width || 0) / 2;
+        const elementCenterY = targetElement.position.y + (targetElement.dimensions?.height || 0) / 2;
+
+        // Calculate transform position to center the element
+        let targetX = -elementCenterX * targetScale + (window.innerWidth / 2);
+        let targetY = -elementCenterY * targetScale + (window.innerHeight / 2);
+
+        // Shift view right and down
+        const shiftRight = window.innerWidth * 0.25;  // 25% desno
+        const shiftDown = window.innerHeight * 0.075; // 7.5% dole
+        targetX -= shiftRight;
+        targetY -= shiftDown;
+
+        // Set transform
+        if (transformWrapperRef.current) {
+          transformWrapperRef.current.setTransform(targetX, targetY, targetScale, 500);
+        }
+
+        // Highlight element
+        setHighlightedElement(elementId);
+
+        // Remove highlight after 3 seconds
+        setTimeout(() => setHighlightedElement(null), 3000);
+
+        // Clean URL after zoom animation completes
+        setTimeout(() => {
+          window.history.replaceState({}, '', window.location.pathname);
+        }, 600);
+      }, 300);
+    }
+  }, [canvasElements, location.search]);
 
   // If in post-view mode, render PostView instead of canvas
   if (viewMode === 'post-view') {

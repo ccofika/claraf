@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, List } from 'lucide-react';
+import { X, List, FolderOpen, Tag } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import WrapperElementList from './WrapperElementList';
+import CategoryPicker, { CategoryIcon } from './CategoryPicker';
 import { getElementsInsideWrapper } from '../utils/wrapperUtils';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const WrapperElement = ({
   element,
@@ -23,6 +27,7 @@ const WrapperElement = ({
   const isDarkMode = theme === 'dark';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showElementList, setShowElementList] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dimensions, setDimensions] = useState({
     width: element.dimensions.width || 400,
@@ -231,17 +236,63 @@ const WrapperElement = ({
             pointerEvents: 'none', // Allow clicks to pass through to elements inside
           }}
         >
-          {/* Top label */}
-          <div className={`
-            absolute -top-6 left-0
-            px-2 py-0.5
-            text-xs font-medium
-            rounded-t
-            ${isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'}
-          `}
-          style={{ pointerEvents: 'auto' }}
+          {/* Top label with category */}
+          <div
+            className={`
+              absolute -top-6 left-0
+              flex items-center gap-1.5
+              px-2 py-0.5
+              text-xs font-medium
+              rounded-t
+              group/label
+              ${isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'}
+            `}
+            style={{ pointerEvents: 'auto' }}
           >
-            Wrapper
+            {element.category ? (
+              <>
+                <span className="text-sm">
+                  <CategoryIcon name={element.category.icon || 'folder'} size={12} />
+                </span>
+                <span className="truncate max-w-[120px]">
+                  {element.category.name || 'Wrapper'}
+                </span>
+                {/* Remove category button - shows on hover */}
+                {canEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Update local state immediately for instant feedback
+                      if (onUpdate) {
+                        onUpdate({
+                          ...element,
+                          category: null
+                        });
+                      }
+                      // Then make API call to persist and update post counts
+                      const token = localStorage.getItem('token');
+                      axios.put(
+                        `${API_URL}/api/categories/assign`,
+                        { elementId: element._id, categoryId: null },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                      ).catch(error => {
+                        console.error('Error removing category:', error);
+                      });
+                    }}
+                    className={`
+                      ml-1 p-0.5 rounded opacity-0 group-hover/label:opacity-100
+                      transition-opacity
+                      ${isDarkMode ? 'hover:bg-red-500/30 text-red-400' : 'hover:bg-red-100 text-red-500'}
+                    `}
+                    title="Remove from category"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </>
+            ) : (
+              'Wrapper'
+            )}
           </div>
 
           {/* Action buttons - only show when hovering and can edit */}
@@ -256,6 +307,23 @@ const WrapperElement = ({
             onMouseEnter={() => onMouseEnter?.(element._id)}
             onMouseLeave={() => onMouseLeave?.()}
             >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCategoryPicker(true);
+                }}
+                className={`
+                  p-1 rounded
+                  ${isDarkMode
+                    ? 'bg-purple-900/50 hover:bg-purple-900/70 text-purple-300'
+                    : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                  }
+                  transition-colors
+                `}
+                title="Set Category"
+              >
+                <Tag size={14} />
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -448,6 +516,23 @@ const WrapperElement = ({
         wrapper={element}
         allElements={allElements}
         onUpdate={onUpdate}
+      />
+
+      {/* Category Picker Modal */}
+      <CategoryPicker
+        isOpen={showCategoryPicker}
+        onClose={() => setShowCategoryPicker(false)}
+        onSelect={(category) => {
+          // Update the element with the new category
+          if (onUpdate) {
+            onUpdate({
+              ...element,
+              category: category ? { _id: category._id, name: category.name, icon: category.icon, color: category.color } : null
+            });
+          }
+        }}
+        currentCategoryId={element.category?._id}
+        elementId={element._id}
       />
     </>
   );

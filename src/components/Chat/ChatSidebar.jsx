@@ -8,6 +8,7 @@ import ChannelContextMenu from './ChannelContextMenu';
 import SectionHeader from './SectionHeader';
 import SectionModal from './SectionModal';
 import ThreadsList from './ThreadsList';
+import LeaveChannelModal from './LeaveChannelModal';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -35,6 +36,8 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
   const [unreadThreadCount, setUnreadThreadCount] = useState(0);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [channelToLeave, setChannelToLeave] = useState(null);
 
   // Fetch unread thread count
   useEffect(() => {
@@ -229,13 +232,9 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
           break;
 
         case 'leave':
-          if (window.confirm(`Are you sure you want to leave ${contextMenu.channel.name}?`)) {
-            await axios.delete(
-              `${API_URL}/api/chat/channels/${channelId}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            await fetchChannels();
-          }
+          // Show confirmation modal instead of window.confirm
+          setChannelToLeave(contextMenu.channel);
+          setShowLeaveModal(true);
           break;
 
         case 'copyLink':
@@ -787,6 +786,16 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
           onSave={handleSaveSection}
         />
       )}
+
+      {/* Leave Channel Confirmation Modal */}
+      <LeaveChannelModal
+        isOpen={showLeaveModal}
+        onClose={() => {
+          setShowLeaveModal(false);
+          setChannelToLeave(null);
+        }}
+        channel={channelToLeave}
+      />
     </>
   );
 };

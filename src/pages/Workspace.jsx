@@ -491,7 +491,16 @@ const Workspace = () => {
     // 3. Elements are loaded
     // 4. Haven't zoomed yet for this workspace
     // 5. Not currently switching workspaces
+    // 6. No element parameter in URL (let InfiniteCanvas handle URL navigation)
     const pendingNav = sessionStorage.getItem('pendingElementNavigation');
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlElementId = urlParams.get('element');
+
+    // Skip auto-zoom if there's an element in the URL - InfiniteCanvas will handle it
+    if (urlElementId) {
+      hasZoomedToLatestTitle.current = true;
+      return;
+    }
 
     if (!pendingNav && canvas && elements.length > 0 && !switchingWorkspace && !hasZoomedToLatestTitle.current) {
       let targetElement = null;

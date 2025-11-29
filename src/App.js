@@ -9,7 +9,9 @@ import { SocketProvider } from './context/SocketContext';
 import { ChatProvider } from './context/ChatContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { WheelNavigationProvider } from './context/WheelNavigationContext';
+import { WorkspaceNavigationProvider } from './context/WorkspaceNavigationContext';
 import WheelNavigationWrapper from './components/WheelNavigationWrapper';
+import WorkspaceNavigation from './components/WorkspaceNavigation';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -39,11 +41,13 @@ function App() {
           <NotificationProvider>
             <ChatProvider>
               <WheelNavigationProvider>
-                <CommandPaletteProvider>
-                  <TextFormattingProvider>
-                    <Router>
-                      <WheelNavigationWrapper />
-                      <Routes>
+                <WorkspaceNavigationProvider>
+                  <CommandPaletteProvider>
+                    <TextFormattingProvider>
+                      <Router>
+                        <WheelNavigationWrapper />
+                        <WorkspaceNavigation />
+                        <Routes>
                         {/* Public routes */}
                         <Route path="/" element={<Navigate to="/login" />} />
                         <Route path="/login" element={<Login />} />
@@ -190,8 +194,9 @@ function App() {
                         theme="system"
                       />
                     </Router>
-                  </TextFormattingProvider>
-                </CommandPaletteProvider>
+                    </TextFormattingProvider>
+                  </CommandPaletteProvider>
+                </WorkspaceNavigationProvider>
               </WheelNavigationProvider>
             </ChatProvider>
           </NotificationProvider>

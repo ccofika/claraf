@@ -747,6 +747,114 @@ export const ChatProvider = ({ children }) => {
     }
   }, [activeChannel, API_URL, fetchChannels]);
 
+  // Update channel (name, description, topic)
+  const updateChannel = useCallback(async (channelId, updates) => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    try {
+      console.log('📝 Updating channel:', channelId, updates);
+      const response = await axios.put(
+        `${API_URL}/api/chat/channels/${channelId}`,
+        updates,
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      console.log('✅ Channel updated successfully');
+
+      // Update local state
+      setChannels(prev =>
+        prev.map(ch => ch._id === channelId ? { ...ch, ...response.data } : ch)
+      );
+
+      // Update active channel if it's the one being updated
+      if (activeChannel?._id === channelId) {
+        setActiveChannel(prev => ({ ...prev, ...response.data }));
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error updating channel:', error);
+      toast.error(error.response?.data?.message || 'Failed to update channel');
+      throw error;
+    }
+  }, [activeChannel, API_URL]);
+
+  // Leave channel
+  const leaveChannel = useCallback(async (channelId) => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    try {
+      console.log('🚪 Leaving channel:', channelId);
+      await axios.post(
+        `${API_URL}/api/chat/channels/${channelId}/leave`,
+        {},
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      console.log('✅ Left channel successfully');
+
+      // Remove from local state
+      setChannels(prev => prev.filter(ch => ch._id !== channelId));
+
+      // Clear active channel if it was the one left
+      if (activeChannel?._id === channelId) {
+        setActiveChannel(null);
+      }
+
+      toast.success('Left channel successfully');
+    } catch (error) {
+      console.error('❌ Error leaving channel:', error);
+      toast.error(error.response?.data?.message || 'Failed to leave channel');
+      throw error;
+    }
+  }, [activeChannel, API_URL]);
+
+  // Convert DM to group
+  const convertDMToGroup = useCallback(async (channelId, name, description = '') => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    try {
+      console.log('🔄 Converting DM to group:', channelId);
+      const response = await axios.post(
+        `${API_URL}/api/chat/channels/${channelId}/convert-to-group`,
+        { name, description },
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      console.log('✅ Converted to group successfully');
+
+      // Update local state
+      const updatedChannel = response.data.channel;
+      setChannels(prev =>
+        prev.map(ch => ch._id === channelId ? updatedChannel : ch)
+      );
+
+      // Update active channel if it's the one being converted
+      if (activeChannel?._id === channelId) {
+        setActiveChannel(updatedChannel);
+      }
+
+      toast.success('Converted to group channel');
+      return updatedChannel;
+    } catch (error) {
+      console.error('❌ Error converting to group:', error);
+      toast.error(error.response?.data?.message || 'Failed to convert to group');
+      throw error;
+    }
+  }, [activeChannel, API_URL]);
+
   // Initialize chat when user is authenticated
   useEffect(() => {
     // Check token from localStorage directly (more reliable than state)
@@ -1352,6 +1460,9 @@ export const ChatProvider = ({ children }) => {
     markAsRead,
     createChannel,
     createDM,
+    updateChannel,
+    leaveChannel,
+    convertDMToGroup,
     toggleArchiveChannel,
     toggleStarChannel,
     updateMyPresence,
