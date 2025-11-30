@@ -10,8 +10,10 @@ import { ChatProvider } from './context/ChatContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { WheelNavigationProvider } from './context/WheelNavigationContext';
 import { WorkspaceNavigationProvider } from './context/WorkspaceNavigationContext';
+import { TemplatesNavigationProvider } from './context/TemplatesNavigationContext';
 import WheelNavigationWrapper from './components/WheelNavigationWrapper';
 import WorkspaceNavigation from './components/WorkspaceNavigation';
+import TemplatesNavigation from './components/TemplatesNavigation';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -32,6 +34,7 @@ import KYC from './pages/KYC';
 import DeveloperDashboard from './pages/DeveloperDashboard';
 import QAManager from './pages/QAManager';
 import KYCAgentStats from './pages/KYCAgentStats';
+import ActiveIssues from './pages/ActiveIssues';
 
 function App() {
   return (
@@ -42,11 +45,13 @@ function App() {
             <ChatProvider>
               <WheelNavigationProvider>
                 <WorkspaceNavigationProvider>
-                  <CommandPaletteProvider>
-                    <TextFormattingProvider>
-                      <Router>
-                        <WheelNavigationWrapper />
-                        <WorkspaceNavigation />
+                  <TemplatesNavigationProvider>
+                    <CommandPaletteProvider>
+                      <TextFormattingProvider>
+                        <Router>
+                          <WheelNavigationWrapper />
+                          <WorkspaceNavigation />
+                          <TemplatesNavigation />
                         <Routes>
                         {/* Public routes */}
                         <Route path="/" element={<Navigate to="/login" />} />
@@ -56,6 +61,7 @@ function App() {
                         <Route path="/auth/callback" element={<AuthCallback />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route path="/terms-of-service" element={<TermsOfService />} />
+                        <Route path="/active-issues" element={<ActiveIssues />} />
 
                         {/* Protected routes with PageLayout wrapper */}
                         <Route
@@ -194,8 +200,9 @@ function App() {
                         theme="system"
                       />
                     </Router>
-                    </TextFormattingProvider>
-                  </CommandPaletteProvider>
+                      </TextFormattingProvider>
+                    </CommandPaletteProvider>
+                  </TemplatesNavigationProvider>
                 </WorkspaceNavigationProvider>
               </WheelNavigationProvider>
             </ChatProvider>

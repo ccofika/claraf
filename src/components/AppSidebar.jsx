@@ -499,6 +499,7 @@ function DetailSidebar({
   onRefreshWorkspaces
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
@@ -670,9 +671,10 @@ function DetailSidebar({
         w.name.toLowerCase().includes(searchQuery.toLowerCase())
       ) || [];
 
-      // Separate announcements and other workspaces
+      // Separate announcements, active-issues, and other workspaces
       const announcements = filteredWorkspaces.find(w => w.type === 'announcements');
-      const otherWorkspaces = filteredWorkspaces.filter(w => w.type !== 'announcements');
+      const activeIssues = filteredWorkspaces.find(w => w.type === 'active-issues');
+      const otherWorkspaces = filteredWorkspaces.filter(w => w.type !== 'announcements' && w.type !== 'active-issues');
 
       // Helper function to create workspace item
       const createWorkspaceItem = (workspace, showFavoriteButton = true) => {
@@ -680,19 +682,27 @@ function DetailSidebar({
           (workspace.owner._id || workspace.owner) === user._id
         );
         const isFavorited = favoriteWorkspaces.some(fw => fw._id === workspace._id);
+        const isSpecialWorkspace = workspace.type === 'announcements' || workspace.type === 'active-issues';
+
+        // Special handling for active-issues - navigate to /active-issues instead of workspace
+        const handleClick = workspace.type === 'active-issues'
+          ? () => navigate('/active-issues')
+          : () => onWorkspaceClick(workspace._id);
 
         return {
           icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />,
           label: workspace.name,
-          isActive: currentWorkspace?._id === workspace._id,
-          onClick: () => onWorkspaceClick(workspace._id),
+          isActive: workspace.type === 'active-issues'
+            ? window.location.pathname === '/active-issues'
+            : currentWorkspace?._id === workspace._id,
+          onClick: handleClick,
           workspaceId: workspace._id,
           canSettings: isOwner && workspace.type === 'personal',
           canEdit: workspace.permissions?.canEdit,
-          canDelete: workspace.type !== 'announcements' && workspace.permissions?.canDelete,
-          canFavorite: showFavoriteButton && workspace.type !== 'announcements',
+          canDelete: !isSpecialWorkspace && workspace.permissions?.canDelete,
+          canFavorite: showFavoriteButton && !isSpecialWorkspace,
           isFavorited: isFavorited,
-          onToggleFavorite: showFavoriteButton && workspace.type !== 'announcements'
+          onToggleFavorite: showFavoriteButton && !isSpecialWorkspace
             ? () => handleToggleFavorite(workspace._id)
             : undefined
         };
@@ -714,6 +724,11 @@ function DetailSidebar({
       // Add Announcements first
       if (announcements) {
         workspaceItems.push(createWorkspaceItem(announcements, false));
+      }
+
+      // Add Active Issues second (after Announcements)
+      if (activeIssues) {
+        workspaceItems.push(createWorkspaceItem(activeIssues, false));
       }
 
       // Add other workspaces

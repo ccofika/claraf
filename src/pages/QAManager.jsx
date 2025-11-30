@@ -48,6 +48,7 @@ const QAManager = () => {
   const [agents, setAgents] = useState([]);
   const [allExistingAgents, setAllExistingAgents] = useState([]); // All existing agents in system
   const [agentsForFilter, setAgentsForFilter] = useState([]); // Agents who have tickets (for filters)
+  const [graders, setGraders] = useState([]); // QA graders for archive filter
   const [tickets, setTickets] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [pagination, setPagination] = useState({
@@ -70,6 +71,7 @@ const QAManager = () => {
     category: '',
     priority: '',
     tags: '',
+    grader: '', // Filter by grader (createdBy) - only for archive
     searchMode: 'text' // 'ai' for semantic search, 'text' for keyword search
   });
 
@@ -111,6 +113,7 @@ const QAManager = () => {
   useEffect(() => {
     fetchAgents(); // Always fetch agents for dropdowns
     fetchAgentsForFilter(); // Fetch all agents with tickets for filters
+    fetchGraders(); // Fetch graders for archive filter (admin only)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -321,6 +324,16 @@ const QAManager = () => {
     }
   };
 
+  const fetchGraders = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/analytics/graders`, getAuthHeaders());
+      setGraders(response.data);
+    } catch (err) {
+      // Non-admins won't have access - fail silently
+      console.log('Could not fetch graders (admin only):', err.response?.status);
+    }
+  };
+
   const fetchTickets = async () => {
     try {
       setLoading(true);
@@ -338,9 +351,18 @@ const QAManager = () => {
       if (filters.status) params.append('status', filters.status);
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
-      if (filters.scoreMin) params.append('scoreMin', filters.scoreMin);
-      if (filters.scoreMax && filters.scoreMax < 100) params.append('scoreMax', filters.scoreMax);
+      // Score filters - only send if meaningfully different from defaults
+      const scoreMinVal = filters.scoreMin !== '' && filters.scoreMin !== undefined ? Number(filters.scoreMin) : null;
+      const scoreMaxVal = filters.scoreMax !== '' && filters.scoreMax !== undefined ? Number(filters.scoreMax) : null;
+      if (scoreMinVal !== null && !isNaN(scoreMinVal) && scoreMinVal > 0) {
+        params.append('scoreMin', scoreMinVal);
+      }
+      if (scoreMaxVal !== null && !isNaN(scoreMaxVal) && scoreMaxVal < 100) {
+        params.append('scoreMax', scoreMaxVal);
+      }
       params.append('isArchived', activeTab === 'archive');
+      // Add grader filter (createdBy) for archive tab
+      if (filters.grader && activeTab === 'archive') params.append('createdBy', filters.grader);
 
       if (useAISearch) {
         // AI Semantic Search - uses embeddings to find semantically similar tickets
@@ -1216,7 +1238,6 @@ const QAManager = () => {
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Position</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Team</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -1233,13 +1254,6 @@ const QAManager = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.position || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.team || '-'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        agent.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
-                      }`}>
-                        {agent.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -1471,6 +1485,8 @@ const QAManager = () => {
             currentFilters={{ ...filters, isArchived: true }}
             onFilterChange={setFilters}
             agents={agentsForFilter}
+            graders={graders}
+            isArchive={true}
           />
         </div>
 
@@ -1629,10 +1645,7 @@ const QAManager = () => {
     const [formData, setFormData] = useState({
       name: '',
       position: '',
-      team: '',
-      goalMinDate: '',
-      goalMaxDate: '',
-      isActive: true
+      team: ''
     });
 
     useEffect(() => {
@@ -1640,19 +1653,13 @@ const QAManager = () => {
         setFormData({
           name: agentDialog.data.name || '',
           position: agentDialog.data.position || '',
-          team: agentDialog.data.team || '',
-          goalMinDate: agentDialog.data.goalMinDate ? new Date(agentDialog.data.goalMinDate).toISOString().split('T')[0] : '',
-          goalMaxDate: agentDialog.data.goalMaxDate ? new Date(agentDialog.data.goalMaxDate).toISOString().split('T')[0] : '',
-          isActive: agentDialog.data.isActive !== undefined ? agentDialog.data.isActive : true
+          team: agentDialog.data.team || ''
         });
       } else {
         setFormData({
           name: '',
           position: '',
-          team: '',
-          goalMinDate: '',
-          goalMaxDate: '',
-          isActive: true
+          team: ''
         });
       }
     }, [agentDialog.data]);
@@ -1716,36 +1723,6 @@ const QAManager = () => {
                 placeholder="Enter team name"
                 className="text-sm"
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Goal Min Date</Label>
-                <DatePicker
-                  value={formData.goalMinDate}
-                  onChange={(value) => setFormData({ ...formData, goalMinDate: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Goal Max Date</Label>
-                <DatePicker
-                  value={formData.goalMaxDate}
-                  onChange={(value) => setFormData({ ...formData, goalMaxDate: value })}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="rounded border-gray-300 dark:border-neutral-600"
-              />
-              <Label htmlFor="isActive" className="text-xs text-gray-600 dark:text-neutral-400">Active Agent</Label>
             </div>
 
             <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
@@ -1918,7 +1895,7 @@ const QAManager = () => {
       notes: '',
       feedback: '',
       qualityScorePercent: '',
-      category: 'General'
+      category: 'Other'
     });
 
     useEffect(() => {
@@ -1931,7 +1908,7 @@ const QAManager = () => {
           notes: ticketDialog.data.notes || '',
           feedback: ticketDialog.data.feedback || '',
           qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
-          category: ticketDialog.data.category || 'General'
+          category: ticketDialog.data.category || 'Other'
         });
       } else {
         setFormData({
@@ -1942,7 +1919,7 @@ const QAManager = () => {
           notes: '',
           feedback: '',
           qualityScorePercent: '',
-          category: 'General'
+          category: 'Other'
         });
       }
     }, [ticketDialog.data]);
@@ -1970,114 +1947,173 @@ const QAManager = () => {
 
     return (
       <Dialog open={ticketDialog.open} onOpenChange={(open) => setTicketDialog({ ...ticketDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
             </DialogTitle>
           </DialogHeader>
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
-                <select
-                  value={formData.agent}
-                  onChange={(e) => setFormData({ ...formData, agent: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">Select Agent</option>
-                  {agents.map(agent => (
-                    <option key={agent._id} value={agent._id}>{agent.name}</option>
-                  ))}
-                </select>
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+            {/* Compact metadata section */}
+            <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-4 space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
+                  <select
+                    value={formData.agent}
+                    onChange={(e) => setFormData({ ...formData, agent: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select Agent</option>
+                    {agents.map(agent => (
+                      <option key={agent._id} value={agent._id}>{agent.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>
+                  <Input
+                    value={formData.ticketId}
+                    onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
+                    placeholder="Enter ticket ID"
+                    required
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                  >
+                    <option value="Selected">Selected</option>
+                    <option value="Graded">Graded</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Category</Label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                  >
+                    <option value="Account closure">Account closure</option>
+                    <option value="ACP usage">ACP usage</option>
+                    <option value="Account recovery">Account recovery</option>
+                    <option value="Affiliate program">Affiliate program</option>
+                    <option value="Available bonuses">Available bonuses</option>
+                    <option value="Balance issues">Balance issues</option>
+                    <option value="Bet | Bet archive">Bet | Bet archive</option>
+                    <option value="Birthday bonus">Birthday bonus</option>
+                    <option value="Break in play">Break in play</option>
+                    <option value="Bonus crediting">Bonus crediting</option>
+                    <option value="Bonus drops">Bonus drops</option>
+                    <option value="Casino">Casino</option>
+                    <option value="Coin mixing | AML">Coin mixing | AML</option>
+                    <option value="Compliance (KYC, Terms of service, Privacy)">Compliance (KYC, Terms of service, Privacy)</option>
+                    <option value="Crypto - General">Crypto - General</option>
+                    <option value="Crypto deposits">Crypto deposits</option>
+                    <option value="Crypto withdrawals">Crypto withdrawals</option>
+                    <option value="Data Deletion">Data Deletion</option>
+                    <option value="Deposit bonus">Deposit bonus</option>
+                    <option value="Exclusion | General">Exclusion | General</option>
+                    <option value="Exclusion | Self exclusion">Exclusion | Self exclusion</option>
+                    <option value="Exclusion | Casino exclusion">Exclusion | Casino exclusion</option>
+                    <option value="Fiat General">Fiat General</option>
+                    <option value="Fiat - CAD">Fiat - CAD</option>
+                    <option value="Fiat - BRL">Fiat - BRL</option>
+                    <option value="Fiat - JPY">Fiat - JPY</option>
+                    <option value="Fiat - PEN/ARS/CLP">Fiat - PEN/ARS/CLP</option>
+                    <option value="Fiat - INR">Fiat - INR</option>
+                    <option value="Fiat - NGN/VND/IDR">Fiat - NGN/VND/IDR</option>
+                    <option value="Forum">Forum</option>
+                    <option value="Funds recovery">Funds recovery</option>
+                    <option value="Games issues">Games issues</option>
+                    <option value="Games | Providers | Rules">Games | Providers | Rules</option>
+                    <option value="Games | Live games">Games | Live games</option>
+                    <option value="Hacked accounts">Hacked accounts</option>
+                    <option value="In-game chat | Third party chat">In-game chat | Third party chat</option>
+                    <option value="Monthly bonus">Monthly bonus</option>
+                    <option value="No luck tickets | RTP">No luck tickets | RTP</option>
+                    <option value="Phishing | Scam attempt">Phishing | Scam attempt</option>
+                    <option value="Phone removal">Phone removal</option>
+                    <option value="Pre/Post monthly bonus">Pre/Post monthly bonus</option>
+                    <option value="Promotions">Promotions</option>
+                    <option value="Provably fair">Provably fair</option>
+                    <option value="Race">Race</option>
+                    <option value="Rakeback">Rakeback</option>
+                    <option value="Reload">Reload</option>
+                    <option value="Responsible gambling">Responsible gambling</option>
+                    <option value="Roles">Roles</option>
+                    <option value="Rollover">Rollover</option>
+                    <option value="Security (2FA, Password, Email codes)">Security (2FA, Password, Email codes)</option>
+                    <option value="Sportsbook">Sportsbook</option>
+                    <option value="Stake basics">Stake basics</option>
+                    <option value="Stake originals">Stake originals</option>
+                    <option value="Tech issues | Jira cases | Bugs">Tech issues | Jira cases | Bugs</option>
+                    <option value="Tip Recovery">Tip Recovery</option>
+                    <option value="VIP host">VIP host</option>
+                    <option value="VIP program">VIP program</option>
+                    <option value="Welcome bonus">Welcome bonus</option>
+                    <option value="Weekly bonus">Weekly bonus</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>
-                <Input
-                  value={formData.ticketId}
-                  onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
-                  placeholder="Enter ticket ID"
-                  required
-                  className="text-sm"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date Entered</Label>
+                  <DatePicker
+                    value={formData.dateEntered}
+                    onChange={(value) => setFormData({ ...formData, dateEntered: value })}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.qualityScorePercent}
+                    onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
+                    placeholder="0-100"
+                    className="text-sm"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="Selected">Selected</option>
-                  <option value="Graded">Graded</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date Entered</Label>
-                <DatePicker
-                  value={formData.dateEntered}
-                  onChange={(value) => setFormData({ ...formData, dateEntered: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.qualityScorePercent}
-                  onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
-                  placeholder="0-100"
-                  className="text-sm"
-                />
-              </div>
-            </div>
-
+            {/* Notes - Full width, larger */}
             <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Category</Label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-              >
-                <option value="General">General</option>
-                <option value="Technical">Technical</option>
-                <option value="Billing">Billing</option>
-                <option value="Account">Account</option>
-                <option value="Complaint">Complaint</option>
-                <option value="Feature Request">Feature Request</option>
-                <option value="Bug Report">Bug Report</option>
-                <option value="Other">Other</option>
-              </select>
+              <Label className="text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1.5 flex items-center gap-2">
+                Notes
+                <span className="text-xs font-normal text-gray-400 dark:text-neutral-500">Internal notes for yourself</span>
+              </Label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Add detailed notes about this ticket review..."
+                rows={6}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-y min-h-[120px]"
+              />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Notes</Label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Internal notes for yourself"
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Feedback</Label>
-                <textarea
-                  value={formData.feedback}
-                  onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
-                  placeholder="Feedback to agent after grading"
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
-                />
-              </div>
+            {/* Feedback - Full width, larger */}
+            <div>
+              <Label className="text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1.5 flex items-center gap-2">
+                Feedback
+                <span className="text-xs font-normal text-gray-400 dark:text-neutral-500">Feedback to share with the agent</span>
+              </Label>
+              <textarea
+                value={formData.feedback}
+                onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
+                placeholder="Write detailed feedback for the agent about their performance on this ticket..."
+                rows={6}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-y min-h-[120px]"
+              />
             </div>
 
             <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
@@ -2177,19 +2213,23 @@ const QAManager = () => {
 
     return (
       <Dialog open={feedbackDialog.open} onOpenChange={(open) => setFeedbackDialog({ ...feedbackDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md">
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Add Feedback</DialogTitle>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+              Ticket: {feedbackDialog.ticket?.ticketId} - {feedbackDialog.ticket?.agent?.name || 'Unknown Agent'}
+            </p>
           </DialogHeader>
           <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Feedback</Label>
+              <Label className="text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1.5">Feedback for Agent</Label>
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                placeholder="Enter your feedback..."
+                rows={10}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-y min-h-[200px]"
+                placeholder="Write detailed feedback about the agent's performance on this ticket..."
+                autoFocus
               />
             </div>
             <DialogFooter>

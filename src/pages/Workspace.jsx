@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useTemplatesNavigation } from '../context/TemplatesNavigationContext';
 import InfiniteCanvas from '../components/InfiniteCanvas';
 import AppSidebar from '../components/AppSidebar';
 import CreateWorkspaceModal from '../components/modals/CreateWorkspaceModal';
@@ -21,6 +22,7 @@ const Workspace = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { joinWorkspace, leaveWorkspace, workspaceUsers } = useSocket();
+  const { setEditModeState, setElementCreator, setViewport: setTemplatesViewport } = useTemplatesNavigation();
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [canvas, setCanvas] = useState(null);
@@ -434,6 +436,24 @@ const Workspace = () => {
       console.error('Error saving view mode preference:', err);
     }
   };
+
+  // Sync templates system with edit mode
+  useEffect(() => {
+    const isEditMode = viewMode === 'edit' && workspace?.permissions?.canEditContent;
+    setEditModeState(isEditMode);
+  }, [viewMode, workspace?.permissions?.canEditContent, setEditModeState]);
+
+  // Sync templates system with viewport
+  useEffect(() => {
+    setTemplatesViewport(viewport);
+  }, [viewport, setTemplatesViewport]);
+
+  // Sync templates system with element creator
+  useEffect(() => {
+    if (canvas) {
+      setElementCreator(handleElementCreate);
+    }
+  }, [canvas, setElementCreator]);
 
   // Handle pending element navigation after workspace switch
   React.useEffect(() => {
