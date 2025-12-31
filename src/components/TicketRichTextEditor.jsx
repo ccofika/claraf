@@ -69,72 +69,138 @@ const TicketRichTextEditor = ({
     const clipboardData = e.clipboardData || window.clipboardData;
     const items = clipboardData.items;
 
-    let hasImage = false;
-    let imageFile = null;
-    let hasText = false;
+    let imageFiles = [];
     let textContent = '';
     let htmlContent = '';
 
-    // Check clipboard items
+    // Collect all clipboard items
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
-        hasImage = true;
-        imageFile = items[i].getAsFile();
-      } else if (items[i].type === 'text/html') {
-        hasText = true;
-        htmlContent = await new Promise(resolve => items[i].getAsString(resolve));
+        const file = items[i].getAsFile();
+        if (file) imageFiles.push(file);
       } else if (items[i].type === 'text/plain') {
-        if (!hasText) {
-          textContent = await new Promise(resolve => items[i].getAsString(resolve));
-        }
+        textContent = await new Promise(resolve => items[i].getAsString(resolve));
+      } else if (items[i].type === 'text/html') {
+        htmlContent = await new Promise(resolve => items[i].getAsString(resolve));
       }
     }
 
-    // If we have both image and text, handle them together
-    if (hasImage && imageFile) {
-      e.preventDefault();
+    // Always prevent default to control paste behavior
+    e.preventDefault();
 
-      // First insert any text content if present
-      if (htmlContent || textContent) {
-        const selection = window.getSelection();
-        if (selection.rangeCount) {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
+    // Normalize text: remove excessive line breaks but keep single line breaks
+    const normalizeText = (text) => {
+      if (!text) return '';
+      // Replace multiple consecutive newlines with double newline (paragraph break)
+      // Replace single \r\n or \r with \n
+      return text
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')  // Max 2 newlines in a row
+        .trim();
+    };
 
-          if (htmlContent) {
-            // Parse HTML and insert
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = htmlContent;
-            const fragment = document.createDocumentFragment();
-            while (tempDiv.firstChild) {
-              fragment.appendChild(tempDiv.firstChild);
-            }
-            range.insertNode(fragment);
-          } else if (textContent) {
-            const textNode = document.createTextNode(textContent);
-            range.insertNode(textNode);
+    // Extract images from HTML content (for when images are embedded in copied content)
+    const extractImagesFromHtml = async (html) => {
+      if (!html) return [];
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const images = doc.querySelectorAll('img');
+      const imagePromises = [];
+
+      for (const img of images) {
+        const src = img.src;
+        if (src && src.startsWith('data:image')) {
+          // Convert data URL to blob/file
+          try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const file = new File([blob], 'pasted-image.png', { type: blob.type });
+            imagePromises.push(file);
+          } catch (err) {
+            console.error('Error converting data URL to file:', err);
           }
-
-          // Move cursor to end
-          range.collapse(false);
-          selection.removeAllRanges();
-          selection.addRange(range);
+        } else if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
+          // For external URLs, we can try to fetch them (may fail due to CORS)
+          // Skip for now - these are usually not what users want to paste
         }
       }
 
-      // Then upload and insert image
-      await handleImagePaste(imageFile);
+      return imagePromises;
+    };
+
+    // If we have direct image files from clipboard (e.g., screenshots)
+    if (imageFiles.length > 0) {
+      // First insert normalized plain text if present
+      if (textContent) {
+        const normalized = normalizeText(textContent);
+        insertPlainText(normalized);
+      }
+
+      // Then upload and insert all images
+      for (const imageFile of imageFiles) {
+        await handleImagePaste(imageFile);
+      }
+      onChange?.(editorRef.current.innerHTML);
       return;
     }
 
-    // If only image, handle it
-    if (hasImage && imageFile) {
-      e.preventDefault();
-      await handleImagePaste(imageFile);
-      return;
+    // Check for images embedded in HTML content
+    if (htmlContent) {
+      const embeddedImages = await extractImagesFromHtml(htmlContent);
+
+      if (embeddedImages.length > 0) {
+        // We have images in HTML - insert text first, then images
+        if (textContent) {
+          const normalized = normalizeText(textContent);
+          insertPlainText(normalized);
+        }
+
+        for (const imageFile of embeddedImages) {
+          await handleImagePaste(imageFile);
+        }
+        onChange?.(editorRef.current.innerHTML);
+        return;
+      }
     }
 
-    // For text only, let default paste behavior happen
+    // For text only - insert as plain text (no styles, no formatting)
+    if (textContent) {
+      const normalized = normalizeText(textContent);
+      insertPlainText(normalized);
+      onChange?.(editorRef.current.innerHTML);
+    }
+  };
+
+  const insertPlainText = (text) => {
+    if (!text || !editorRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+
+    // Split text by newlines and insert with proper line breaks
+    const lines = text.split('\n');
+    const fragment = document.createDocumentFragment();
+
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        // Add line break before each line except the first
+        fragment.appendChild(document.createElement('br'));
+      }
+      if (line) {
+        fragment.appendChild(document.createTextNode(line));
+      }
+    });
+
+    range.insertNode(fragment);
+
+    // Move cursor to end
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
 
   const handleImagePaste = async (imageFile) => {
@@ -271,7 +337,8 @@ const TicketRichTextEditor = ({
           whiteSpace: 'pre-wrap',
           overflowWrap: 'break-word',
           cursor: disabled ? 'not-allowed' : 'text',
-          opacity: disabled ? 0.6 : 1
+          opacity: disabled ? 0.6 : 1,
+          color: 'inherit'
         }}
         data-placeholder={placeholder}
         suppressContentEditableWarning
@@ -288,6 +355,10 @@ const TicketRichTextEditor = ({
       <style>{`
         .ticket-rich-editor {
           position: relative;
+          color: inherit;
+        }
+        .ticket-rich-editor * {
+          color: inherit;
         }
         .ticket-rich-editor:empty:before {
           content: attr(data-placeholder);

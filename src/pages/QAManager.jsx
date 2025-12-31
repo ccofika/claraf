@@ -1955,174 +1955,259 @@ const QAManager = () => {
 
     return (
       <Dialog open={ticketDialog.open} onOpenChange={(open) => setTicketDialog({ ...ticketDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-              {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
-            </DialogTitle>
-          </DialogHeader>
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
-                <select
-                  value={formData.agent}
-                  onChange={(e) => setFormData({ ...formData, agent: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">Select Agent</option>
-                  {agents.map(agent => (
-                    <option key={agent._id} value={agent._id}>{agent.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>
-                <Input
-                  value={formData.ticketId}
-                  onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
-                  placeholder="Enter ticket ID"
-                  required
-                  className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Status</Label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="Selected">Selected</option>
-                  <option value="Graded">Graded</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Date Entered</Label>
-                <DatePicker
-                  value={formData.dateEntered}
-                  onChange={(value) => setFormData({ ...formData, dateEntered: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Quality Score (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.qualityScorePercent}
-                  onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
-                  placeholder="0-100"
-                  className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Category</Label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+        <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
+          {/* Header */}
+          <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+                {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
+              </DialogTitle>
+              <button
+                onClick={() => setTicketDialog({ ...ticketDialog, open: false })}
+                className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
               >
-                <option value="Account closure">Account closure</option>
-                <option value="ACP usage">ACP usage</option>
-                <option value="Account recovery">Account recovery</option>
-                <option value="Affiliate program">Affiliate program</option>
-                <option value="Available bonuses">Available bonuses</option>
-                <option value="Balance issues">Balance issues</option>
-                <option value="Bet | Bet archive">Bet | Bet archive</option>
-                <option value="Birthday bonus">Birthday bonus</option>
-                <option value="Break in play">Break in play</option>
-                <option value="Bonus crediting">Bonus crediting</option>
-                <option value="Bonus drops">Bonus drops</option>
-                <option value="Casino">Casino</option>
-                <option value="Coin mixing | AML">Coin mixing | AML</option>
-                <option value="Compliance (KYC, Terms of service, Privacy)">Compliance (KYC, Terms of service, Privacy)</option>
-                <option value="Crypto - General">Crypto - General</option>
-                <option value="Crypto deposits">Crypto deposits</option>
-                <option value="Crypto withdrawals">Crypto withdrawals</option>
-                <option value="Data deletion">Data deletion</option>
-                <option value="Deposit bonus">Deposit bonus</option>
-                <option value="Exclusion | General">Exclusion | General</option>
-                <option value="Exclusion | Self exclusion">Exclusion | Self exclusion</option>
-                <option value="Exclusion | Casino exclusion">Exclusion | Casino exclusion</option>
-                <option value="Fiat General">Fiat General</option>
-                <option value="Fiat - CAD">Fiat - CAD</option>
-                <option value="Fiat - BRL">Fiat - BRL</option>
-                <option value="Fiat - JPY">Fiat - JPY</option>
-                <option value="Fiat - INR">Fiat - INR</option>
-                <option value="Fiat - PEN/ARS/CLP">Fiat - PEN/ARS/CLP</option>
-                <option value="Forum">Forum</option>
-                <option value="Funds recovery">Funds recovery</option>
-                <option value="Games issues">Games issues</option>
-                <option value="Games | Providers | Rules">Games | Providers | Rules</option>
-                <option value="Games | Live games">Games | Live games</option>
-                <option value="Hacked accounts">Hacked accounts</option>
-                <option value="In-game chat | Third party chat">In-game chat | Third party chat</option>
-                <option value="Monthly bonus">Monthly bonus</option>
-                <option value="No luck tickets | RTP">No luck tickets | RTP</option>
-                <option value="Phishing | Scam attempt">Phishing | Scam attempt</option>
-                <option value="Phone removal">Phone removal</option>
-                <option value="Pre/Post monthly bonus">Pre/Post monthly bonus</option>
-                <option value="Promotions">Promotions</option>
-                <option value="Provably fair">Provably fair</option>
-                <option value="Race">Race</option>
-                <option value="Rakeback">Rakeback</option>
-                <option value="Reload">Reload</option>
-                <option value="Responsible gambling">Responsible gambling</option>
-                <option value="Roles">Roles</option>
-                <option value="Rollover">Rollover</option>
-                <option value="Security (2FA, Password, Email codes)">Security (2FA, Password, Email codes)</option>
-                <option value="Sportsbook">Sportsbook</option>
-                <option value="Stake basics">Stake basics</option>
-                <option value="Stake chat">Stake chat</option>
-                <option value="Stake original">Stake original</option>
-                <option value="Tech issues | Jira cases | Bugs">Tech issues | Jira cases | Bugs</option>
-                <option value="Tip recovery">Tip recovery</option>
-                <option value="VIP host">VIP host</option>
-                <option value="VIP program">VIP program</option>
-                <option value="Welcome bonus">Welcome bonus</option>
-                <option value="Weekly bonus">Weekly bonus</option>
-                <option value="Other">Other</option>
-              </select>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </DialogHeader>
+
+          {/* Main Content - 50/50 Split */}
+          <form ref={formRef} onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
+            {/* LEFT SIDE - Ticket Form */}
+            <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Top Section: Agent, Ticket ID, Date Entered */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
+                    <select
+                      value={formData.agent}
+                      onChange={(e) => setFormData({ ...formData, agent: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Select Agent</option>
+                      {agents.map(agent => (
+                        <option key={agent._id} value={agent._id}>{agent.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>
+                    <Input
+                      value={formData.ticketId}
+                      onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
+                      placeholder="Enter ticket ID"
+                      required
+                      className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Date Entered</Label>
+                    <DatePicker
+                      value={formData.dateEntered}
+                      onChange={(value) => setFormData({ ...formData, dateEntered: value })}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Notes
+                  </Label>
+                  <TicketRichTextEditor
+                    value={formData.notes}
+                    onChange={(html) => setFormData({ ...formData, notes: html })}
+                    placeholder="Internal notes for yourself"
+                    rows={5}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300 dark:border-neutral-700"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 bg-white dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
+                      Grading Information
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Status, Quality Score, Category */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="Selected">Selected</option>
+                      <option value="Graded">Graded</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Quality Score (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.qualityScorePercent}
+                      onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
+                      placeholder="0-100"
+                      className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Category</Label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="Account closure">Account closure</option>
+                      <option value="ACP usage">ACP usage</option>
+                      <option value="Account recovery">Account recovery</option>
+                      <option value="Affiliate program">Affiliate program</option>
+                      <option value="Available bonuses">Available bonuses</option>
+                      <option value="Balance issues">Balance issues</option>
+                      <option value="Bet | Bet archive">Bet | Bet archive</option>
+                      <option value="Birthday bonus">Birthday bonus</option>
+                      <option value="Break in play">Break in play</option>
+                      <option value="Bonus crediting">Bonus crediting</option>
+                      <option value="Bonus drops">Bonus drops</option>
+                      <option value="Casino">Casino</option>
+                      <option value="Coin mixing | AML">Coin mixing | AML</option>
+                      <option value="Compliance (KYC, Terms of service, Privacy)">Compliance (KYC, Terms of service, Privacy)</option>
+                      <option value="Crypto - General">Crypto - General</option>
+                      <option value="Crypto deposits">Crypto deposits</option>
+                      <option value="Crypto withdrawals">Crypto withdrawals</option>
+                      <option value="Data deletion">Data deletion</option>
+                      <option value="Deposit bonus">Deposit bonus</option>
+                      <option value="Exclusion | General">Exclusion | General</option>
+                      <option value="Exclusion | Self exclusion">Exclusion | Self exclusion</option>
+                      <option value="Exclusion | Casino exclusion">Exclusion | Casino exclusion</option>
+                      <option value="Fiat General">Fiat General</option>
+                      <option value="Fiat - CAD">Fiat - CAD</option>
+                      <option value="Fiat - BRL">Fiat - BRL</option>
+                      <option value="Fiat - JPY">Fiat - JPY</option>
+                      <option value="Fiat - INR">Fiat - INR</option>
+                      <option value="Fiat - PEN/ARS/CLP">Fiat - PEN/ARS/CLP</option>
+                      <option value="Forum">Forum</option>
+                      <option value="Funds recovery">Funds recovery</option>
+                      <option value="Games issues">Games issues</option>
+                      <option value="Games | Providers | Rules">Games | Providers | Rules</option>
+                      <option value="Games | Live games">Games | Live games</option>
+                      <option value="Hacked accounts">Hacked accounts</option>
+                      <option value="In-game chat | Third party chat">In-game chat | Third party chat</option>
+                      <option value="Monthly bonus">Monthly bonus</option>
+                      <option value="No luck tickets | RTP">No luck tickets | RTP</option>
+                      <option value="Phishing | Scam attempt">Phishing | Scam attempt</option>
+                      <option value="Phone removal">Phone removal</option>
+                      <option value="Pre/Post monthly bonus">Pre/Post monthly bonus</option>
+                      <option value="Promotions">Promotions</option>
+                      <option value="Provably fair">Provably fair</option>
+                      <option value="Race">Race</option>
+                      <option value="Rakeback">Rakeback</option>
+                      <option value="Reload">Reload</option>
+                      <option value="Responsible gambling">Responsible gambling</option>
+                      <option value="Roles">Roles</option>
+                      <option value="Rollover">Rollover</option>
+                      <option value="Security (2FA, Password, Email codes)">Security (2FA, Password, Email codes)</option>
+                      <option value="Sportsbook">Sportsbook</option>
+                      <option value="Stake basics">Stake basics</option>
+                      <option value="Stake chat">Stake chat</option>
+                      <option value="Stake original">Stake original</option>
+                      <option value="Tech issues | Jira cases | Bugs">Tech issues | Jira cases | Bugs</option>
+                      <option value="Tip recovery">Tip recovery</option>
+                      <option value="VIP host">VIP host</option>
+                      <option value="VIP program">VIP program</option>
+                      <option value="Welcome bonus">Welcome bonus</option>
+                      <option value="Weekly bonus">Weekly bonus</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Feedback Section */}
+                <div>
+                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Feedback
+                  </Label>
+                  <TicketRichTextEditor
+                    value={formData.feedback}
+                    onChange={(html) => setFormData({ ...formData, feedback: html })}
+                    placeholder="Feedback to agent after grading"
+                    rows={5}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-neutral-800">
+                  <Button type="button" variant="secondary" onClick={() => setTicketDialog({ ...ticketDialog, open: false })}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Save Changes'}
+                  </Button>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Notes</Label>
-              <TicketRichTextEditor
-                value={formData.notes}
-                onChange={(html) => setFormData({ ...formData, notes: html })}
-                placeholder="Internal notes for yourself"
-                rows={4}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
+            {/* RIGHT SIDE - AI Functionality Placeholder */}
+            <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+              {/* Subtle grid pattern overlay */}
+              <div
+                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+                style={{
+                  backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}
               />
-            </div>
 
-            <div>
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Feedback</Label>
-              <TicketRichTextEditor
-                value={formData.feedback}
-                onChange={(html) => setFormData({ ...formData, feedback: html })}
-                placeholder="Feedback to agent after grading"
-                rows={4}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none"
-              />
-            </div>
+              {/* Centered AI Coming Soon Content */}
+              <div className="flex-1 flex items-center justify-center relative z-10">
+                <div className="text-center space-y-6 px-8">
+                  {/* Animated icon */}
+                  <div className="relative mx-auto w-24 h-24">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 rounded-2xl animate-pulse" />
+                    <div className="absolute inset-2 bg-white dark:bg-neutral-900 rounded-xl flex items-center justify-center border border-gray-200 dark:border-neutral-800">
+                      <Sparkles className="w-10 h-10 text-gray-400 dark:text-neutral-500" />
+                    </div>
+                  </div>
 
-            <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
-              <Button type="button" variant="secondary" onClick={() => setTicketDialog({ ...ticketDialog, open: false })}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
+                  {/* Main text */}
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                      AI FUNCTIONALITY
+                    </h3>
+                    <p className="text-lg font-medium text-gray-500 dark:text-neutral-400">
+                      COMING SOON
+                    </p>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-gray-400 dark:text-neutral-500 max-w-sm mx-auto leading-relaxed">
+                    Advanced AI-powered ticket analysis, automated feedback suggestions, and quality insights will be available here.
+                  </p>
+
+                  {/* Decorative dots */}
+                  <div className="flex items-center justify-center gap-1.5 pt-4">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
@@ -2239,7 +2324,7 @@ const QAManager = () => {
     );
   };
 
-  // View Ticket Details Dialog Component
+  // View Ticket Details Dialog Component - Full Screen 50/50 Layout
   const ViewTicketDialogContent = () => {
     if (!viewDialog.ticket) return null;
 
@@ -2247,133 +2332,216 @@ const QAManager = () => {
 
     return (
       <Dialog open={viewDialog.open} onOpenChange={(open) => setViewDialog({ ...viewDialog, open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-3xl max-h-[85vh]">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-              Ticket Details
-            </DialogTitle>
+        <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
+          {/* Header */}
+          <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+                Ticket Details
+              </DialogTitle>
+              <div className="flex items-center gap-2">
+                {!ticket.isArchived && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setViewDialog({ open: false, ticket: null });
+                      setTicketDialog({ open: true, mode: 'edit', data: ticket });
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-1.5" />
+                    Edit Ticket
+                  </Button>
+                )}
+                <button
+                  onClick={() => setViewDialog({ open: false, ticket: null })}
+                  className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[calc(85vh-120px)] space-y-6 pr-2">
-            {/* Header Info */}
-            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200 dark:border-neutral-800">
-              <div>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Ticket ID</p>
-                <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{ticket.ticketId}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Agent</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{ticket.agent?.name || ticket.agentName || 'Unknown'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Status</p>
-                <StatusBadge status={ticket.status} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Quality Score</p>
-                <QualityScoreBadge score={ticket.qualityScorePercent} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Date Entered</p>
-                <p className="text-sm text-gray-900 dark:text-white">
-                  {new Date(ticket.dateEntered || ticket.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </p>
-              </div>
-              {ticket.gradedDate && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Graded Date</p>
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    {new Date(ticket.gradedDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
+          {/* Main Content - 50/50 Split */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* LEFT SIDE - Ticket Information */}
+            <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Top Section: Agent, Ticket ID, Date Entered */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Agent</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{ticket.agent?.name || ticket.agentName || 'Unknown'}</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Ticket ID</p>
+                    <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{ticket.ticketId}</p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Date Entered</p>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(ticket.dateEntered || ticket.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                {/* Notes Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Notes
+                  </h4>
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800 min-h-[120px]">
+                    {ticket.notes ? (
+                      <TicketContentDisplay
+                        content={ticket.notes}
+                        className="text-sm text-gray-700 dark:text-neutral-300"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-400 dark:text-neutral-500 italic">No notes available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300 dark:border-neutral-700"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 bg-white dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
+                      Grading Information
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Status, Quality Score */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">Status</p>
+                    <StatusBadge status={ticket.status} />
+                  </div>
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">Quality Score</p>
+                    <QualityScoreBadge score={ticket.qualityScorePercent} />
+                  </div>
+                </div>
+
+                {/* Feedback Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Feedback
+                  </h4>
+                  <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800 min-h-[120px]">
+                    {ticket.feedback ? (
+                      <TicketContentDisplay
+                        content={ticket.feedback}
+                        className="text-sm text-gray-700 dark:text-neutral-300"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-400 dark:text-neutral-500 italic">No feedback available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Additional Metadata */}
+                {(ticket.category || ticket.createdBy || (ticket.isArchived && ticket.archivedDate) || ticket.gradedDate) && (
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-neutral-800">
+                    {ticket.category && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Category</p>
+                        <p className="text-sm text-gray-900 dark:text-white">{ticket.category}</p>
+                      </div>
+                    )}
+                    {ticket.createdBy && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Created By</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {ticket.createdBy.name || ticket.createdBy.email}
+                        </p>
+                      </div>
+                    )}
+                    {ticket.gradedDate && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Graded Date</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {new Date(ticket.gradedDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    )}
+                    {ticket.isArchived && ticket.archivedDate && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Archived Date</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {new Date(ticket.archivedDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Notes Section */}
-            {ticket.notes && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Notes
-                </h4>
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
-                  <TicketContentDisplay
-                    content={ticket.notes}
-                    className="text-sm text-gray-700 dark:text-neutral-300"
-                  />
+            {/* RIGHT SIDE - AI Functionality Placeholder */}
+            <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+              {/* Subtle grid pattern overlay */}
+              <div
+                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+                style={{
+                  backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}
+              />
+
+              {/* Centered AI Coming Soon Content */}
+              <div className="flex-1 flex items-center justify-center relative z-10">
+                <div className="text-center space-y-6 px-8">
+                  {/* Animated icon */}
+                  <div className="relative mx-auto w-24 h-24">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 rounded-2xl animate-pulse" />
+                    <div className="absolute inset-2 bg-white dark:bg-neutral-900 rounded-xl flex items-center justify-center border border-gray-200 dark:border-neutral-800">
+                      <Sparkles className="w-10 h-10 text-gray-400 dark:text-neutral-500" />
+                    </div>
+                  </div>
+
+                  {/* Main text */}
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                      AI FUNCTIONALITY
+                    </h3>
+                    <p className="text-lg font-medium text-gray-500 dark:text-neutral-400">
+                      COMING SOON
+                    </p>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-gray-400 dark:text-neutral-500 max-w-sm mx-auto leading-relaxed">
+                    Advanced AI-powered ticket analysis, automated feedback suggestions, and quality insights will be available here.
+                  </p>
+
+                  {/* Decorative dots */}
+                  <div className="flex items-center justify-center gap-1.5 pt-4">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '300ms' }} />
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Feedback Section */}
-            {ticket.feedback && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Feedback
-                </h4>
-                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                  <TicketContentDisplay
-                    content={ticket.feedback}
-                    className="text-sm text-gray-700 dark:text-neutral-300"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Metadata */}
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-neutral-800">
-              {ticket.category && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Category</p>
-                  <p className="text-sm text-gray-900 dark:text-white">{ticket.category}</p>
-                </div>
-              )}
-              {ticket.createdBy && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Created By</p>
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    {ticket.createdBy.name || ticket.createdBy.email}
-                  </p>
-                </div>
-              )}
-              {ticket.isArchived && ticket.archivedDate && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Archived Date</p>
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    {new Date(ticket.archivedDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
-
-          <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
-            <Button variant="secondary" onClick={() => setViewDialog({ open: false, ticket: null })}>
-              Close
-            </Button>
-            {!ticket.isArchived && (
-              <Button onClick={() => {
-                setViewDialog({ open: false, ticket: null });
-                setTicketDialog({ open: true, mode: 'edit', data: ticket });
-              }}>
-                <Edit className="w-4 h-4 mr-1.5" />
-                Edit Ticket
-              </Button>
-            )}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
