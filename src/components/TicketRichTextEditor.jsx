@@ -102,12 +102,13 @@ const TicketRichTextEditor = ({
     };
 
     // Extract images from HTML content (for when images are embedded in copied content)
+    // Returns array of { type: 'file', file: File } or { type: 'url', url: string }
     const extractImagesFromHtml = async (html) => {
       if (!html) return [];
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const images = doc.querySelectorAll('img');
-      const imagePromises = [];
+      const extractedImages = [];
 
       for (const img of images) {
         const src = img.src;
@@ -117,17 +118,36 @@ const TicketRichTextEditor = ({
             const response = await fetch(src);
             const blob = await response.blob();
             const file = new File([blob], 'pasted-image.png', { type: blob.type });
-            imagePromises.push(file);
+            extractedImages.push({ type: 'file', file });
           } catch (err) {
             console.error('Error converting data URL to file:', err);
           }
         } else if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
-          // For external URLs, we can try to fetch them (may fail due to CORS)
-          // Skip for now - these are usually not what users want to paste
+          // External URLs - try to fetch and convert to file, fallback to direct URL
+          try {
+            const response = await fetch(src);
+            if (response.ok) {
+              const blob = await response.blob();
+              if (blob.type.startsWith('image/')) {
+                const file = new File([blob], 'pasted-image.png', { type: blob.type });
+                extractedImages.push({ type: 'file', file });
+              } else {
+                // Not an image blob, use URL directly
+                extractedImages.push({ type: 'url', url: src });
+              }
+            } else {
+              // Fetch failed, use URL directly
+              extractedImages.push({ type: 'url', url: src });
+            }
+          } catch (err) {
+            // CORS or other error - use URL directly as fallback
+            console.log('Could not fetch external image, using URL directly:', src);
+            extractedImages.push({ type: 'url', url: src });
+          }
         }
       }
 
-      return imagePromises;
+      return extractedImages;
     };
 
     // If we have direct image files from clipboard (e.g., screenshots)
@@ -157,8 +177,13 @@ const TicketRichTextEditor = ({
           insertPlainText(normalized);
         }
 
-        for (const imageFile of embeddedImages) {
-          await handleImagePaste(imageFile);
+        for (const imgData of embeddedImages) {
+          if (imgData.type === 'file') {
+            await handleImagePaste(imgData.file);
+          } else if (imgData.type === 'url') {
+            // Insert external URL image directly
+            insertExternalImage(imgData.url);
+          }
         }
         onChange?.(editorRef.current.innerHTML);
         return;
@@ -299,6 +324,79 @@ const TicketRichTextEditor = ({
 
     // Trigger onChange
     onChange?.(editorRef.current.innerHTML);
+  };
+
+  // Insert external image URL directly (for images that can't be uploaded due to CORS)
+  const insertExternalImage = (url) => {
+    if (!editorRef.current || !url) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+
+    // Create image container for thumbnail display
+    const imgContainer = document.createElement('span');
+    imgContainer.className = 'inline-image-container';
+    imgContainer.style.cssText = 'display: inline-block; position: relative; margin: 4px 2px; vertical-align: middle;';
+
+    // Create image element with thumbnail styling
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'External image';
+    img.className = 'ticket-inline-image';
+    img.style.cssText = `
+      max-width: 120px;
+      max-height: 80px;
+      width: auto;
+      height: auto;
+      border-radius: 4px;
+      cursor: pointer;
+      object-fit: cover;
+      border: 1px solid rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    `;
+
+    // Add data attributes for lightbox
+    img.setAttribute('data-full-url', url);
+    img.setAttribute('data-external', 'true');
+
+    // Create zoom indicator
+    const zoomIndicator = document.createElement('span');
+    zoomIndicator.className = 'zoom-indicator';
+    zoomIndicator.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>`;
+    zoomIndicator.style.cssText = `
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 2px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    imgContainer.appendChild(img);
+    imgContainer.appendChild(zoomIndicator);
+
+    // Insert at cursor
+    range.deleteContents();
+    range.insertNode(imgContainer);
+
+    // Add space after image
+    const space = document.createTextNode(' ');
+    imgContainer.parentNode.insertBefore(space, imgContainer.nextSibling);
+
+    // Move cursor after the space
+    range.setStartAfter(space);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
 
   const handleClick = (e) => {
