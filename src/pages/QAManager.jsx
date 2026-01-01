@@ -6,7 +6,7 @@ import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
-  Keyboard, RefreshCw
+  Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -23,6 +23,7 @@ import QAShortcutsModal from '../components/QAShortcutsModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
 import TicketRichTextEditor, { TicketContentDisplay } from '../components/TicketRichTextEditor';
+import SimilarFeedbacksPanel from '../components/SimilarFeedbacksPanel';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -58,8 +59,8 @@ const QAManager = () => {
     pages: 0
   });
 
-  // Filter state
-  const [filters, setFilters] = useState({
+  // Separate filter states for tickets and archive tabs
+  const [ticketsFilters, setTicketsFilters] = useState({
     agent: '',
     status: '',
     isArchived: false,
@@ -71,8 +72,27 @@ const QAManager = () => {
     category: '',
     priority: '',
     tags: '',
-    searchMode: 'text' // 'ai' for semantic search, 'text' for keyword search
+    searchMode: 'text'
   });
+
+  const [archiveFilters, setArchiveFilters] = useState({
+    agent: '',
+    status: '',
+    isArchived: true,
+    dateFrom: '',
+    dateTo: '',
+    scoreMin: 0,
+    scoreMax: 100,
+    search: '',
+    category: '',
+    priority: '',
+    tags: '',
+    searchMode: 'text'
+  });
+
+  // Get current filters based on active tab
+  const filters = activeTab === 'archive' ? archiveFilters : ticketsFilters;
+  const setFilters = activeTab === 'archive' ? setArchiveFilters : setTicketsFilters;
 
   // Dialog state
   const [agentDialog, setAgentDialog] = useState({ open: false, mode: 'create', data: null });
@@ -83,6 +103,10 @@ const QAManager = () => {
   const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
   const [feedbackDialog, setFeedbackDialog] = useState({ open: false, ticket: null });
   const [viewDialog, setViewDialog] = useState({ open: false, ticket: null });
+
+  // Agent expansion state (for showing unresolved issues)
+  const [expandedAgentId, setExpandedAgentId] = useState(null);
+  const [agentIssues, setAgentIssues] = useState({ loading: false, data: null });
 
   // Selection state
   const [selectedTickets, setSelectedTickets] = useState([]);
@@ -103,11 +127,18 @@ const QAManager = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'tickets' || activeTab === 'archive') {
+    if (activeTab === 'tickets') {
       fetchTickets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, activeTab, pagination.page]);
+  }, [ticketsFilters, pagination.page]);
+
+  useEffect(() => {
+    if (activeTab === 'archive') {
+      fetchTickets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveFilters, pagination.page]);
 
   useEffect(() => {
     fetchAgents(); // Always fetch agents for dropdowns
@@ -319,6 +350,29 @@ const QAManager = () => {
     } catch (err) {
       console.error('Error fetching agents for filter:', err);
       toast.error('Failed to load agents for filter');
+    }
+  };
+
+  // Fetch agent's unresolved issues when expanding
+  const fetchAgentIssues = async (agentId) => {
+    try {
+      setAgentIssues({ loading: true, data: null });
+      const response = await axios.get(`${API_URL}/api/qa/agents/${agentId}/issues`, getAuthHeaders());
+      setAgentIssues({ loading: false, data: response.data });
+    } catch (err) {
+      console.error('Error fetching agent issues:', err);
+      setAgentIssues({ loading: false, data: null });
+    }
+  };
+
+  // Toggle agent expansion
+  const handleAgentExpand = (agentId) => {
+    if (expandedAgentId === agentId) {
+      setExpandedAgentId(null);
+      setAgentIssues({ loading: false, data: null });
+    } else {
+      setExpandedAgentId(agentId);
+      fetchAgentIssues(agentId);
     }
   };
 
@@ -1206,52 +1260,134 @@ const QAManager = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
-                {sortedAgents.map((agent) => (
-                  <tr key={agent._id} className="group hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
-                          {agent.name?.charAt(0) || '?'}
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{agent.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.position || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.team || '-'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        agent.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
-                      }`}>
-                        {agent.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleExportMaestro(agent._id)}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                          title="Export"
-                        >
-                          <Download className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
-                        </button>
-                        <button
-                          onClick={() => setAgentDialog({ open: true, mode: 'edit', data: agent })}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteDialog({ open: true, type: 'agent', id: agent._id, name: agent.name })}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                          title="Remove"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedAgents.map((agent) => {
+                  const isExpanded = expandedAgentId === agent._id;
+                  return (
+                    <React.Fragment key={agent._id}>
+                      <tr className="group hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleAgentExpand(agent._id)}
+                            className="flex items-center gap-3 w-full text-left group/name"
+                          >
+                            <div className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-neutral-500">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </div>
+                            <div className="w-7 h-7 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                              {agent.name?.charAt(0) || '?'}
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white group-hover/name:text-blue-600 dark:group-hover/name:text-blue-400 transition-colors">{agent.name}</span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.position || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.team || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            agent.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
+                          }`}>
+                            {agent.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleExportMaestro(agent._id)}
+                              className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                              title="Export"
+                            >
+                              <Download className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                            </button>
+                            <button
+                              onClick={() => setAgentDialog({ open: true, mode: 'edit', data: agent })}
+                              className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteDialog({ open: true, type: 'agent', id: agent._id, name: agent.name })}
+                              className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Expanded row - Agent Issues */}
+                      {isExpanded && (
+                        <tr className="bg-gray-50/50 dark:bg-neutral-900/50">
+                          <td colSpan={5} className="px-4 py-4">
+                            <div className="ml-8">
+                              {agentIssues.loading ? (
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-neutral-400">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Loading issues...
+                                </div>
+                              ) : agentIssues.data?.unresolvedCount === 0 ? (
+                                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                                  <CheckCircle className="w-4 h-4" />
+                                  No unresolved issues - great performance!
+                                </div>
+                              ) : agentIssues.data?.issues?.length > 0 ? (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    {agentIssues.data.unresolvedCount} unresolved issue{agentIssues.data.unresolvedCount !== 1 ? 's' : ''} (last 3 weeks)
+                                  </div>
+                                  <div className="grid gap-2">
+                                    {agentIssues.data.issues.map((issue, idx) => (
+                                      <div
+                                        key={issue.ticketId || idx}
+                                        className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-3"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className="text-xs font-mono text-gray-500 dark:text-neutral-500">
+                                                {issue.ticketNumber}
+                                              </span>
+                                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                                issue.qualityScore < 70
+                                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                                  : issue.qualityScore < 80
+                                                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                                                  : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                                              }`}>
+                                                {issue.qualityScore}%
+                                              </span>
+                                              {issue.category && (
+                                                <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400">
+                                                  {issue.category}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-sm text-gray-900 dark:text-white">
+                                              {issue.summary}
+                                            </p>
+                                            {issue.gradedDate && (
+                                              <p className="text-xs text-gray-400 dark:text-neutral-500 mt-1">
+                                                {new Date(issue.gradedDate).toLocaleDateString()}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-neutral-400">
+                                  No issues data available
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1269,9 +1405,9 @@ const QAManager = () => {
         {/* Unified Search Bar with AI/Text toggle and filters */}
         <div className="mb-4">
           <QASearchBar
-            currentFilters={filters}
-            onFilterChange={setFilters}
-            agents={agentsForFilter}
+            currentFilters={ticketsFilters}
+            onFilterChange={setTicketsFilters}
+            agents={agents}
           />
         </div>
 
@@ -1445,7 +1581,7 @@ const QAManager = () => {
   // Archive Tab
   const renderArchive = () => {
     // For AI search, tickets are already sorted by relevance, don't re-sort
-    const isAISearch = filters.searchMode === 'ai' && filters.search && filters.search.trim().length > 0;
+    const isAISearch = archiveFilters.searchMode === 'ai' && archiveFilters.search && archiveFilters.search.trim().length > 0;
     const sortedTickets = isAISearch ? tickets : getSortedData(tickets);
 
     return (
@@ -1453,8 +1589,8 @@ const QAManager = () => {
         {/* Unified Search Bar with AI/Text toggle and filters */}
         <div className="mb-4">
           <QASearchBar
-            currentFilters={{ ...filters, isArchived: true }}
-            onFilterChange={setFilters}
+            currentFilters={archiveFilters}
+            onFilterChange={setArchiveFilters}
             agents={agentsForFilter}
           />
         </div>
@@ -2173,40 +2309,20 @@ const QAManager = () => {
                 }}
               />
 
-              {/* Centered AI Coming Soon Content */}
-              <div className="flex-1 flex items-center justify-center relative z-10">
-                <div className="text-center space-y-6 px-8">
-                  {/* Animated icon */}
-                  <div className="relative mx-auto w-24 h-24">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 rounded-2xl animate-pulse" />
-                    <div className="absolute inset-2 bg-white dark:bg-neutral-900 rounded-xl flex items-center justify-center border border-gray-200 dark:border-neutral-800">
-                      <Sparkles className="w-10 h-10 text-gray-400 dark:text-neutral-500" />
-                    </div>
-                  </div>
-
-                  {/* Main text */}
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-                      AI FUNCTIONALITY
-                    </h3>
-                    <p className="text-lg font-medium text-gray-500 dark:text-neutral-400">
-                      COMING SOON
-                    </p>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-sm text-gray-400 dark:text-neutral-500 max-w-sm mx-auto leading-relaxed">
-                    Advanced AI-powered ticket analysis, automated feedback suggestions, and quality insights will be available here.
-                  </p>
-
-                  {/* Decorative dots */}
-                  <div className="flex items-center justify-center gap-1.5 pt-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
+              {/* AI Similar Feedbacks Panel */}
+              <SimilarFeedbacksPanel
+                notes={formData.notes}
+                ticketId={ticketDialog.data?._id}
+                onCopyFeedback={(feedback) => {
+                  // Append to existing feedback
+                  const currentFeedback = formData.feedback || '';
+                  const separator = currentFeedback.trim() ? '\n\n' : '';
+                  setFormData(prev => ({
+                    ...prev,
+                    feedback: currentFeedback + separator + feedback
+                  }));
+                }}
+              />
             </div>
           </form>
         </DialogContent>
@@ -2506,40 +2622,11 @@ const QAManager = () => {
                 }}
               />
 
-              {/* Centered AI Coming Soon Content */}
-              <div className="flex-1 flex items-center justify-center relative z-10">
-                <div className="text-center space-y-6 px-8">
-                  {/* Animated icon */}
-                  <div className="relative mx-auto w-24 h-24">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 rounded-2xl animate-pulse" />
-                    <div className="absolute inset-2 bg-white dark:bg-neutral-900 rounded-xl flex items-center justify-center border border-gray-200 dark:border-neutral-800">
-                      <Sparkles className="w-10 h-10 text-gray-400 dark:text-neutral-500" />
-                    </div>
-                  </div>
-
-                  {/* Main text */}
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-                      AI FUNCTIONALITY
-                    </h3>
-                    <p className="text-lg font-medium text-gray-500 dark:text-neutral-400">
-                      COMING SOON
-                    </p>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-sm text-gray-400 dark:text-neutral-500 max-w-sm mx-auto leading-relaxed">
-                    Advanced AI-powered ticket analysis, automated feedback suggestions, and quality insights will be available here.
-                  </p>
-
-                  {/* Decorative dots */}
-                  <div className="flex items-center justify-center gap-1.5 pt-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-600 animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
+              {/* AI Similar Feedbacks Panel */}
+              <SimilarFeedbacksPanel
+                notes={ticket.notes}
+                ticketId={ticket._id}
+              />
             </div>
           </div>
         </DialogContent>
