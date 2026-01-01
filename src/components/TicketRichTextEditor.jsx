@@ -66,6 +66,10 @@ const TicketRichTextEditor = ({
   }, [onChange]);
 
   const handlePaste = async (e) => {
+    // CRITICAL: Prevent default IMMEDIATELY before any async operations
+    // Otherwise browser will perform default paste while we're collecting clipboard data
+    e.preventDefault();
+
     const clipboardData = e.clipboardData || window.clipboardData;
     const items = clipboardData.items;
 
@@ -84,9 +88,6 @@ const TicketRichTextEditor = ({
         htmlContent = await new Promise(resolve => items[i].getAsString(resolve));
       }
     }
-
-    // Always prevent default to control paste behavior
-    e.preventDefault();
 
     // Normalize text: remove excessive line breaks but keep single line breaks
     const normalizeText = (text) => {
