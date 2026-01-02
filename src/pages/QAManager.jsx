@@ -19,11 +19,13 @@ import QASearchBar from '../components/QASearchBar';
 import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
 import QAAllAgents from '../components/QAAllAgents';
+import QASummaries from '../components/QASummaries';
 import QAShortcutsModal from '../components/QAShortcutsModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
 import TicketRichTextEditor, { TicketContentDisplay } from '../components/TicketRichTextEditor';
 import SimilarFeedbacksPanel from '../components/SimilarFeedbacksPanel';
+import RelatedTicketsPanel from '../components/RelatedTicketsPanel';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -41,7 +43,7 @@ const QAManager = () => {
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -2031,6 +2033,7 @@ const QAManager = () => {
   // Ticket Dialog Component
   const TicketDialogContent = () => {
     const formRef = useRef(null);
+    const [rightPanelMode, setRightPanelMode] = useState('ai'); // 'ai' | 'related'
     const [formData, setFormData] = useState({
       agent: '',
       ticketId: '',
@@ -2201,11 +2204,24 @@ const QAManager = () => {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Category</Label>
+                    <Label className={`text-xs mb-1.5 block ${
+                      (!formData.category || formData.category === 'Other') && rightPanelMode === 'related'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-600 dark:text-neutral-400'
+                    }`}>
+                      Category
+                      {(!formData.category || formData.category === 'Other') && rightPanelMode === 'related' && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
+                    </Label>
                     <select
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                      className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white transition-all ${
+                        (!formData.category || formData.category === 'Other') && rightPanelMode === 'related'
+                          ? 'border-2 border-red-400 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-500/20 focus:ring-red-400 dark:focus:ring-red-500'
+                          : 'border border-gray-200 dark:border-neutral-800 focus:ring-gray-900 dark:focus:ring-gray-300'
+                      }`}
                     >
                       <option value="Account closure">Account closure</option>
                       <option value="ACP usage">ACP usage</option>
@@ -2268,6 +2284,12 @@ const QAManager = () => {
                       <option value="Weekly bonus">Weekly bonus</option>
                       <option value="Other">Other</option>
                     </select>
+                    {(!formData.category || formData.category === 'Other') && rightPanelMode === 'related' && (
+                      <p className="text-xs text-red-500 dark:text-red-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        This field must be filled for Related Tickets
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -2298,7 +2320,7 @@ const QAManager = () => {
               </div>
             </div>
 
-            {/* RIGHT SIDE - AI Functionality Placeholder */}
+            {/* RIGHT SIDE - AI/Related Toggle Panel */}
             <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
               {/* Subtle grid pattern overlay */}
               <div
@@ -2309,20 +2331,60 @@ const QAManager = () => {
                 }}
               />
 
-              {/* AI Similar Feedbacks Panel */}
-              <SimilarFeedbacksPanel
-                notes={formData.notes}
-                ticketId={ticketDialog.data?._id}
-                onCopyFeedback={(feedback) => {
-                  // Append to existing feedback
-                  const currentFeedback = formData.feedback || '';
-                  const separator = currentFeedback.trim() ? '\n\n' : '';
-                  setFormData(prev => ({
-                    ...prev,
-                    feedback: currentFeedback + separator + feedback
-                  }));
-                }}
-              />
+              {/* Toggle Header */}
+              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
+                <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('ai')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                      rightPanelMode === 'ai'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Similar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('related')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                      rightPanelMode === 'related'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Related
+                  </button>
+                </div>
+              </div>
+
+              {/* Panel Content */}
+              <div className="flex-1 overflow-hidden relative z-10">
+                {rightPanelMode === 'ai' ? (
+                  <SimilarFeedbacksPanel
+                    notes={formData.notes}
+                    ticketId={ticketDialog.data?._id}
+                    onCopyFeedback={(feedback) => {
+                      // Append to existing feedback
+                      const currentFeedback = formData.feedback || '';
+                      const separator = currentFeedback.trim() ? '\n\n' : '';
+                      setFormData(prev => ({
+                        ...prev,
+                        feedback: currentFeedback + separator + feedback
+                      }));
+                    }}
+                  />
+                ) : (
+                  <RelatedTicketsPanel
+                    agentId={formData.agent}
+                    category={formData.category}
+                    currentTicketId={ticketDialog.data?._id}
+                  />
+                )}
+              </div>
             </div>
           </form>
         </DialogContent>
@@ -2442,6 +2504,8 @@ const QAManager = () => {
 
   // View Ticket Details Dialog Component - Full Screen 50/50 Layout
   const ViewTicketDialogContent = () => {
+    const [rightPanelMode, setRightPanelMode] = useState('ai'); // 'ai' | 'related'
+
     if (!viewDialog.ticket) return null;
 
     const ticket = viewDialog.ticket;
@@ -2611,7 +2675,7 @@ const QAManager = () => {
               </div>
             </div>
 
-            {/* RIGHT SIDE - AI Functionality Placeholder */}
+            {/* RIGHT SIDE - AI/Related Toggle Panel */}
             <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
               {/* Subtle grid pattern overlay */}
               <div
@@ -2622,11 +2686,51 @@ const QAManager = () => {
                 }}
               />
 
-              {/* AI Similar Feedbacks Panel */}
-              <SimilarFeedbacksPanel
-                notes={ticket.notes}
-                ticketId={ticket._id}
-              />
+              {/* Toggle Header */}
+              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
+                <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('ai')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                      rightPanelMode === 'ai'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Similar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('related')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                      rightPanelMode === 'related'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Related
+                  </button>
+                </div>
+              </div>
+
+              {/* Panel Content */}
+              <div className="flex-1 overflow-hidden relative z-10">
+                {rightPanelMode === 'ai' ? (
+                  <SimilarFeedbacksPanel
+                    notes={ticket.notes}
+                    ticketId={ticket._id}
+                  />
+                ) : (
+                  <RelatedTicketsPanel
+                    agentId={ticket.agent?._id || ticket.agent}
+                    category={ticket.category}
+                    currentTicketId={ticket._id}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -2718,6 +2822,10 @@ const QAManager = () => {
                 <BarChart3 className="w-4 h-4 inline mr-1.5" />
                 Analytics
               </TabsTrigger>
+              <TabsTrigger value="summaries" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                <FileText className="w-4 h-4 inline mr-1.5" />
+                Summaries
+              </TabsTrigger>
               {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
                 <TabsTrigger value="all-agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <UsersRound className="w-4 h-4 inline mr-1.5" />
@@ -2739,6 +2847,9 @@ const QAManager = () => {
             <TabsContent value="archive">{renderArchive()}</TabsContent>
             <TabsContent value="analytics">
               <QAAnalyticsDashboard />
+            </TabsContent>
+            <TabsContent value="summaries">
+              <QASummaries />
             </TabsContent>
             <TabsContent value="all-agents">
               <QAAllAgents />
