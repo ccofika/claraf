@@ -141,7 +141,7 @@ const KPIChart = ({ chart, data }) => {
 
 // Column Chart (Vertical Bars)
 const ColumnChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
   const options = chart.options || {};
 
   return (
@@ -184,7 +184,7 @@ const ColumnChartComponent = ({ chart, data }) => {
 
 // Bar Chart (Horizontal Bars)
 const BarChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
   const options = chart.options || {};
 
   return (
@@ -221,7 +221,7 @@ const BarChartComponent = ({ chart, data }) => {
 
 // Line Chart
 const LineChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
   const options = chart.options || {};
 
   return (
@@ -254,7 +254,7 @@ const LineChartComponent = ({ chart, data }) => {
 
 // Area Chart
 const AreaChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
   const options = chart.options || {};
 
   return (
@@ -286,7 +286,7 @@ const AreaChartComponent = ({ chart, data }) => {
 
 // Donut Chart
 const DonutChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
   const options = chart.options || {};
   const total = chartData.reduce((sum, d) => sum + (d.value || 0), 0);
 
@@ -341,7 +341,7 @@ const DonutChartComponent = ({ chart, data }) => {
 
 // Combo Chart (Column + Line)
 const ComboChartComponent = ({ chart, data }) => {
-  const chartData = Array.isArray(data) ? data : [];
+  const chartData = normalizeToArray(data);
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -368,10 +368,10 @@ const ComboChartComponent = ({ chart, data }) => {
 
 // Table Component
 const TableComponent = ({ chart, data }) => {
-  const tableData = Array.isArray(data) ? data : [];
+  const tableData = normalizeToArray(data);
 
   if (tableData.length === 0) {
-    return <div style={{ padding: 20, color: '#666' }}>No data available</div>;
+    return <div className="p-5 text-gray-500 dark:text-gray-400">No data available</div>;
   }
 
   // Get columns from chart options or auto-generate from data keys
@@ -387,20 +387,14 @@ const TableComponent = ({ chart, data }) => {
       }));
 
   return (
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', tableLayout: 'auto' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f3f4f6' }}>
+    <div className="overflow-auto h-full">
+      <table className="w-full border-collapse text-sm">
+        <thead className="sticky top-0">
+          <tr className="bg-gray-100 dark:bg-neutral-800">
             {columns.map(col => (
               <th
                 key={col.field}
-                style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  borderBottom: '2px solid #d1d5db',
-                  whiteSpace: 'nowrap'
-                }}
+                className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white border-b-2 border-gray-200 dark:border-neutral-700 whitespace-nowrap"
               >
                 {col.label}
               </th>
@@ -409,15 +403,14 @@ const TableComponent = ({ chart, data }) => {
         </thead>
         <tbody>
           {tableData.map((row, i) => (
-            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+            <tr
+              key={i}
+              className={`${i % 2 === 0 ? 'bg-white dark:bg-neutral-900' : 'bg-gray-50 dark:bg-neutral-800/50'} hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}
+            >
               {columns.map(col => (
                 <td
                   key={col.field}
-                  style={{
-                    padding: '10px 16px',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}
+                  className="px-4 py-2.5 text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-neutral-800"
                 >
                   {row[col.field] !== undefined ? String(row[col.field]) : '-'}
                 </td>
@@ -426,12 +419,13 @@ const TableComponent = ({ chart, data }) => {
           ))}
         </tbody>
       </table>
+    </div>
   );
 };
 
 // Heatmap Component
 const HeatmapComponent = ({ chart, data }) => {
-  const heatmapData = Array.isArray(data) ? data : [];
+  const heatmapData = normalizeToArray(data);
   const maxValue = Math.max(...heatmapData.map(d => d.value || 0), 1);
 
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -521,6 +515,18 @@ const GaugeChartComponent = ({ chart, data }) => {
     </div>
   );
 };
+
+// Helper function to normalize data for charts that expect arrays
+// When viewBy === 'none', backend returns {value, count} instead of [{name, value}]
+function normalizeToArray(data, defaultName = 'Total') {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && typeof data === 'object' && 'value' in data) {
+    return [{ name: defaultName, value: data.value, count: data.count }];
+  }
+  return [];
+}
 
 // Helper functions
 function formatValue(value, format, decimals = 1) {

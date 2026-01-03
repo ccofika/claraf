@@ -37,7 +37,7 @@ const ReportsList = ({
 
     return (
       <div
-        className="group relative bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg transition-all cursor-pointer"
+        className="group relative bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg transition-all duration-200 cursor-pointer"
         onClick={() => onSelectReport(report._id)}
       >
         {/* Pin indicator */}
@@ -84,7 +84,7 @@ const ReportsList = ({
                 e.stopPropagation();
                 setOpenMenu(isMenuOpen ? null : report._id);
               }}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 opacity-0 group-hover:opacity-100 transition-all duration-200"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -148,9 +148,9 @@ const ReportsList = ({
           </div>
         </div>
 
-        {/* Hover arrow */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="w-5 h-5 text-gray-400" />
+        {/* Hover arrow - positioned to not overlap with bottom meta info */}
+        <div className="absolute right-4 top-12 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <ChevronRight className="w-5 h-5 text-blue-400" />
         </div>
       </div>
     );
