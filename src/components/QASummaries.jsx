@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,42 +15,24 @@ import {
   Sun,
   Moon,
   RefreshCw,
-  X
+  Search,
+  Download,
+  TrendingUp,
+  Users,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Modal component - defined OUTSIDE to prevent re-creation on every render
-const Modal = ({ open, onClose, title, children, footer }) => {
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-      <div
-        className="relative bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white rounded"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="p-4 overflow-y-auto">
-          {children}
-        </div>
-        {footer && (
-          <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-neutral-700">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription
+} from './ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
 
 const QASummaries = () => {
   const { user } = useAuth();
@@ -64,6 +46,10 @@ const QASummaries = () => {
   const [summaryDates, setSummaryDates] = useState([]);
   const [viewingSummary, setViewingSummary] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // New feature states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('all'); // 'all', 'Morning', 'Afternoon'
 
   // Calendar state
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
@@ -115,6 +101,46 @@ const QASummaries = () => {
     fetchSummaryDates();
   }, [fetchSummaries, fetchSummaryDates]);
 
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalSummaries = summaries.length;
+    const morningSummaries = summaries.filter(s => s.shift === 'Morning').length;
+    const afternoonSummaries = summaries.filter(s => s.shift === 'Afternoon').length;
+
+    let totalTickets = 0;
+    let totalAgents = 0;
+
+    summaries.forEach(s => {
+      const ticketCount = s.metadata?.ticketCount;
+      if (ticketCount) {
+        totalTickets += (ticketCount.selected || 0) + (ticketCount.graded || 0) + (ticketCount.both || 0);
+      }
+      totalAgents += s.metadata?.agentsSummarized?.length || 0;
+    });
+
+    const avgTicketsPerSummary = totalSummaries > 0 ? Math.round(totalTickets / totalSummaries) : 0;
+
+    return {
+      totalSummaries,
+      morningSummaries,
+      afternoonSummaries,
+      totalTickets,
+      totalAgents,
+      avgTicketsPerSummary
+    };
+  }, [summaries]);
+
+  // Filtered summaries
+  const filteredSummaries = useMemo(() => {
+    return summaries.filter(s => {
+      const matchesSearch = searchQuery === '' ||
+        s.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesShift = shiftFilter === 'all' || s.shift === shiftFilter;
+      return matchesSearch && matchesShift;
+    });
+  }, [summaries, searchQuery, shiftFilter]);
+
   // Get Monday of current week
   const getMondayOfWeek = (date) => {
     const d = new Date(date);
@@ -144,7 +170,6 @@ const QASummaries = () => {
 
     try {
       setGenerating(true);
-      // Use local date components to avoid timezone shift
       const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
       const response = await axios.post(
         `${API_URL}/api/qa/summaries`,
@@ -223,6 +248,21 @@ const QASummaries = () => {
     }
   };
 
+  // Export summary as text file
+  const handleExportSummary = (summary) => {
+    const content = `${summary.title}\n${'='.repeat(summary.title.length)}\n\n${summary.content}\n\n---\nGenerated: ${new Date(summary.createdAt).toLocaleString()}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `summary-${summary.date}-${summary.shift.toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Summary exported!');
+  };
+
   // Calendar navigation
   const handlePrevMonth = () => {
     if (calendarMonth === 0) {
@@ -265,13 +305,13 @@ const QASummaries = () => {
     const firstDay = getFirstDayOfMonth(calendarMonth, calendarYear);
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dayNames = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
     const days = [];
 
     // Empty cells before first day
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="p-2"></div>);
+      days.push(<div key={`empty-${i}`} className="p-1 sm:p-2"></div>);
     }
 
     // Days of the month
@@ -283,6 +323,8 @@ const QASummaries = () => {
       const isSelected = selectedDate.getDate() === day &&
         selectedDate.getMonth() === calendarMonth &&
         selectedDate.getFullYear() === calendarYear;
+      const checkDate = new Date(calendarYear, calendarMonth, day);
+      const canSelect = isDateSelectable(checkDate);
 
       days.push(
         <button
@@ -290,7 +332,6 @@ const QASummaries = () => {
           onClick={() => {
             const newDate = new Date(calendarYear, calendarMonth, day);
             setSelectedDate(newDate);
-            // Find summary for this date (use UTC for comparison)
             const summary = summaries.find(s => {
               const sDate = new Date(s.date);
               return sDate.getUTCDate() === day &&
@@ -304,20 +345,24 @@ const QASummaries = () => {
             }
           }}
           className={`
-            relative p-2 text-sm rounded-lg transition-all text-gray-900 dark:text-white
-            ${isToday ? 'font-bold ring-2 ring-blue-500' : ''}
-            ${isSelected ? 'bg-blue-600 !text-white' : 'hover:bg-gray-200 dark:hover:bg-neutral-700'}
-            ${dateInfo && !isSelected ? 'bg-gray-200 dark:bg-neutral-700' : ''}
+            relative aspect-square p-1 sm:p-2 text-xs sm:text-sm rounded-lg transition-all duration-200
+            ${isToday ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-white dark:ring-offset-neutral-900 font-bold' : ''}
+            ${isSelected
+              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+              : canSelect
+                ? 'hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-900 dark:text-white'
+                : 'text-gray-400 dark:text-neutral-600'}
+            ${dateInfo && !isSelected ? 'bg-gray-100 dark:bg-neutral-800' : ''}
           `}
         >
-          {day}
+          <span className="relative z-10">{day}</span>
           {dateInfo && (
-            <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+            <div className="absolute bottom-0.5 sm:bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
               {dateInfo.shifts.includes('Morning') && (
-                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" title="Morning shift"></div>
+                <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-amber-400 shadow-sm" title="Morning shift"></div>
               )}
               {dateInfo.shifts.includes('Afternoon') && (
-                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" title="Afternoon shift"></div>
+                <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-orange-500 shadow-sm" title="Afternoon shift"></div>
               )}
             </div>
           )}
@@ -326,86 +371,131 @@ const QASummaries = () => {
     }
 
     return (
-      <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-gray-200 dark:border-neutral-700">
-        {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handlePrevMonth}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <span className="font-medium text-gray-900 dark:text-white">{monthNames[calendarMonth]} {calendarYear}</span>
-          <button
-            onClick={handleNextMonth}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardHeader className="pb-2 sm:pb-4 px-3 sm:px-6 pt-3 sm:pt-6">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handlePrevMonth}
+              className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-neutral-400" />
+            </button>
+            <CardTitle className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
+              {monthNames[calendarMonth]} {calendarYear}
+            </CardTitle>
+            <button
+              onClick={handleNextMonth}
+              className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+            >
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-neutral-400" />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent className="px-2 sm:px-6 pb-3 sm:pb-6">
+          {/* Day names */}
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 sm:mb-2">
+            {dayNames.map(name => (
+              <div key={name} className="p-1 sm:p-2 text-center text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500 font-medium">
+                {name}
+              </div>
+            ))}
+          </div>
 
-        {/* Day names */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {dayNames.map(name => (
-            <div key={name} className="p-2 text-center text-xs text-gray-500 dark:text-neutral-400 font-medium">
-              {name}
+          {/* Days */}
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+            {days}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center justify-center gap-3 sm:gap-4 mt-3 sm:mt-4 text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <Sun className="h-3 w-3 text-amber-400" />
+              <span>Morning</span>
             </div>
-          ))}
-        </div>
-
-        {/* Days */}
-        <div className="grid grid-cols-7 gap-1">
-          {days}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-gray-500 dark:text-neutral-400">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-            <span>Morning</span>
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <Moon className="h-3 w-3 text-orange-500" />
+              <span>Afternoon</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-            <span>Afternoon</span>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   };
 
   // Render summary card
   const renderSummaryCard = (summary) => {
+    const isActive = viewingSummary?._id === summary._id;
+    const ticketCount = (summary.metadata?.ticketCount?.selected || 0) +
+      (summary.metadata?.ticketCount?.graded || 0) +
+      (summary.metadata?.ticketCount?.both || 0);
+
     return (
       <div
         key={summary._id}
         onClick={() => setViewingSummary(summary)}
         className={`
-          bg-gray-50 dark:bg-neutral-800 rounded-lg p-4 cursor-pointer transition-all
-          hover:bg-gray-100 dark:hover:bg-neutral-750 border-2
-          ${viewingSummary?._id === summary._id ? 'border-blue-500' : 'border-transparent'}
+          group relative rounded-xl p-3 sm:p-4 cursor-pointer transition-all duration-200
+          ${isActive
+            ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 ring-2 ring-blue-500 shadow-lg shadow-blue-500/10'
+            : 'bg-gray-50 dark:bg-neutral-800/50 hover:bg-gray-100 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-700/50'}
         `}
       >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-medium text-gray-900 dark:text-white">{summary.title}</h3>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={`
+              flex-shrink-0 p-1.5 rounded-lg
+              ${summary.shift === 'Morning'
+                ? 'bg-amber-100 dark:bg-amber-900/30'
+                : 'bg-orange-100 dark:bg-orange-900/30'}
+            `}>
+              {summary.shift === 'Morning' ? (
+                <Sun className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <Moon className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+              )}
+            </div>
+            <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">{summary.title}</h3>
+          </div>
+          <Badge
+            variant="secondary"
+            className={`
+              text-[10px] flex-shrink-0
+              ${summary.shift === 'Morning'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'}
+            `}
+          >
+            {summary.shift}
+          </Badge>
+        </div>
+
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 mb-3">
+          {summary.content.substring(0, 120)}...
+        </p>
+
+        <div className="flex items-center gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500">
           <div className="flex items-center gap-1">
-            {summary.shift === 'Morning' ? (
-              <Sun className="h-4 w-4 text-yellow-500" />
-            ) : (
-              <Moon className="h-4 w-4 text-orange-500" />
-            )}
+            <Users className="h-3 w-3" />
+            <span>{summary.metadata?.agentsSummarized?.length || 0} agents</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            <span>{ticketCount} tickets</span>
           </div>
         </div>
-        <p className="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2">
-          {summary.content.substring(0, 150)}...
-        </p>
-        <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-neutral-500">
-          <span>{summary.metadata?.agentsSummarized?.length || 0} agents</span>
-          <span>|</span>
-          <span>
-            {(summary.metadata?.ticketCount?.selected || 0) +
-              (summary.metadata?.ticketCount?.graded || 0) +
-              (summary.metadata?.ticketCount?.both || 0)} tickets
-          </span>
+
+        {/* Quick actions on hover */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyToClipboard(summary.content);
+            }}
+            className="p-1.5 bg-white dark:bg-neutral-700 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-neutral-600 transition-colors"
+            title="Copy"
+          >
+            <Copy className="h-3 w-3 text-gray-600 dark:text-neutral-300" />
+          </button>
         </div>
       </div>
     );
@@ -415,176 +505,397 @@ const QASummaries = () => {
   const renderSummaryDetail = () => {
     if (!viewingSummary) {
       return (
-        <div className="bg-white dark:bg-neutral-800 rounded-lg p-8 flex flex-col items-center justify-center text-center h-full min-h-[400px] border border-gray-200 dark:border-neutral-700">
-          <FileText className="h-12 w-12 text-gray-400 dark:text-neutral-600 mb-4" />
-          <h3 className="text-lg font-medium text-gray-600 dark:text-neutral-400 mb-2">No Summary Selected</h3>
-          <p className="text-sm text-gray-500 dark:text-neutral-500 mb-4">
-            Select a date and create a summary, or click on an existing one to view it.
-          </p>
-        </div>
+        <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 h-full min-h-[400px] flex flex-col items-center justify-center">
+          <CardContent className="flex flex-col items-center justify-center text-center py-12">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-neutral-800 dark:to-neutral-700 flex items-center justify-center mb-4">
+              <FileText className="h-8 w-8 text-gray-400 dark:text-neutral-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Summary Selected</h3>
+            <p className="text-sm text-gray-500 dark:text-neutral-500 max-w-xs">
+              Select a date from the calendar and create a summary, or click on an existing one to view details.
+            </p>
+          </CardContent>
+        </Card>
       );
     }
 
+    const ticketCount = (viewingSummary.metadata?.ticketCount?.selected || 0) +
+      (viewingSummary.metadata?.ticketCount?.graded || 0) +
+      (viewingSummary.metadata?.ticketCount?.both || 0);
+
     return (
-      <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 border border-gray-200 dark:border-neutral-700">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            {viewingSummary.shift === 'Morning' ? (
-              <Sun className="h-5 w-5 text-yellow-500" />
-            ) : (
-              <Moon className="h-5 w-5 text-orange-500" />
-            )}
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{viewingSummary.title}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleCopyToClipboard(viewingSummary.content)}
-              className="p-2 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
-              title="Copy to clipboard"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={() => setEditDialog({
-                open: true,
-                summary: viewingSummary,
-                content: viewingSummary.content
-              })}
-              className="p-2 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
-              title="Edit summary"
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setDeleteDialog({
-                open: true,
-                summaryId: viewingSummary._id
-              })}
-              className="p-2 text-gray-500 dark:text-neutral-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
-              title="Delete summary"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`
+                flex-shrink-0 p-2.5 rounded-xl
+                ${viewingSummary.shift === 'Morning'
+                  ? 'bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/30'
+                  : 'bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/40 dark:to-orange-800/30'}
+              `}>
+                {viewingSummary.shift === 'Morning' ? (
+                  <Sun className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <Moon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                )}
+              </div>
+              <div>
+                <CardTitle className="text-lg sm:text-xl text-gray-900 dark:text-white">{viewingSummary.title}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs border-gray-300 dark:border-neutral-600">
+                    <Users className="h-3 w-3 mr-1" />
+                    {viewingSummary.metadata?.agentsSummarized?.length || 0} agents
+                  </Badge>
+                  <Badge variant="outline" className="text-xs border-gray-300 dark:border-neutral-600">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {ticketCount} tickets
+                  </Badge>
+                </div>
+              </div>
+            </div>
 
-        {/* Content */}
-        <div className="bg-gray-50 dark:bg-neutral-900 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-neutral-300 max-h-[500px] overflow-y-auto border border-gray-200 dark:border-neutral-700">
-          {viewingSummary.content}
-        </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={() => handleCopyToClipboard(viewingSummary.content)}
+                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                title="Copy to clipboard"
+              >
+                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              </button>
+              <button
+                onClick={() => handleExportSummary(viewingSummary)}
+                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                title="Export as text file"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setEditDialog({
+                  open: true,
+                  summary: viewingSummary,
+                  content: viewingSummary.content
+                })}
+                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                title="Edit summary"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setDeleteDialog({
+                  open: true,
+                  summaryId: viewingSummary._id
+                })}
+                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                title="Delete summary"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </CardHeader>
 
-        {/* Metadata */}
-        <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-neutral-500">
-          <span>Created: {new Date(viewingSummary.createdAt).toLocaleString()}</span>
-          {viewingSummary.updatedAt !== viewingSummary.createdAt && (
-            <span>Updated: {new Date(viewingSummary.updatedAt).toLocaleString()}</span>
+        <CardContent className="pt-0">
+          {/* Agent breakdown */}
+          {viewingSummary.metadata?.agentsSummarized?.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-xs font-medium text-gray-500 dark:text-neutral-500 uppercase tracking-wider mb-2">
+                Agents Summarized
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {viewingSummary.metadata.agentsSummarized.map((agent, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="secondary"
+                    className="text-xs bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 border-0"
+                  >
+                    {agent.agentName}
+                    {agent.ticketCount > 0 && (
+                      <span className="ml-1 text-gray-400 dark:text-neutral-500">
+                        ({agent.ticketCount})
+                      </span>
+                    )}
+                  </Badge>
+                ))}
+              </div>
+            </div>
           )}
-        </div>
-      </div>
+
+          {/* Content */}
+          <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-xl p-4 sm:p-5 whitespace-pre-wrap text-sm text-gray-700 dark:text-neutral-300 max-h-[400px] sm:max-h-[500px] overflow-y-auto border border-gray-100 dark:border-neutral-700/50">
+            {viewingSummary.content}
+          </div>
+
+          {/* Metadata */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-neutral-500">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Created: {new Date(viewingSummary.createdAt).toLocaleString()}
+            </span>
+            {viewingSummary.updatedAt !== viewingSummary.createdAt && (
+              <span className="flex items-center gap-1">
+                <Edit className="h-3 w-3" />
+                Updated: {new Date(viewingSummary.updatedAt).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     );
   };
 
+  // Stats cards
+  const renderStats = () => (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500 font-medium uppercase tracking-wider">Summaries</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stats.totalSummaries}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <Sun className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500 font-medium uppercase tracking-wider">Morning</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stats.morningSummaries}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+              <Moon className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500 font-medium uppercase tracking-wider">Afternoon</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stats.afternoonSummaries}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-500 font-medium uppercase tracking-wider">Avg Tickets</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stats.avgTicketsPerSummary}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Summaries</h2>
-          <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
-            Generate and manage daily QA work summaries
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Summaries</h2>
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">
+              {stats.totalSummaries} this month
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-neutral-400 mt-1">
+            Generate and manage your daily QA work summaries
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => {
               fetchSummaries();
               fetchSummaryDates();
             }}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300 transition-colors"
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
             onClick={handleCreateSummary}
             disabled={generating || !isDateSelectable(selectedDate)}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-neutral-700 disabled:text-gray-500 dark:disabled:text-neutral-400 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 dark:disabled:from-neutral-700 dark:disabled:to-neutral-600 disabled:text-gray-500 dark:disabled:text-neutral-400 rounded-lg transition-all shadow-lg shadow-blue-500/25 disabled:shadow-none"
           >
             {generating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Generating...
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                <span>Generating...</span>
               </>
             ) : (
               <>
-                <Plus className="h-4 w-4" />
-                Create Summary
+                <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Create Summary</span>
               </>
             )}
           </button>
         </div>
       </div>
 
+      {/* Stats */}
+      {renderStats()}
+
       {/* Selected Date Info */}
-      <div className="bg-gray-100 dark:bg-neutral-800/50 rounded-lg p-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-neutral-400" />
-          <span className="text-sm text-gray-700 dark:text-neutral-300">
-            Selected: <strong>{selectedDate.toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}</strong>
-          </span>
+      <Card className="border-gray-200 dark:border-neutral-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10">
+        <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300">
+              Selected: <strong className="text-gray-900 dark:text-white">{selectedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}</strong>
+            </span>
+          </div>
+          {!isDateSelectable(selectedDate) && (
+            <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700">
+              Only Monday to today available
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-neutral-500" />
+          <input
+            type="text"
+            placeholder="Search summaries..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500"
+          />
         </div>
-        {!isDateSelectable(selectedDate) && (
-          <span className="text-xs text-yellow-600 dark:text-yellow-500">
-            Only dates from Monday to today can be used for new summaries
-          </span>
-        )}
+
+        {/* Shift filter */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShiftFilter('all')}
+            className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
+              shiftFilter === 'all'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setShiftFilter('Morning')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
+              shiftFilter === 'Morning'
+                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <Sun className="h-3 w-3" />
+            Morning
+          </button>
+          <button
+            onClick={() => setShiftFilter('Afternoon')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
+              shiftFilter === 'Afternoon'
+                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <Moon className="h-3 w-3" />
+            Afternoon
+          </button>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left: Calendar */}
-        <div className="col-span-4">
+      {/* Main Content - Responsive Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        {/* Left: Calendar + Summary List */}
+        <div className="lg:col-span-4 xl:col-span-4 space-y-4 sm:space-y-6">
           {renderCalendar()}
 
           {/* Recent Summaries List */}
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-neutral-400 mb-3">Recent Summaries</h3>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-neutral-500" />
+          <Card className="border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {searchQuery || shiftFilter !== 'all' ? 'Filtered Results' : 'Recent Summaries'}
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs border-0">
+                  {filteredSummaries.length}
+                </Badge>
               </div>
-            ) : summaries.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-neutral-500 text-center py-4">No summaries this month</p>
-            ) : (
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {summaries.map(summary => renderSummaryCard(summary))}
-              </div>
-            )}
-          </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                </div>
+              ) : filteredSummaries.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center mx-auto mb-3">
+                    <FileText className="h-6 w-6 text-gray-400 dark:text-neutral-500" />
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-neutral-500">
+                    {searchQuery || shiftFilter !== 'all' ? 'No matching summaries' : 'No summaries this month'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                  {filteredSummaries.map(summary => renderSummaryCard(summary))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right: Summary Detail */}
-        <div className="col-span-8">
+        <div className="lg:col-span-8 xl:col-span-8">
           {renderSummaryDetail()}
         </div>
       </div>
 
-      {/* Edit Modal */}
-      <Modal
-        open={editDialog.open}
-        onClose={() => setEditDialog({ open: false, summary: null, content: '' })}
-        title="Edit Summary"
-        footer={
-          <>
+      {/* Edit Dialog */}
+      <Dialog open={editDialog.open} onOpenChange={(open) => !open && setEditDialog({ open: false, summary: null, content: '' })}>
+        <DialogContent className="max-w-2xl bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-white">Edit Summary</DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-neutral-400">
+              Make changes to your summary content below.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={editDialog.content}
+            onChange={(e) => setEditDialog({ ...editDialog, content: e.target.value })}
+            className="w-full h-80 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-4 text-sm text-gray-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            placeholder="Enter summary content..."
+          />
+          <DialogFooter>
             <button
               onClick={() => setEditDialog({ open: false, summary: null, content: '' })}
-              className="px-4 py-2 text-sm text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               Cancel
             </button>
@@ -594,27 +905,23 @@ const QASummaries = () => {
             >
               Save Changes
             </button>
-          </>
-        }
-      >
-        <textarea
-          value={editDialog.content}
-          onChange={(e) => setEditDialog({ ...editDialog, content: e.target.value })}
-          className="w-full h-96 bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-lg p-4 text-sm text-gray-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          placeholder="Enter summary content..."
-        />
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Modal */}
-      <Modal
-        open={deleteDialog.open}
-        onClose={() => setDeleteDialog({ open: false, summaryId: null })}
-        title="Delete Summary"
-        footer={
-          <>
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, summaryId: null })}>
+        <DialogContent className="max-w-md bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-white">Delete Summary</DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-neutral-400">
+              Are you sure you want to delete this summary? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
             <button
               onClick={() => setDeleteDialog({ open: false, summaryId: null })}
-              className="px-4 py-2 text-sm text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               Cancel
             </button>
@@ -624,13 +931,9 @@ const QASummaries = () => {
             >
               Delete
             </button>
-          </>
-        }
-      >
-        <p className="text-gray-600 dark:text-neutral-400">
-          Are you sure you want to delete this summary? This action cannot be undone.
-        </p>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

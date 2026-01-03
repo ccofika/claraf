@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Sparkles, X, Filter, Calendar, Tag,
-  TrendingUp, Users, FileText, Target, UserCheck
+  TrendingUp, Users, FileText, Target, UserCheck, ChevronDown
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -9,8 +9,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const [searchMode, setSearchMode] = useState('text'); // 'ai' or 'text' - default is now 'text'
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   const searchInputRef = useRef(null);
+  const agentDropdownRef = useRef(null);
+  const categoryDropdownRef = useRef(null);
 
   // Sync with currentFilters from parent
   useEffect(() => {
@@ -24,6 +28,21 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       setAgentSearchQuery('');
     }
   }, [currentFilters.agent, agents]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target)) {
+        setShowAgentDropdown(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSearchChange = (value) => {
     // Update parent filters immediately
@@ -51,7 +70,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       scoreMin: 0,
       scoreMax: 100,
       search: '',
-      category: '',
+      categories: [],
       priority: '',
       tags: '',
       grader: '',
@@ -61,7 +80,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   };
 
   const getActiveFilterCount = () => {
-    const filterKeys = ['agent', 'status', 'category', 'priority', 'tags', 'grader'];
+    const filterKeys = ['agent', 'status', 'priority', 'tags', 'grader'];
     let count = 0;
 
     filterKeys.forEach(key => {
@@ -69,6 +88,11 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
         count++;
       }
     });
+
+    // Count categories as one filter if any selected
+    if (currentFilters.categories && currentFilters.categories.length > 0) {
+      count++;
+    }
 
     // Count date range as one filter if either is set
     if (currentFilters.dateFrom || currentFilters.dateTo) {
@@ -204,83 +228,106 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Category */}
-            <div>
+            {/* Categories - Multi-select */}
+            <div className="relative" ref={categoryDropdownRef}>
               <label className="block text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1">
                 <Tag className="w-3 h-3 inline mr-1" />
-                Category
+                Categories
               </label>
-              <select
-                value={currentFilters.category || ''}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-gray-900 dark:text-white"
+              <button
+                type="button"
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-gray-900 dark:text-white text-left flex items-center justify-between"
               >
-                <option value="">All categories</option>
-                <option value="Account closure">Account closure</option>
-                <option value="ACP usage">ACP usage</option>
-                <option value="Account recovery">Account recovery</option>
-                <option value="Affiliate program">Affiliate program</option>
-                <option value="Available bonuses">Available bonuses</option>
-                <option value="Balance issues">Balance issues</option>
-                <option value="Bet | Bet archive">Bet | Bet archive</option>
-                <option value="Birthday bonus">Birthday bonus</option>
-                <option value="Break in play">Break in play</option>
-                <option value="Bonus crediting">Bonus crediting</option>
-                <option value="Bonus drops">Bonus drops</option>
-                <option value="Casino">Casino</option>
-                <option value="Coin mixing | AML">Coin mixing | AML</option>
-                <option value="Compliance (KYC, Terms of service, Privacy)">Compliance (KYC, ToS, Privacy)</option>
-                <option value="Crypto - General">Crypto - General</option>
-                <option value="Crypto deposits">Crypto deposits</option>
-                <option value="Crypto withdrawals">Crypto withdrawals</option>
-                <option value="Data Deletion">Data Deletion</option>
-                <option value="Deposit bonus">Deposit bonus</option>
-                <option value="Exclusion | General">Exclusion | General</option>
-                <option value="Exclusion | Self exclusion">Exclusion | Self exclusion</option>
-                <option value="Exclusion | Casino exclusion">Exclusion | Casino exclusion</option>
-                <option value="Fiat General">Fiat General</option>
-                <option value="Fiat - CAD">Fiat - CAD</option>
-                <option value="Fiat - BRL">Fiat - BRL</option>
-                <option value="Fiat - JPY">Fiat - JPY</option>
-                <option value="Fiat - PEN/ARS/CLP">Fiat - PEN/ARS/CLP</option>
-                <option value="Fiat - INR">Fiat - INR</option>
-                <option value="Fiat - NGN/VND/IDR">Fiat - NGN/VND/IDR</option>
-                <option value="Forum">Forum</option>
-                <option value="Funds recovery">Funds recovery</option>
-                <option value="Games issues">Games issues</option>
-                <option value="Games | Providers | Rules">Games | Providers | Rules</option>
-                <option value="Games | Live games">Games | Live games</option>
-                <option value="Hacked accounts">Hacked accounts</option>
-                <option value="In-game chat | Third party chat">In-game chat | Third party chat</option>
-                <option value="Monthly bonus">Monthly bonus</option>
-                <option value="No luck tickets | RTP">No luck tickets | RTP</option>
-                <option value="Phishing | Scam attempt">Phishing | Scam attempt</option>
-                <option value="Phone removal">Phone removal</option>
-                <option value="Pre/Post monthly bonus">Pre/Post monthly bonus</option>
-                <option value="Promotions">Promotions</option>
-                <option value="Provably fair">Provably fair</option>
-                <option value="Race">Race</option>
-                <option value="Rakeback">Rakeback</option>
-                <option value="Reload">Reload</option>
-                <option value="Responsible gambling">Responsible gambling</option>
-                <option value="Roles">Roles</option>
-                <option value="Rollover">Rollover</option>
-                <option value="Security (2FA, Password, Email codes)">Security (2FA, Password, Email)</option>
-                <option value="Sportsbook">Sportsbook</option>
-                <option value="Stake basics">Stake basics</option>
-                <option value="Stake originals">Stake originals</option>
-                <option value="Tech issues | Jira cases | Bugs">Tech issues | Jira | Bugs</option>
-                <option value="Tip Recovery">Tip Recovery</option>
-                <option value="VIP host">VIP host</option>
-                <option value="VIP program">VIP program</option>
-                <option value="Welcome bonus">Welcome bonus</option>
-                <option value="Weekly bonus">Weekly bonus</option>
-                <option value="Other">Other</option>
-              </select>
+                <span className={(!currentFilters.categories || currentFilters.categories.length === 0) ? 'text-gray-500 dark:text-neutral-500' : ''}>
+                  {(!currentFilters.categories || currentFilters.categories.length === 0)
+                    ? 'All categories'
+                    : currentFilters.categories.length === 1
+                      ? currentFilters.categories[0]
+                      : `${currentFilters.categories.length} selected`}
+                </span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showCategoryDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFilterChange('categories', []);
+                      setShowCategoryDropdown(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400"
+                  >
+                    Clear all
+                  </button>
+                  {[
+                    'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
+                    'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
+                    'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
+                    'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
+                    'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
+                    'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
+                    'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
+                    'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
+                    'Games issues', 'Games | Providers | Rules', 'Games | Live games',
+                    'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
+                    'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
+                    'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
+                    'Reload', 'Responsible gambling', 'Roles', 'Rollover',
+                    'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
+                    'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
+                    'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
+                  ].map(cat => (
+                    <label
+                      key={cat}
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(currentFilters.categories || []).includes(cat)}
+                        onChange={(e) => {
+                          const current = currentFilters.categories || [];
+                          if (e.target.checked) {
+                            handleFilterChange('categories', [...current, cat]);
+                          } else {
+                            handleFilterChange('categories', current.filter(c => c !== cat));
+                          }
+                        }}
+                        className="w-3 h-3 rounded border-gray-300 dark:border-neutral-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-900 dark:text-white truncate">{cat}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {currentFilters.categories && currentFilters.categories.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {currentFilters.categories.slice(0, 3).map(cat => (
+                    <span
+                      key={cat}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded"
+                    >
+                      {cat.length > 15 ? cat.substring(0, 15) + '...' : cat}
+                      <button
+                        type="button"
+                        onClick={() => handleFilterChange('categories', currentFilters.categories.filter(c => c !== cat))}
+                        className="hover:text-blue-900 dark:hover:text-blue-300"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  {currentFilters.categories.length > 3 && (
+                    <span className="text-[10px] text-gray-500 dark:text-neutral-500">
+                      +{currentFilters.categories.length - 3} more
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Agent - Searchable Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={agentDropdownRef}>
               <label className="block text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1">
                 <Users className="w-3 h-3 inline mr-1" />
                 Agent
@@ -289,17 +336,21 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 <input
                   type="text"
                   value={agentSearchQuery}
-                  onChange={(e) => setAgentSearchQuery(e.target.value)}
-                  onFocus={() => setAgentSearchQuery(agentSearchQuery)}
+                  onChange={(e) => {
+                    setAgentSearchQuery(e.target.value);
+                    setShowAgentDropdown(true);
+                  }}
+                  onFocus={() => setShowAgentDropdown(true)}
                   placeholder="Search agents..."
                   className="w-full px-2 py-1.5 text-xs border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-gray-900 dark:text-white"
                 />
-                {agentSearchQuery && (
+                {showAgentDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-neutral-950 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
                     <button
                       onClick={() => {
                         handleFilterChange('agent', '');
                         setAgentSearchQuery('');
+                        setShowAgentDropdown(false);
                       }}
                       className="w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-900 dark:text-white"
                     >
@@ -312,6 +363,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                           onClick={() => {
                             handleFilterChange('agent', agent._id);
                             setAgentSearchQuery(agent.name);
+                            setShowAgentDropdown(false);
                           }}
                           className="w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-900 dark:text-white"
                         >

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
-  Users, CheckCircle, Target,
+  Users, CheckCircle, Target, Eye,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
   Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
 import QAAllAgents from '../components/QAAllAgents';
 import QASummaries from '../components/QASummaries';
+import StatisticsPage from '../components/statistics/StatisticsPage';
 import QAShortcutsModal from '../components/QAShortcutsModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
@@ -43,7 +44,7 @@ const QAManager = () => {
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -71,7 +72,7 @@ const QAManager = () => {
     scoreMin: 0,
     scoreMax: 100,
     search: '',
-    category: '',
+    categories: [],
     priority: '',
     tags: '',
     searchMode: 'text'
@@ -86,7 +87,7 @@ const QAManager = () => {
     scoreMin: 0,
     scoreMax: 100,
     search: '',
-    category: '',
+    categories: [],
     priority: '',
     tags: '',
     searchMode: 'text'
@@ -154,6 +155,9 @@ const QAManager = () => {
       // Don't trigger shortcuts when typing in inputs (except for Ctrl+Enter to save)
       const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
                        document.activeElement?.isContentEditable;
+
+      // Don't trigger ticket shortcuts when any modal is open
+      const isModalOpen = ticketDialog.open || gradeDialog.open || feedbackDialog.open || viewDialog.open;
 
       // Alt key shortcuts (avoid Chrome's Ctrl shortcuts)
       if (e.altKey && !e.ctrlKey && !e.shiftKey) {
@@ -231,16 +235,18 @@ const QAManager = () => {
             return;
           case 'r':
           case 'R':
-            e.preventDefault();
-            if (activeTab === 'dashboard') fetchDashboardStats();
-            else if (activeTab === 'agents') fetchAgents();
-            else fetchTickets();
-            toast.success('Refreshing data...');
+            if (!isModalOpen) {
+              e.preventDefault();
+              if (activeTab === 'dashboard') fetchDashboardStats();
+              else if (activeTab === 'agents') fetchAgents();
+              else fetchTickets();
+              toast.success('Refreshing data...');
+            }
             return;
         }
 
-        // Ticket list navigation (J/K) - only in tickets/archive tabs
-        if ((activeTab === 'tickets' || activeTab === 'archive') && tickets.length > 0) {
+        // Ticket list navigation (J/K) - only in tickets/archive tabs, and not when modal is open
+        if ((activeTab === 'tickets' || activeTab === 'archive') && tickets.length > 0 && !isModalOpen) {
           switch (e.key.toLowerCase()) {
             case 'j':
               e.preventDefault();
@@ -284,7 +290,7 @@ const QAManager = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, tickets, focusedTicketIndex, selectedTickets, filters.searchMode]);
+  }, [activeTab, tickets, focusedTicketIndex, selectedTickets, filters.searchMode, ticketDialog.open, gradeDialog.open, feedbackDialog.open, viewDialog.open]);
 
   // Scroll focused ticket into view
   useEffect(() => {
@@ -397,6 +403,10 @@ const QAManager = () => {
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       if (filters.scoreMin) params.append('scoreMin', filters.scoreMin);
       if (filters.scoreMax && filters.scoreMax < 100) params.append('scoreMax', filters.scoreMax);
+      if (filters.categories && filters.categories.length > 0) {
+        params.append('categories', filters.categories.join(','));
+      }
+      if (filters.priority) params.append('priority', filters.priority);
       params.append('isArchived', activeTab === 'archive');
 
       if (useAISearch) {
@@ -575,7 +585,11 @@ const QAManager = () => {
 
   const handleUpdateTicket = async (id, formData) => {
     try {
+      console.log('Updating ticket with formData:', formData);
+      console.log('Categories being sent:', formData.categories);
       const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, formData, getAuthHeaders());
+      console.log('Response from server:', response.data);
+      console.log('Categories in response:', response.data.categories);
       const currentTickets = Array.isArray(tickets) ? tickets : [];
       setTickets(currentTickets.map(t => t._id === id ? response.data : t));
       setTicketDialog({ open: false, mode: 'create', data: null });
@@ -736,6 +750,17 @@ const QAManager = () => {
       console.error('Error details:', err.response?.data);
       toast.error(err.response?.data?.message || 'Failed to export selected tickets');
     }
+  };
+
+  // Navigate to tickets tab with agent filter
+  const handleViewAgentTickets = (agentId) => {
+    // Set agent filter in tickets tab (replace any existing agent filter)
+    setTicketsFilters(prev => ({
+      ...prev,
+      agent: agentId
+    }));
+    // Switch to tickets tab
+    setActiveTab('tickets');
   };
 
   const handleExportSelectedTickets = async () => {
@@ -1179,13 +1204,22 @@ const QAManager = () => {
                         <QualityScoreBadge score={stat.avgScore ? parseFloat(stat.avgScore.toFixed(1)) : null} />
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleExportMaestro(stat.agentId)}
-                          className="text-xs text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white flex items-center gap-1.5 ml-auto transition-colors"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Export
-                        </button>
+                        <div className="flex items-center gap-3 justify-end">
+                          <button
+                            onClick={() => handleViewAgentTickets(stat.agentId)}
+                            className="text-xs text-gray-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleExportMaestro(stat.agentId)}
+                            className="text-xs text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Export
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1293,6 +1327,13 @@ const QAManager = () => {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
+                              onClick={() => handleViewAgentTickets(agent._id)}
+                              className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                              title="View Tickets"
+                            >
+                              <Eye className="w-4 h-4 text-gray-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400" />
+                            </button>
+                            <button
                               onClick={() => handleExportMaestro(agent._id)}
                               className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
                               title="Export"
@@ -1358,9 +1399,9 @@ const QAManager = () => {
                                               }`}>
                                                 {issue.qualityScore}%
                                               </span>
-                                              {issue.category && (
+                                              {issue.categories && issue.categories.length > 0 && (
                                                 <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400">
-                                                  {issue.category}
+                                                  {issue.categories.length === 1 ? issue.categories[0] : `${issue.categories.length} categories`}
                                                 </span>
                                               )}
                                             </div>
@@ -2042,8 +2083,21 @@ const QAManager = () => {
       notes: '',
       feedback: '',
       qualityScorePercent: '',
-      category: 'Other'
+      categories: []
     });
+    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const categoryDropdownRef = useRef(null);
+
+    // Close category dropdown on click outside
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+          setShowCategoryDropdown(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
       if (ticketDialog.data) {
@@ -2055,7 +2109,7 @@ const QAManager = () => {
           notes: ticketDialog.data.notes || '',
           feedback: ticketDialog.data.feedback || '',
           qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
-          category: ticketDialog.data.category || 'Other'
+          categories: ticketDialog.data.categories || []
         });
       } else {
         setFormData({
@@ -2066,7 +2120,7 @@ const QAManager = () => {
           notes: '',
           feedback: '',
           qualityScorePercent: '',
-          category: 'Other'
+          categories: []
         });
       }
     }, [ticketDialog.data]);
@@ -2203,88 +2257,96 @@ const QAManager = () => {
                       className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
                     />
                   </div>
-                  <div>
+                  <div ref={categoryDropdownRef} className="relative">
                     <Label className={`text-xs mb-1.5 block ${
-                      (!formData.category || formData.category === 'Other') && rightPanelMode === 'related'
+                      formData.categories.length === 0 && rightPanelMode === 'related'
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-gray-600 dark:text-neutral-400'
                     }`}>
-                      Category
-                      {(!formData.category || formData.category === 'Other') && rightPanelMode === 'related' && (
+                      Categories
+                      {formData.categories.length === 0 && rightPanelMode === 'related' && (
                         <span className="text-red-500 ml-1">*</span>
                       )}
                     </Label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white transition-all ${
-                        (!formData.category || formData.category === 'Other') && rightPanelMode === 'related'
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                      className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white transition-all text-left flex items-center justify-between ${
+                        formData.categories.length === 0 && rightPanelMode === 'related'
                           ? 'border-2 border-red-400 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-500/20 focus:ring-red-400 dark:focus:ring-red-500'
                           : 'border border-gray-200 dark:border-neutral-800 focus:ring-gray-900 dark:focus:ring-gray-300'
                       }`}
                     >
-                      <option value="Account closure">Account closure</option>
-                      <option value="ACP usage">ACP usage</option>
-                      <option value="Account recovery">Account recovery</option>
-                      <option value="Affiliate program">Affiliate program</option>
-                      <option value="Available bonuses">Available bonuses</option>
-                      <option value="Balance issues">Balance issues</option>
-                      <option value="Bet | Bet archive">Bet | Bet archive</option>
-                      <option value="Birthday bonus">Birthday bonus</option>
-                      <option value="Break in play">Break in play</option>
-                      <option value="Bonus crediting">Bonus crediting</option>
-                      <option value="Bonus drops">Bonus drops</option>
-                      <option value="Casino">Casino</option>
-                      <option value="Coin mixing | AML">Coin mixing | AML</option>
-                      <option value="Compliance (KYC, Terms of service, Privacy)">Compliance (KYC, Terms of service, Privacy)</option>
-                      <option value="Crypto - General">Crypto - General</option>
-                      <option value="Crypto deposits">Crypto deposits</option>
-                      <option value="Crypto withdrawals">Crypto withdrawals</option>
-                      <option value="Data deletion">Data deletion</option>
-                      <option value="Deposit bonus">Deposit bonus</option>
-                      <option value="Exclusion | General">Exclusion | General</option>
-                      <option value="Exclusion | Self exclusion">Exclusion | Self exclusion</option>
-                      <option value="Exclusion | Casino exclusion">Exclusion | Casino exclusion</option>
-                      <option value="Fiat General">Fiat General</option>
-                      <option value="Fiat - CAD">Fiat - CAD</option>
-                      <option value="Fiat - BRL">Fiat - BRL</option>
-                      <option value="Fiat - JPY">Fiat - JPY</option>
-                      <option value="Fiat - INR">Fiat - INR</option>
-                      <option value="Fiat - PEN/ARS/CLP">Fiat - PEN/ARS/CLP</option>
-                      <option value="Forum">Forum</option>
-                      <option value="Funds recovery">Funds recovery</option>
-                      <option value="Games issues">Games issues</option>
-                      <option value="Games | Providers | Rules">Games | Providers | Rules</option>
-                      <option value="Games | Live games">Games | Live games</option>
-                      <option value="Hacked accounts">Hacked accounts</option>
-                      <option value="In-game chat | Third party chat">In-game chat | Third party chat</option>
-                      <option value="Monthly bonus">Monthly bonus</option>
-                      <option value="No luck tickets | RTP">No luck tickets | RTP</option>
-                      <option value="Phishing | Scam attempt">Phishing | Scam attempt</option>
-                      <option value="Phone removal">Phone removal</option>
-                      <option value="Pre/Post monthly bonus">Pre/Post monthly bonus</option>
-                      <option value="Promotions">Promotions</option>
-                      <option value="Provably fair">Provably fair</option>
-                      <option value="Race">Race</option>
-                      <option value="Rakeback">Rakeback</option>
-                      <option value="Reload">Reload</option>
-                      <option value="Responsible gambling">Responsible gambling</option>
-                      <option value="Roles">Roles</option>
-                      <option value="Rollover">Rollover</option>
-                      <option value="Security (2FA, Password, Email codes)">Security (2FA, Password, Email codes)</option>
-                      <option value="Sportsbook">Sportsbook</option>
-                      <option value="Stake basics">Stake basics</option>
-                      <option value="Stake chat">Stake chat</option>
-                      <option value="Stake original">Stake original</option>
-                      <option value="Tech issues | Jira cases | Bugs">Tech issues | Jira cases | Bugs</option>
-                      <option value="Tip recovery">Tip recovery</option>
-                      <option value="VIP host">VIP host</option>
-                      <option value="VIP program">VIP program</option>
-                      <option value="Welcome bonus">Welcome bonus</option>
-                      <option value="Weekly bonus">Weekly bonus</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    {(!formData.category || formData.category === 'Other') && rightPanelMode === 'related' && (
+                      <span className={formData.categories.length === 0 ? 'text-gray-400 dark:text-neutral-500' : ''}>
+                        {formData.categories.length === 0
+                          ? 'Select categories...'
+                          : formData.categories.length === 1
+                            ? formData.categories[0]
+                            : `${formData.categories.length} categories selected`}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showCategoryDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {[
+                          'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
+                          'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
+                          'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
+                          'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
+                          'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
+                          'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
+                          'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
+                          'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
+                          'Games issues', 'Games | Providers | Rules', 'Games | Live games',
+                          'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
+                          'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
+                          'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
+                          'Reload', 'Responsible gambling', 'Roles', 'Rollover',
+                          'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
+                          'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
+                          'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
+                        ].map(cat => (
+                          <label
+                            key={cat}
+                            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.categories.includes(cat)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData({ ...formData, categories: [...formData.categories, cat] });
+                                } else {
+                                  setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) });
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-gray-300 dark:border-neutral-600 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-900 dark:text-white">{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {formData.categories.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {formData.categories.map(cat => (
+                          <span
+                            key={cat}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
+                          >
+                            {cat}
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) })}
+                              className="hover:text-blue-900 dark:hover:text-blue-300"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {formData.categories.length === 0 && rightPanelMode === 'related' && (
                       <p className="text-xs text-red-500 dark:text-red-400 mt-1 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
                         This field must be filled for Related Tickets
@@ -2380,7 +2442,7 @@ const QAManager = () => {
                 ) : (
                   <RelatedTicketsPanel
                     agentId={formData.agent}
-                    category={formData.category}
+                    categories={formData.categories}
                     currentTicketId={ticketDialog.data?._id}
                   />
                 )}
@@ -2630,12 +2692,18 @@ const QAManager = () => {
                 </div>
 
                 {/* Additional Metadata */}
-                {(ticket.category || ticket.createdBy || (ticket.isArchived && ticket.archivedDate) || ticket.gradedDate) && (
+                {((ticket.categories && ticket.categories.length > 0) || ticket.createdBy || (ticket.isArchived && ticket.archivedDate) || ticket.gradedDate) && (
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-neutral-800">
-                    {ticket.category && (
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Category</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{ticket.category}</p>
+                    {ticket.categories && ticket.categories.length > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Categories</p>
+                        <div className="flex flex-wrap gap-1">
+                          {ticket.categories.map(cat => (
+                            <span key={cat} className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                     {ticket.createdBy && (
@@ -2726,7 +2794,7 @@ const QAManager = () => {
                 ) : (
                   <RelatedTicketsPanel
                     agentId={ticket.agent?._id || ticket.agent}
-                    category={ticket.category}
+                    categories={ticket.categories || []}
                     currentTicketId={ticket._id}
                   />
                 )}
@@ -2803,33 +2871,39 @@ const QAManager = () => {
 
       {/* Tabs - Fixed */}
       <div className="flex-shrink-0 bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 pt-6 pb-4">
+        <div className="max-w-7xl mx-auto px-6 pt-6 pb-4 overflow-x-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 p-1 rounded-lg">
-              <TabsTrigger value="dashboard" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+            <TabsList className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 p-1 rounded-lg inline-flex w-max">
+              <TabsTrigger value="dashboard" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 Dashboard
               </TabsTrigger>
-              <TabsTrigger value="agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+              <TabsTrigger value="agents" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 Agents
               </TabsTrigger>
-              <TabsTrigger value="tickets" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+              <TabsTrigger value="tickets" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 Tickets
               </TabsTrigger>
-              <TabsTrigger value="archive" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+              <TabsTrigger value="archive" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 Archive
               </TabsTrigger>
-              <TabsTrigger value="analytics" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+              <TabsTrigger value="analytics" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 <BarChart3 className="w-4 h-4 inline mr-1.5" />
                 Analytics
               </TabsTrigger>
-              <TabsTrigger value="summaries" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+              <TabsTrigger value="summaries" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                 <FileText className="w-4 h-4 inline mr-1.5" />
                 Summaries
               </TabsTrigger>
               {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
-                <TabsTrigger value="all-agents" className="text-sm data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                <TabsTrigger value="all-agents" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <UsersRound className="w-4 h-4 inline mr-1.5" />
                   All Agents
+                </TabsTrigger>
+              )}
+              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+                <TabsTrigger value="statistics" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                  <TrendingUp className="w-4 h-4 inline mr-1.5" />
+                  Statistics
                 </TabsTrigger>
               )}
             </TabsList>
@@ -2853,6 +2927,9 @@ const QAManager = () => {
             </TabsContent>
             <TabsContent value="all-agents">
               <QAAllAgents />
+            </TabsContent>
+            <TabsContent value="statistics">
+              <StatisticsPage />
             </TabsContent>
           </Tabs>
         </div>

@@ -49,7 +49,7 @@ const getScoreColor = (score) => {
   };
 };
 
-const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
+const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
 
@@ -58,8 +58,9 @@ const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Category validation
-  const isCategoryEmpty = !category || category.trim() === '' || category === 'Other';
+  // Category validation - must have at least one non-Other category
+  const validCategories = (categories || []).filter(c => c && c !== 'Other');
+  const isCategoryEmpty = validCategories.length === 0;
 
   const getAuthHeaders = () => ({
     headers: { Authorization: `Bearer ${user?.token}` }
@@ -75,7 +76,8 @@ const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
     try {
       const params = new URLSearchParams();
       params.append('agent', agentId);
-      params.append('category', category);
+      // Send categories as comma-separated for backend to handle
+      validCategories.forEach(cat => params.append('categories', cat));
       params.append('isArchived', 'false');
       params.append('limit', '50');
       params.append('sortBy', 'qualityScorePercent');
@@ -104,7 +106,7 @@ const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
     } finally {
       setLoading(false);
     }
-  }, [agentId, category, currentTicketId, API_URL, user?.token, isCategoryEmpty]);
+  }, [agentId, validCategories.join(','), currentTicketId, API_URL, user?.token, isCategoryEmpty]);
 
   // Auto-fetch when dependencies change
   useEffect(() => {
@@ -114,7 +116,7 @@ const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
       setTickets([]);
       setHasSearched(false);
     }
-  }, [agentId, category, isCategoryEmpty]);
+  }, [agentId, validCategories.join(','), isCategoryEmpty]);
 
   // Category required message
   if (isCategoryEmpty) {
@@ -171,7 +173,7 @@ const RelatedTicketsPanel = ({ agentId, category, currentTicketId }) => {
         </div>
         <h3 className="text-lg font-medium text-gray-700 dark:text-zinc-300 mb-2">No Related Tickets</h3>
         <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-[250px]">
-          No other tickets found for this agent in the "{category}" category.
+          No other tickets found for this agent in the selected categories.
         </p>
       </div>
     );
