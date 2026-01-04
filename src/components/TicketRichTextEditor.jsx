@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { uploadTicketImage, generateImageId } from '../utils/imageUpload';
 import { toast } from 'sonner';
 import { X, ZoomIn } from 'lucide-react';
+import MacroTriggerDropdown from './MacroTriggerDropdown';
 
 // Image Lightbox Component for fullscreen view
 const ImageLightbox = ({ src, alt, onClose }) => {
@@ -40,11 +41,18 @@ const TicketRichTextEditor = ({
   placeholder = 'Enter text...',
   className = '',
   rows = 3,
-  disabled = false
+  disabled = false,
+  enableMacros = false,
+  onMacroSelect = null
 }) => {
   const editorRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [macroTrigger, setMacroTrigger] = useState({
+    active: false,
+    text: '',
+    position: null
+  });
 
   // Initialize editor with HTML content
   useEffect(() => {
@@ -60,10 +68,104 @@ const TicketRichTextEditor = ({
     }
   }, [value, isFocused]);
 
+  // Get text content before cursor
+  const getTextBeforeCursor = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount || !editorRef.current) return '';
+
+    const range = selection.getRangeAt(0);
+
+    // Create a range from start of editor to cursor
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(editorRef.current);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+    // Get text content
+    return preCaretRange.toString();
+  }, []);
+
+  // Check for macro trigger (#)
+  const checkMacroTrigger = useCallback(() => {
+    if (!enableMacros) return;
+
+    const textBeforeCursor = getTextBeforeCursor();
+
+    // Match # followed by word characters (no space after #)
+    const match = textBeforeCursor.match(/#(\w*)$/);
+
+    if (match) {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const editorRect = editorRef.current.getBoundingClientRect();
+
+        setMacroTrigger({
+          active: true,
+          text: match[1], // Text after #
+          position: {
+            top: rect.bottom - editorRect.top + 5,
+            left: rect.left - editorRect.left
+          }
+        });
+      }
+    } else {
+      if (macroTrigger.active) {
+        setMacroTrigger({ active: false, text: '', position: null });
+      }
+    }
+  }, [enableMacros, getTextBeforeCursor, macroTrigger.active]);
+
+  // Handle macro selection - update DOM directly since useEffect won't run while focused
+  const handleMacroSelection = useCallback((macro) => {
+    if (!editorRef.current) return;
+
+    // Get current HTML content
+    let currentHtml = editorRef.current.innerHTML;
+
+    // Find and remove the #text trigger from the HTML
+    const textBeforeCursor = getTextBeforeCursor();
+    const match = textBeforeCursor.match(/#(\w*)$/);
+
+    if (match) {
+      // Find the trigger text in the HTML and remove it
+      const triggerText = match[0]; // e.g., "#test" or "#"
+      const lastIndex = currentHtml.lastIndexOf(triggerText);
+      if (lastIndex !== -1) {
+        currentHtml = currentHtml.substring(0, lastIndex) + currentHtml.substring(lastIndex + triggerText.length);
+      }
+    }
+
+    // Append macro content
+    const newHtml = currentHtml + macro.feedback;
+
+    // Update DOM directly - the useEffect won't update innerHTML while editor is focused
+    editorRef.current.innerHTML = newHtml;
+
+    // Also update parent state via onChange
+    onChange?.(newHtml);
+
+    // Close trigger dropdown
+    setMacroTrigger({ active: false, text: '', position: null });
+
+    // Notify parent if callback provided
+    if (onMacroSelect) {
+      onMacroSelect(macro);
+    }
+  }, [getTextBeforeCursor, onChange, onMacroSelect]);
+
+  // Close macro trigger
+  const closeMacroTrigger = useCallback(() => {
+    setMacroTrigger({ active: false, text: '', position: null });
+  }, []);
+
   const handleInput = useCallback((e) => {
     const html = e.target.innerHTML;
     onChange?.(html);
-  }, [onChange]);
+
+    // Check for macro trigger after input
+    setTimeout(() => checkMacroTrigger(), 0);
+  }, [onChange, checkMacroTrigger]);
 
   const handlePaste = async (e) => {
     // CRITICAL: Prevent default IMMEDIATELY before any async operations
@@ -421,27 +523,48 @@ const TicketRichTextEditor = ({
 
   return (
     <>
-      <div
-        ref={editorRef}
-        contentEditable={!disabled}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        onInput={handleInput}
-        onPaste={handlePaste}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        className={`ticket-rich-editor ${className}`}
-        style={{
-          minHeight: `${rows * 24}px`,
-          whiteSpace: 'pre-wrap',
-          overflowWrap: 'break-word',
-          cursor: disabled ? 'not-allowed' : 'text',
-          opacity: disabled ? 0.6 : 1,
-          color: 'inherit'
-        }}
-        data-placeholder={placeholder}
-        suppressContentEditableWarning
-      />
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={editorRef}
+          contentEditable={!disabled}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            setIsFocused(false);
+            // Delay closing macro trigger to allow click on dropdown
+            setTimeout(() => {
+              if (!document.activeElement?.closest('.macro-trigger-dropdown')) {
+                closeMacroTrigger();
+              }
+            }, 150);
+          }}
+          onInput={handleInput}
+          onPaste={handlePaste}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          className={`ticket-rich-editor ${className}`}
+          style={{
+            minHeight: `${rows * 24}px`,
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            cursor: disabled ? 'not-allowed' : 'text',
+            opacity: disabled ? 0.6 : 1,
+            color: 'inherit'
+          }}
+          data-placeholder={placeholder}
+          suppressContentEditableWarning
+        />
+
+        {/* Macro Trigger Dropdown */}
+        {enableMacros && macroTrigger.active && macroTrigger.position && (
+          <MacroTriggerDropdown
+            triggerText={macroTrigger.text}
+            position={macroTrigger.position}
+            onSelect={handleMacroSelection}
+            onClose={closeMacroTrigger}
+            editorRef={editorRef}
+          />
+        )}
+      </div>
 
       {lightboxImage && (
         <ImageLightbox

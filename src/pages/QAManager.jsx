@@ -6,7 +6,7 @@ import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target, Eye,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
-  Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2
+  Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2, Hash, Save
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -27,6 +27,10 @@ import ShareButton from '../components/Chat/ShareButton';
 import TicketRichTextEditor, { TicketContentDisplay } from '../components/TicketRichTextEditor';
 import SimilarFeedbacksPanel from '../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../components/RelatedTicketsPanel';
+import ManageMacrosModal from '../components/ManageMacrosModal';
+import ChooseMacroModal from '../components/ChooseMacroModal';
+import SaveAsMacroModal from '../components/SaveAsMacroModal';
+import { useMacros } from '../hooks/useMacros';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -106,6 +110,11 @@ const QAManager = () => {
   const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
   const [feedbackDialog, setFeedbackDialog] = useState({ open: false, ticket: null });
   const [viewDialog, setViewDialog] = useState({ open: false, ticket: null });
+
+  // Macro dialog state
+  const [manageMacrosDialog, setManageMacrosDialog] = useState({ open: false });
+  const [chooseMacroDialog, setChooseMacroDialog] = useState({ open: false, onSelect: null });
+  const [saveAsMacroDialog, setSaveAsMacroDialog] = useState({ open: false, feedback: '' });
 
   // Agent expansion state (for showing unresolved issues)
   const [expandedAgentId, setExpandedAgentId] = useState(null);
@@ -1460,10 +1469,16 @@ const QAManager = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tickets</h2>
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
           </div>
-          <Button size="sm" onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Ticket
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setManageMacrosDialog({ open: true })}>
+              <Hash className="w-4 h-4 mr-1.5" />
+              Manage Macros
+            </Button>
+            <Button size="sm" onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              New Ticket
+            </Button>
+          </div>
         </div>
 
         {/* Bulk Actions */}
@@ -2087,6 +2102,8 @@ const QAManager = () => {
     });
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
     const categoryDropdownRef = useRef(null);
+    const [showChooseMacroModal, setShowChooseMacroModal] = useState(false);
+    const { recordUsage } = useMacros();
 
     // Close category dropdown on click outside
     useEffect(() => {
@@ -2147,6 +2164,7 @@ const QAManager = () => {
     };
 
     return (
+      <>
       <Dialog open={ticketDialog.open} onOpenChange={(open) => setTicketDialog({ ...ticketDialog, open })}>
         <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
           {/* Header */}
@@ -2357,16 +2375,46 @@ const QAManager = () => {
 
                 {/* Feedback Section */}
                 <div>
-                  <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    Feedback
-                  </Label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-xs text-gray-600 dark:text-neutral-400 flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Feedback
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowChooseMacroModal(true)}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        <Hash className="w-3 h-3" />
+                        Choose Macro
+                      </button>
+                      {formData.feedback && formData.feedback.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setSaveAsMacroDialog({ open: true, feedback: formData.feedback })}
+                          className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
+                        >
+                          <Save className="w-3 h-3" />
+                          Save as Macro
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <TicketRichTextEditor
                     value={formData.feedback}
                     onChange={(html) => setFormData({ ...formData, feedback: html })}
-                    placeholder="Feedback to agent after grading"
+                    placeholder="Feedback to agent after grading (type # to insert macro)"
                     rows={5}
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                    enableMacros={true}
+                    onMacroSelect={(macro) => {
+                      // Record usage when macro selected via # trigger
+                      // Use local recordUsage to avoid triggering QAManager re-render
+                      if (ticketDialog.data?._id) {
+                        recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
+                      }
+                    }}
                   />
                 </div>
 
@@ -2451,6 +2499,25 @@ const QAManager = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Choose Macro Modal - rendered inside TicketDialogContent for direct access to formData */}
+      <ChooseMacroModal
+        open={showChooseMacroModal}
+        onOpenChange={setShowChooseMacroModal}
+        onSelectMacro={(macro) => {
+          const currentFeedback = formData.feedback || '';
+          const separator = currentFeedback.trim() ? '\n\n' : '';
+          setFormData(prev => ({
+            ...prev,
+            feedback: currentFeedback + separator + macro.feedback
+          }));
+          if (ticketDialog.data?._id) {
+            recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
+          }
+          setShowChooseMacroModal(false);
+        }}
+      />
+      </>
     );
   };
 
@@ -2572,9 +2639,17 @@ const QAManager = () => {
 
     const ticket = viewDialog.ticket;
 
+    // Check if user can edit this ticket
+    // Non-archived tickets can always be edited
+    // Archived tickets can be edited by: creator, filipkozomara@mebit.io, or neven@mebit.io
+    const adminEmails = ['filipkozomara@mebit.io', 'neven@mebit.io'];
+    const isCreator = ticket.createdBy === user?._id || ticket.createdBy?._id === user?._id;
+    const isAdmin = adminEmails.includes(user?.email);
+    const canEdit = !ticket.isArchived || isCreator || isAdmin;
+
     return (
       <Dialog open={viewDialog.open} onOpenChange={(open) => setViewDialog({ ...viewDialog, open })}>
-        <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
+        <DialogContent hideCloseButton overlayClassName="z-[60]" className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col z-[60]">
           {/* Header */}
           <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
             <div className="flex items-center justify-between">
@@ -2582,7 +2657,17 @@ const QAManager = () => {
                 Ticket Details
               </DialogTitle>
               <div className="flex items-center gap-2">
-                {!ticket.isArchived && (
+                {ticket.feedback && ticket.feedback.trim() && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setSaveAsMacroDialog({ open: true, feedback: ticket.feedback })}
+                  >
+                    <Hash className="w-4 h-4 mr-1.5" />
+                    Save as Macro
+                  </Button>
+                )}
+                {canEdit && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -2944,6 +3029,48 @@ const QAManager = () => {
       {feedbackDialog.open && <FeedbackDialogContent />}
       {viewDialog.open && <ViewTicketDialogContent />}
       {deleteDialog.open && <DeleteDialogContent />}
+
+      {/* Macro Modals */}
+      <ManageMacrosModal
+        open={manageMacrosDialog.open}
+        onOpenChange={(open) => setManageMacrosDialog({ open })}
+        onViewTicket={async (ticketId) => {
+          // First try to find in local tickets
+          let ticket = tickets.find(t => t._id === ticketId || t.ticketId === ticketId);
+
+          // If not found locally, fetch from API
+          if (!ticket) {
+            try {
+              const response = await axios.get(`${API_URL}/api/qa/tickets/${ticketId}`, getAuthHeaders());
+              ticket = response.data;
+            } catch (err) {
+              console.error('Error fetching ticket:', err);
+              toast.error('Could not load ticket');
+              return;
+            }
+          }
+
+          if (ticket) {
+            setViewDialog({ open: true, ticket });
+          }
+        }}
+      />
+      <ChooseMacroModal
+        open={chooseMacroDialog.open}
+        onOpenChange={(open) => setChooseMacroDialog({ ...chooseMacroDialog, open })}
+        onSelectMacro={(macro) => {
+          if (chooseMacroDialog.onSelect) {
+            chooseMacroDialog.onSelect(macro);
+          }
+          setChooseMacroDialog({ open: false, onSelect: null });
+        }}
+      />
+      <SaveAsMacroModal
+        open={saveAsMacroDialog.open}
+        onOpenChange={(open) => setSaveAsMacroDialog({ ...saveAsMacroDialog, open })}
+        initialFeedback={saveAsMacroDialog.feedback}
+        onSave={() => setSaveAsMacroDialog({ open: false, feedback: '' })}
+      />
 
       {/* Command Palette */}
       <QACommandPalette
