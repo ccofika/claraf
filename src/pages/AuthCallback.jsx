@@ -10,6 +10,7 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const success = searchParams.get('success');
+    const tokenFromUrl = searchParams.get('token');
 
     // Check if authentication was successful
     if (success !== 'true') {
@@ -18,24 +19,21 @@ const AuthCallback = () => {
       return;
     }
 
-    // SECURITY: Token is in httpOnly cookie, fetch it by calling /profile
-    // We don't pass tokens in URL to prevent exposure in browser history
-    // Always fetch user profile and redirect
-    fetchUserProfileWithCookie();
+    // Try cookie-based auth first, fall back to URL token for browsers that block third-party cookies (e.g., Brave)
+    fetchUserProfile(tokenFromUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, navigate]);
 
-  const fetchUserProfileWithCookie = async () => {
-    try {
-      const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const fetchUserProfile = async (tokenFromUrl) => {
+    const backendURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+    // First, try cookie-based authentication (works for most browsers)
+    try {
       const response = await axios.get(`${backendURL}/api/auth/profile`, {
-        withCredentials: true // Use cookies for authentication
+        withCredentials: true
       });
 
-
-      // SECURITY: Backend returns token for Google OAuth users so they can use it in localStorage
-      // This allows compatibility with existing code that expects token in localStorage
+      // Cookie auth succeeded
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         const { token, ...userData } = response.data;
@@ -44,17 +42,56 @@ const AuthCallback = () => {
         setUser(response.data);
       }
 
-      // Store userId for Socket.io authentication
       if (response.data._id) {
         localStorage.setItem('userId', response.data._id);
       }
 
-      // Redirect to announcements workspace
-      const workspacesResponse = await axios.get(
-        `${backendURL}/api/workspaces`,
-        { withCredentials: true }
-      );
+      await redirectToWorkspace(backendURL, response.data.token || tokenFromUrl);
+      return;
+    } catch (cookieError) {
+      // Cookie auth failed (likely Brave or other privacy-focused browser)
+      console.warn('Cookie auth failed, trying URL token fallback:', cookieError.message);
 
+      // Fall back to URL token if available
+      if (tokenFromUrl) {
+        try {
+          // Store token in localStorage first
+          localStorage.setItem('token', tokenFromUrl);
+
+          // Fetch profile using Authorization header
+          const response = await axios.get(`${backendURL}/api/auth/profile`, {
+            headers: { Authorization: `Bearer ${tokenFromUrl}` }
+          });
+
+          const { token, ...userData } = response.data;
+          setUser(userData);
+
+          if (response.data._id) {
+            localStorage.setItem('userId', response.data._id);
+          }
+
+          await redirectToWorkspace(backendURL, tokenFromUrl);
+          return;
+        } catch (tokenError) {
+          console.error('❌ Token auth also failed:', tokenError);
+          navigate('/login?error=Authentication failed');
+          return;
+        }
+      }
+
+      // No fallback available
+      console.error('❌ Error fetching user profile:', cookieError);
+      navigate('/login?error=Failed to fetch user profile');
+    }
+  };
+
+  const redirectToWorkspace = async (backendURL, token) => {
+    try {
+      const config = token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : { withCredentials: true };
+
+      const workspacesResponse = await axios.get(`${backendURL}/api/workspaces`, config);
       const announcementsWorkspace = workspacesResponse.data.find(ws => ws.type === 'announcements');
 
       if (announcementsWorkspace) {
@@ -64,8 +101,8 @@ const AuthCallback = () => {
         navigate('/login?error=Announcements workspace not found');
       }
     } catch (error) {
-      console.error('❌ Error fetching user profile:', error);
-      navigate('/login?error=Failed to fetch user profile');
+      console.error('❌ Error fetching workspaces:', error);
+      navigate('/login?error=Failed to load workspaces');
     }
   };
 
