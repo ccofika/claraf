@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -9,6 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
+import {
+  fadeInUp,
+  staggerContainer,
+  staggerItem,
+  duration,
+  easing
+} from '../utils/animations';
 
 const QAAllAgents = () => {
   const { user } = useAuth();
@@ -266,180 +274,232 @@ const QAAllAgents = () => {
 
   // Pagination component
   const Pagination = () => (
-    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-neutral-800">
-      <div className="text-sm text-gray-500 dark:text-neutral-400">
+    <div className="flex items-center justify-between px-6 py-3 border-t border-neutral-200 dark:border-neutral-800">
+      <div className="text-sm text-neutral-500 dark:text-neutral-400">
         Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} agents
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => handlePageChange(pagination.page - 1)}
           disabled={pagination.page <= 1}
-          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className="text-sm text-gray-600 dark:text-neutral-400">
+        </motion.button>
+        <span className="text-sm text-neutral-600 dark:text-neutral-400">
           Page {pagination.page} of {pagination.pages}
         </span>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => handlePageChange(pagination.page + 1)}
           disabled={pagination.page >= pagination.pages}
-          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
-        </button>
+        </motion.button>
       </div>
     </div>
   );
 
   // Loading skeleton
   const LoadingSkeleton = () => (
-    <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-8">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-8"
+    >
       <div className="flex items-center justify-center gap-3">
-        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-        <span className="text-gray-500 dark:text-neutral-400">Loading agents...</span>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          <Loader2 className="w-5 h-5 text-neutral-400" />
+        </motion.div>
+        <span className="text-neutral-500 dark:text-neutral-400">Loading agents...</span>
       </div>
-    </div>
+    </motion.div>
   );
 
   if (!isAdmin) {
     return (
-      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.normal }}
+        className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-8"
+      >
         <div className="flex flex-col items-center justify-center gap-3 text-center">
           <AlertCircle className="w-12 h-12 text-red-500" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Access Denied</h3>
-          <p className="text-sm text-gray-500 dark:text-neutral-400">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">Access Denied</h3>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
             Only admins can access the All Agents management page.
           </p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="space-y-4"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <motion.div variants={staggerItem} className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">All Agents</h2>
-          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">All Agents</h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Manage all agents in the system ({pagination.total} total)
           </p>
         </div>
 
         {/* Merge button - visible when 2 agents selected */}
+        <AnimatePresence>
         {selectedAgents.length === 2 && (
-          <button
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={openMergeDialog}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
           >
             <GitMerge className="w-4 h-4" />
             Merge Selected ({selectedAgents.length})
-          </button>
+          </motion.button>
         )}
+        </AnimatePresence>
 
         {selectedAgents.length === 1 && (
-          <div className="text-sm text-gray-500 dark:text-neutral-400">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm text-neutral-500 dark:text-neutral-400"
+          >
             Select one more agent to merge
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      <motion.div variants={staggerItem} className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
         <input
           type="text"
           placeholder="Search by name, team, or position..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-10 pr-4 py-2 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
-      </div>
+      </motion.div>
 
       {/* Table */}
+      <motion.div variants={staggerItem}>
       {loading ? (
         <LoadingSkeleton />
       ) : agents.length === 0 ? (
-        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-8"
+        >
           <div className="flex flex-col items-center justify-center gap-3 text-center">
-            <Users className="w-12 h-12 text-gray-300 dark:text-neutral-600" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No agents found</h3>
-            <p className="text-sm text-gray-500 dark:text-neutral-400">
+            <Users className="w-12 h-12 text-neutral-300 dark:text-neutral-600" />
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">No agents found</h3>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
               {search ? 'Try a different search term' : 'No agents in the system yet'}
             </p>
           </div>
-        </div>
+        </motion.div>
       ) : (
-        <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden"
+        >
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
+            <thead className="bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-200 dark:border-neutral-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase w-10">
+                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase w-10">
                   {/* Checkbox column */}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Position</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Team</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Tickets</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Position</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Team</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Tickets</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
-              {agents.map((agent) => {
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+              {agents.map((agent, idx) => {
                 const isSelected = selectedAgents.some(a => a._id === agent._id);
                 const canSelect = selectedAgents.length < 2 || isSelected;
 
                 return (
-                  <tr
+                  <motion.tr
                     key={agent._id}
-                    className={`hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: duration.fast, delay: idx * 0.02 }}
+                    className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}
                   >
                     <td className="px-4 py-4">
-                      <button
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
                         onClick={() => toggleAgentSelection(agent)}
                         disabled={!canSelect}
-                        className={`p-0.5 rounded transition-colors ${canSelect ? 'hover:bg-gray-200 dark:hover:bg-neutral-700' : 'opacity-50 cursor-not-allowed'}`}
+                        className={`p-0.5 rounded transition-colors ${canSelect ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700' : 'opacity-50 cursor-not-allowed'}`}
                       >
                         {isSelected ? (
                           <CheckSquare className="w-5 h-5 text-purple-600" />
                         ) : (
-                          <Square className="w-5 h-5 text-gray-400" />
+                          <Square className="w-5 h-5 text-neutral-400" />
                         )}
-                      </button>
+                      </motion.button>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{agent.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">{agent.position || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">{agent.team || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">{agent.ticketCount || 0}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-neutral-900 dark:text-white">{agent.name}</td>
+                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.position || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.team || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.ticketCount || 0}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
                           onClick={() => setEditDialog({ open: true, agent: { ...agent } })}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                          className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
                           title="Edit"
                         >
-                          <Edit className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
-                        </button>
+                          <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                        </motion.button>
                         {agent.ticketCount === 0 && (
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => setDeleteDialog({ open: true, agent })}
                             className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 );
               })}
             </tbody>
           </table>
           <Pagination />
-        </div>
+        </motion.div>
       )}
+      </motion.div>
 
       {/* Edit Dialog */}
       <Dialog open={editDialog.open} onOpenChange={(open) => !open && setEditDialog({ open: false, agent: null })}>
@@ -484,18 +544,21 @@ const QAAllAgents = () => {
             </div>
           )}
           <DialogFooter>
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => setEditDialog({ open: false, agent: null })}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg"
+              className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
             >
               Cancel
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleEditSave}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
               Save Changes
-            </button>
+            </motion.button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -507,24 +570,27 @@ const QAAllAgents = () => {
             <DialogTitle>Delete Agent</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600 dark:text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               Are you sure you want to delete <strong>{deleteDialog.agent?.name}</strong>?
               This action cannot be undone.
             </p>
           </div>
           <DialogFooter>
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => setDeleteDialog({ open: false, agent: null })}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg"
+              className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
             >
               Cancel
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleDelete}
               className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Delete
-            </button>
+            </motion.button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -542,20 +608,20 @@ const QAAllAgents = () => {
 
           <div className="py-4 space-y-6">
             {/* Selected agents info */}
-            <div className="bg-gray-50 dark:bg-neutral-800 rounded-lg p-4">
+            <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className={`p-3 rounded-lg border-2 ${mergeDestination === 'first' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-neutral-700'}`}>
-                  <div className="font-medium text-gray-900 dark:text-white">{agent1?.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                <div className={`p-3 rounded-lg border-2 ${mergeDestination === 'first' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
+                  <div className="font-medium text-neutral-900 dark:text-white">{agent1?.name}</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                     {agent1?.position || 'No position'} • {agent1?.team || 'No team'}
                   </div>
                   <div className="text-sm font-semibold text-purple-600 mt-2">
                     {agent1?.ticketCount || 0} tickets
                   </div>
                 </div>
-                <div className={`p-3 rounded-lg border-2 ${mergeDestination === 'second' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-neutral-700'}`}>
-                  <div className="font-medium text-gray-900 dark:text-white">{agent2?.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                <div className={`p-3 rounded-lg border-2 ${mergeDestination === 'second' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
+                  <div className="font-medium text-neutral-900 dark:text-white">{agent2?.name}</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                     {agent2?.position || 'No position'} • {agent2?.team || 'No team'}
                   </div>
                   <div className="text-sm font-semibold text-purple-600 mt-2">
@@ -571,7 +637,7 @@ const QAAllAgents = () => {
 
               <div className="space-y-2">
                 <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'first' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-neutral-700 hover:border-gray-300'}`}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'first' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'}`}
                 >
                   <input
                     type="radio"
@@ -581,17 +647,17 @@ const QAAllAgents = () => {
                     className="w-4 h-4 text-purple-600"
                   />
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-neutral-900 dark:text-white">
                       Keep "{agent1?.name}"
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-neutral-400">
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
                       All tickets will be moved to {agent1?.name}. {agent2?.name} will be deleted.
                     </div>
                   </div>
                 </label>
 
                 <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'second' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-neutral-700 hover:border-gray-300'}`}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'second' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'}`}
                 >
                   <input
                     type="radio"
@@ -601,17 +667,17 @@ const QAAllAgents = () => {
                     className="w-4 h-4 text-purple-600"
                   />
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-neutral-900 dark:text-white">
                       Keep "{agent2?.name}"
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-neutral-400">
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
                       All tickets will be moved to {agent2?.name}. {agent1?.name} will be deleted.
                     </div>
                   </div>
                 </label>
 
                 <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'new' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-neutral-700 hover:border-gray-300'}`}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${mergeDestination === 'new' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'}`}
                 >
                   <input
                     type="radio"
@@ -621,10 +687,10 @@ const QAAllAgents = () => {
                     className="w-4 h-4 text-purple-600"
                   />
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-neutral-900 dark:text-white">
                       Create new agent
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-neutral-400">
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
                       All tickets go to a new agent. Both {agent1?.name} and {agent2?.name} will be deleted.
                     </div>
                   </div>
@@ -633,12 +699,12 @@ const QAAllAgents = () => {
             </div>
 
             {/* Final values */}
-            <div className="space-y-4 pt-2 border-t border-gray-200 dark:border-neutral-700">
+            <div className="space-y-4 pt-2 border-t border-neutral-200 dark:border-neutral-700">
               <Label className="text-sm font-medium">Final agent details</Label>
 
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">Name</Label>
+                  <Label className="text-xs text-neutral-500">Name</Label>
                   <div className="flex gap-2">
                     <Input
                       value={mergeFinalValues.name}
@@ -648,20 +714,22 @@ const QAAllAgents = () => {
                     />
                     {mergeDestination === 'new' && (
                       <>
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
                           type="button"
                           onClick={() => setMergeFinalValues(prev => ({ ...prev, name: agent1?.name || '' }))}
-                          className={`px-3 py-1 text-xs rounded border whitespace-nowrap ${mergeFinalValues.name === agent1?.name ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                          className={`px-3 py-1 text-xs rounded border whitespace-nowrap ${mergeFinalValues.name === agent1?.name ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                         >
                           {agent1?.name}
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
                           type="button"
                           onClick={() => setMergeFinalValues(prev => ({ ...prev, name: agent2?.name || '' }))}
-                          className={`px-3 py-1 text-xs rounded border whitespace-nowrap ${mergeFinalValues.name === agent2?.name ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                          className={`px-3 py-1 text-xs rounded border whitespace-nowrap ${mergeFinalValues.name === agent2?.name ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                         >
                           {agent2?.name}
-                        </button>
+                        </motion.button>
                       </>
                     )}
                   </div>
@@ -669,7 +737,7 @@ const QAAllAgents = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-gray-500">Position</Label>
+                    <Label className="text-xs text-neutral-500">Position</Label>
                     <div className="flex gap-2">
                       <Input
                         value={mergeFinalValues.position}
@@ -681,29 +749,31 @@ const QAAllAgents = () => {
                     {(agent1?.position || agent2?.position) && (
                       <div className="flex gap-1 flex-wrap">
                         {agent1?.position && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             type="button"
                             onClick={() => setMergeFinalValues(prev => ({ ...prev, position: agent1.position }))}
-                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.position === agent1.position ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.position === agent1.position ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                           >
                             {agent1.position}
-                          </button>
+                          </motion.button>
                         )}
                         {agent2?.position && agent2.position !== agent1?.position && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             type="button"
                             onClick={() => setMergeFinalValues(prev => ({ ...prev, position: agent2.position }))}
-                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.position === agent2.position ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.position === agent2.position ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                           >
                             {agent2.position}
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-gray-500">Team</Label>
+                    <Label className="text-xs text-neutral-500">Team</Label>
                     <div className="flex gap-2">
                       <Input
                         value={mergeFinalValues.team}
@@ -715,22 +785,24 @@ const QAAllAgents = () => {
                     {(agent1?.team || agent2?.team) && (
                       <div className="flex gap-1 flex-wrap">
                         {agent1?.team && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             type="button"
                             onClick={() => setMergeFinalValues(prev => ({ ...prev, team: agent1.team }))}
-                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.team === agent1.team ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.team === agent1.team ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                           >
                             {agent1.team}
-                          </button>
+                          </motion.button>
                         )}
                         {agent2?.team && agent2.team !== agent1?.team && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             type="button"
                             onClick={() => setMergeFinalValues(prev => ({ ...prev, team: agent2.team }))}
-                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.team === agent2.team ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                            className={`px-2 py-0.5 text-xs rounded border ${mergeFinalValues.team === agent2.team ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300' : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                           >
                             {agent2.team}
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     )}
@@ -740,7 +812,7 @@ const QAAllAgents = () => {
             </div>
 
             {/* Summary */}
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <GitMerge className="w-4 h-4 text-purple-600" />
                 <span className="font-medium text-purple-900 dark:text-purple-100">Summary</span>
@@ -768,25 +840,35 @@ const QAAllAgents = () => {
           </div>
 
           <DialogFooter>
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => setMergeDialog({ open: false })}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg"
+              className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
               disabled={mergeSubmitting}
             >
               Cancel
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleMerge}
               disabled={!mergeFinalValues.name.trim() || mergeSubmitting}
               className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {mergeSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {mergeSubmitting && (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                >
+                  <Loader2 className="w-4 h-4" />
+                </motion.div>
+              )}
               Merge Agents
-            </button>
+            </motion.button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 };
 

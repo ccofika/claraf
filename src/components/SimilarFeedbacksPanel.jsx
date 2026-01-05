@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Copy, Loader2, AlertCircle, Check, FileText, User, Star, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { staggerContainer, staggerItem, fadeInUp, scaleIn, duration, easing } from '../utils/animations';
 
 // Cache for similar feedbacks results - persists across component remounts
 const resultsCache = new Map();
@@ -249,16 +251,22 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
       </div>
 
       {/* Results list */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+      <motion.div
+        className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
         {results.map((result, index) => {
           const simColors = getSimilarityColor(result.similarityScore);
           const isCopied = copiedId === result._id;
 
           return (
-            <div
+            <motion.div
               key={result._id}
               className="group relative bg-white dark:bg-zinc-800/40 hover:bg-gray-50 dark:hover:bg-zinc-800/60 rounded-xl border border-gray-200 dark:border-zinc-700/50 hover:border-gray-300 dark:hover:border-zinc-600/50 transition-all duration-200 shadow-sm dark:shadow-none"
-              style={{ animationDelay: `${index * 50}ms` }}
+              variants={staggerItem}
+              whileHover={{ y: -2, transition: { duration: duration.fast } }}
             >
               {/* Top row - badges */}
               <div className="flex items-center gap-2 px-3 pt-3 pb-2">
@@ -324,10 +332,10 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
                   <Copy className="w-4 h-4" />
                 )}
               </button>
-            </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 };

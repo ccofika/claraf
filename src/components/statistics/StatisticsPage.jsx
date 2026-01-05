@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import { staggerContainer, staggerItem, fadeInUp, modalOverlay, modalContent, scaleIn, duration, easing } from '../../utils/animations';
 
 // Sub-components (will be created)
 import ReportsList from './ReportsList';
@@ -242,9 +244,19 @@ const StatisticsPage = () => {
   }
 
   return (
-    <div className="flex flex-col">
+    <motion.div
+      className="flex flex-col"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: duration.normal }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-950">
+      <motion.div
+        className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-950"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.normal, ease: easing.smooth }}
+      >
         <div className="flex items-center gap-4">
           {view !== 'list' && (
             <button
@@ -292,43 +304,69 @@ const StatisticsPage = () => {
             </button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Content */}
       <div className="bg-gray-50 dark:bg-neutral-900">
-        {view === 'list' && (
-          <ReportsList
-            reports={reports}
-            onSelectReport={(id) => setSelectedReportId(id)}
-            onDeleteReport={deleteReport}
-            onDuplicateReport={duplicateReport}
-            onTogglePin={togglePin}
-            onCreateReport={() => setShowNewReportDialog(true)}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          {view === 'list' && (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: duration.normal, ease: easing.smooth }}
+            >
+              <ReportsList
+                reports={reports}
+                onSelectReport={(id) => setSelectedReportId(id)}
+                onDeleteReport={deleteReport}
+                onDuplicateReport={duplicateReport}
+                onTogglePin={togglePin}
+                onCreateReport={() => setShowNewReportDialog(true)}
+              />
+            </motion.div>
+          )}
 
-        {view === 'report' && currentReport && (
-          <ReportView
-            report={currentReport}
-            metadata={metadata}
-            onEditChart={handleEditChart}
-            onDeleteChart={deleteChart}
-            onUpdateReport={(data) => updateReport(currentReport._id, data)}
-            onRefresh={() => fetchReport(currentReport._id)}
-          />
-        )}
+          {view === 'report' && currentReport && (
+            <motion.div
+              key="report"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: duration.normal, ease: easing.smooth }}
+            >
+              <ReportView
+                report={currentReport}
+                metadata={metadata}
+                onEditChart={handleEditChart}
+                onDeleteChart={deleteChart}
+                onUpdateReport={(data) => updateReport(currentReport._id, data)}
+                onRefresh={() => fetchReport(currentReport._id)}
+              />
+            </motion.div>
+          )}
 
-        {view === 'edit' && currentReport && (
-          <ReportEditor
-            report={currentReport}
-            metadata={metadata}
-            onSave={(data) => {
-              updateReport(currentReport._id, data);
-              setView('report');
-            }}
-            onCancel={() => setView('report')}
-          />
-        )}
+          {view === 'edit' && currentReport && (
+            <motion.div
+              key="edit"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: duration.normal, ease: easing.smooth }}
+            >
+              <ReportEditor
+                report={currentReport}
+                metadata={metadata}
+                onSave={(data) => {
+                  updateReport(currentReport._id, data);
+                  setView('report');
+                }}
+                onCancel={() => setView('report')}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* New Report Dialog */}
@@ -350,7 +388,7 @@ const StatisticsPage = () => {
           onClose={handleChartBuilderClose}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
 
@@ -372,8 +410,20 @@ const NewReportDialog = ({ onClose, onCreate }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-xl w-full max-w-md">
+    <motion.div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: duration.fast }}
+    >
+      <motion.div
+        className="bg-white dark:bg-neutral-900 rounded-xl shadow-xl w-full max-w-md"
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: duration.normal, ease: easing.smooth }}
+      >
         <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Create New Report
@@ -426,8 +476,8 @@ const NewReportDialog = ({ onClose, onCreate }) => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

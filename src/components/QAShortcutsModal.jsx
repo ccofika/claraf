@@ -1,6 +1,8 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Keyboard } from 'lucide-react';
+import { staggerContainer, staggerItem, fadeInUp, duration, easing } from '../utils/animations';
 
 const QAShortcutsModal = ({ open, onClose }) => {
   const shortcutGroups = [
@@ -56,17 +58,30 @@ const QAShortcutsModal = ({ open, onClose }) => {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-          {shortcutGroups.map((group) => (
-            <div key={group.title} className="space-y-3">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4"
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+        >
+          {shortcutGroups.map((group, groupIdx) => (
+            <motion.div
+              key={group.title}
+              className="space-y-3"
+              variants={staggerItem}
+              custom={groupIdx}
+            >
               <h3 className="text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide">
                 {group.title}
               </h3>
               <div className="space-y-2">
                 {group.shortcuts.map((shortcut, idx) => (
-                  <div
+                  <motion.div
                     key={idx}
                     className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: (groupIdx * 0.1) + (idx * 0.03), duration: duration.fast, ease: easing.smooth }}
                   >
                     <span className="text-sm text-gray-700 dark:text-neutral-300">
                       {shortcut.description}
@@ -83,12 +98,12 @@ const QAShortcutsModal = ({ open, onClose }) => {
                         </React.Fragment>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-800">
           <p className="text-xs text-gray-500 dark:text-neutral-400 text-center">

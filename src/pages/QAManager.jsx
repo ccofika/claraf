@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
-  Users, CheckCircle, Target, Eye,
+  Users, CheckCircle, Target, Eye, Upload,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
   Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2, Hash, Save
 } from 'lucide-react';
+import { staggerContainer, staggerItem, fadeInUp, tabContent, cardVariants, tableRow, modalOverlay, modalContent, duration, easing } from '../utils/animations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -20,6 +22,7 @@ import QACommandPalette from '../components/QACommandPalette';
 import QAAnalyticsDashboard from '../components/QAAnalyticsDashboard';
 import QAAllAgents from '../components/QAAllAgents';
 import QASummaries from '../components/QASummaries';
+import QAImportTickets from '../components/QAImportTickets';
 import StatisticsPage from '../components/statistics/StatisticsPage';
 import QAShortcutsModal from '../components/QAShortcutsModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -48,7 +51,7 @@ const QAManager = () => {
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics', 'import-tickets'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -1108,36 +1111,49 @@ const QAManager = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            icon={FileText}
-            label="Total Tickets"
-            value={totalTickets}
-            trend={`${selectedTickets} pending review`}
-            accent="blue"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Graded Rate"
-            value={`${gradedRate}%`}
-            trend={`${gradedTickets} of ${totalTickets} graded`}
-            accent="green"
-          />
-          <StatCard
-            icon={Target}
-            label="Avg Quality"
-            value={dashboardStats.avgQualityScore ? `${dashboardStats.avgQualityScore.toFixed(1)}%` : 'N/A'}
-            trend="Across all tickets"
-            accent="yellow"
-          />
-          <StatCard
-            icon={Users}
-            label="Active Agents"
-            value={dashboardStats.activeAgents || 0}
-            trend={`${agents.length || 0} total agents`}
-            accent="purple"
-          />
-        </div>
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+        >
+          <motion.div variants={staggerItem}>
+            <StatCard
+              icon={FileText}
+              label="Total Tickets"
+              value={totalTickets}
+              trend={`${selectedTickets} pending review`}
+              accent="blue"
+            />
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <StatCard
+              icon={CheckCircle}
+              label="Graded Rate"
+              value={`${gradedRate}%`}
+              trend={`${gradedTickets} of ${totalTickets} graded`}
+              accent="green"
+            />
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <StatCard
+              icon={Target}
+              label="Avg Quality"
+              value={dashboardStats.avgQualityScore ? `${dashboardStats.avgQualityScore.toFixed(1)}%` : 'N/A'}
+              trend="Across all tickets"
+              accent="yellow"
+            />
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <StatCard
+              icon={Users}
+              label="Active Agents"
+              value={dashboardStats.activeAgents || 0}
+              trend={`${agents.length || 0} total agents`}
+              accent="purple"
+            />
+          </motion.div>
+        </motion.div>
 
         {/* Performance Overview */}
         <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
@@ -1188,7 +1204,13 @@ const QAManager = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
                   {dashboardStats.agentStats.map((stat, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">
+                    <motion.tr
+                      key={idx}
+                      className="hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.03, duration: duration.fast, ease: easing.smooth }}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
@@ -1230,7 +1252,7 @@ const QAManager = () => {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
@@ -2935,24 +2957,36 @@ const QAManager = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-neutral-950">
+    <motion.div
+      className="flex flex-col h-screen bg-gray-50 dark:bg-neutral-950"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: duration.normal }}
+    >
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800">
+      <motion.div
+        className="flex-shrink-0 bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.normal, ease: easing.smooth }}
+      >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">QA Manager</h1>
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage agents, tickets, and quality metrics</p>
           </div>
-          <button
+          <motion.button
             onClick={() => setShowCommandPalette(true)}
             className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg transition-colors"
             title="Quick Search (Alt+K)"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             <Search className="w-4 h-4" />
             Quick Search
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Tabs - Fixed */}
       <div className="flex-shrink-0 bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
@@ -2979,6 +3013,10 @@ const QAManager = () => {
                 <FileText className="w-4 h-4 inline mr-1.5" />
                 Summaries
               </TabsTrigger>
+              <TabsTrigger value="import-tickets" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                <Upload className="w-4 h-4 inline mr-1.5" />
+                Import Tickets
+              </TabsTrigger>
               {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
                 <TabsTrigger value="all-agents" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <UsersRound className="w-4 h-4 inline mr-1.5" />
@@ -3000,22 +3038,107 @@ const QAManager = () => {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsContent value="dashboard">{renderDashboard()}</TabsContent>
-            <TabsContent value="agents">{renderAgents()}</TabsContent>
-            <TabsContent value="tickets">{renderTickets()}</TabsContent>
-            <TabsContent value="archive">{renderArchive()}</TabsContent>
-            <TabsContent value="analytics">
-              <QAAnalyticsDashboard />
-            </TabsContent>
-            <TabsContent value="summaries">
-              <QASummaries />
-            </TabsContent>
-            <TabsContent value="all-agents">
-              <QAAllAgents />
-            </TabsContent>
-            <TabsContent value="statistics">
-              <StatisticsPage />
-            </TabsContent>
+            <AnimatePresence mode="wait">
+              <TabsContent value="dashboard">
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  {renderDashboard()}
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="agents">
+                <motion.div
+                  key="agents"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  {renderAgents()}
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="tickets">
+                <motion.div
+                  key="tickets"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  {renderTickets()}
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="archive">
+                <motion.div
+                  key="archive"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  {renderArchive()}
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="analytics">
+                <motion.div
+                  key="analytics"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <QAAnalyticsDashboard />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="summaries">
+                <motion.div
+                  key="summaries"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <QASummaries />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="import-tickets">
+                <motion.div
+                  key="import-tickets"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <QAImportTickets agents={agents} currentUser={user} />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="all-agents">
+                <motion.div
+                  key="all-agents"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <QAAllAgents />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="statistics">
+                <motion.div
+                  key="statistics"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <StatisticsPage />
+                </motion.div>
+              </TabsContent>
+            </AnimatePresence>
           </Tabs>
         </div>
       </div>
@@ -3088,7 +3211,7 @@ const QAManager = () => {
         open={showShortcutsModal}
         onClose={() => setShowShortcutsModal(false)}
       />
-    </div>
+    </motion.div>
   );
 };
 

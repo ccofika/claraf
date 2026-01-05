@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,6 +7,7 @@ import { toast } from 'sonner';
 import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
+import { staggerContainer, staggerItem, fadeInUp, fadeInLeft, duration, easing } from '../utils/animations';
 
 const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const {
@@ -201,22 +203,26 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                   {searchTerm ? 'No macros found' : 'No macros yet'}
                 </div>
               ) : (
-                filteredMacros.map((macro) => (
-                  <button
-                    key={macro._id}
-                    onClick={() => setSelectedMacro(macro)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
-                      selectedMacro?._id === macro._id ? 'bg-gray-100 dark:bg-neutral-800' : ''
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {macro.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
-                      Used {macro.usageCount || 0} times
-                    </p>
-                  </button>
-                ))
+                <motion.div variants={staggerContainer} initial="initial" animate="animate">
+                  {filteredMacros.map((macro, index) => (
+                    <motion.button
+                      key={macro._id}
+                      onClick={() => setSelectedMacro(macro)}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                        selectedMacro?._id === macro._id ? 'bg-gray-100 dark:bg-neutral-800' : ''
+                      }`}
+                      variants={staggerItem}
+                      whileHover={{ x: 4, transition: { duration: duration.fast } }}
+                    >
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {macro.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+                        Used {macro.usageCount || 0} times
+                      </p>
+                    </motion.button>
+                  ))}
+                </motion.div>
               )}
             </div>
 
@@ -290,17 +296,25 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                           </p>
                         ) : (
                           <>
-                            <div className="flex flex-wrap gap-2">
+                            <motion.div
+                              className="flex flex-wrap gap-2"
+                              variants={staggerContainer}
+                              initial="initial"
+                              animate="animate"
+                            >
                               {usedInTickets.tickets.map((item, index) => (
-                                <button
+                                <motion.button
                                   key={index}
                                   onClick={() => handleTicketClick(item)}
                                   className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-mono rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                  variants={staggerItem}
+                                  whileHover={{ scale: 1.05, transition: { duration: duration.fast } }}
+                                  whileTap={{ scale: 0.95 }}
                                 >
                                   {item.ticketNumber || item.ticketId?._id?.slice(-6) || 'Unknown'}
-                                </button>
+                                </motion.button>
                               ))}
-                            </div>
+                            </motion.div>
                             {usedInTickets.hasMore && (
                               <button
                                 onClick={() => loadUsedInTickets(selectedMacro._id, ticketsOffset + 10)}

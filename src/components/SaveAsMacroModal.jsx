@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,6 +7,7 @@ import { toast } from 'sonner';
 import { X, Hash, Save } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
+import { fadeInUp, staggerContainer, staggerItem, duration, easing } from '../utils/animations';
 
 const SaveAsMacroModal = ({ open, onOpenChange, initialFeedback = '', onSave }) => {
   const { createMacro } = useMacros();
@@ -73,9 +75,14 @@ const SaveAsMacroModal = ({ open, onOpenChange, initialFeedback = '', onSave }) 
         </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <motion.div
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+        >
           {/* Title */}
-          <div>
+          <motion.div variants={staggerItem}>
             <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
               Macro Title
             </Label>
@@ -89,10 +96,10 @@ const SaveAsMacroModal = ({ open, onOpenChange, initialFeedback = '', onSave }) 
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
               Use a descriptive, searchable name for this macro.
             </p>
-          </div>
+          </motion.div>
 
           {/* Feedback Content */}
-          <div>
+          <motion.div variants={staggerItem}>
             <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
               Feedback Content
             </Label>
@@ -106,8 +113,8 @@ const SaveAsMacroModal = ({ open, onOpenChange, initialFeedback = '', onSave }) 
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
               You can edit the content before saving.
             </p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Footer */}
         <DialogFooter className="flex-shrink-0 px-4 py-3 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">

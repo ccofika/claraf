@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { X, Search, FileText, Hash, Check } from 'lucide-react';
 import { TicketContentDisplay } from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
+import { staggerContainer, staggerItem, fadeInUp, fadeInRight, duration, easing } from '../utils/animations';
 
 const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
   const { macros, loading, fetchMacros, searchMacros } = useMacros();
@@ -106,20 +108,24 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
                   {searchTerm ? 'No macros found' : 'No macros yet'}
                 </div>
               ) : (
-                displayMacros.map((macro) => (
-                  <button
-                    key={macro._id}
-                    onClick={() => setSelectedMacro(macro)}
-                    onDoubleClick={() => handleDoubleClick(macro)}
-                    className={`w-full text-left px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
-                      selectedMacro?._id === macro._id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500' : ''
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {macro.title}
-                    </p>
-                  </button>
-                ))
+                <motion.div variants={staggerContainer} initial="initial" animate="animate">
+                  {displayMacros.map((macro) => (
+                    <motion.button
+                      key={macro._id}
+                      onClick={() => setSelectedMacro(macro)}
+                      onDoubleClick={() => handleDoubleClick(macro)}
+                      className={`w-full text-left px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                        selectedMacro?._id === macro._id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500' : ''
+                      }`}
+                      variants={staggerItem}
+                      whileHover={{ x: 4, transition: { duration: duration.fast } }}
+                    >
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {macro.title}
+                      </p>
+                    </motion.button>
+                  ))}
+                </motion.div>
               )}
             </div>
           </div>
@@ -136,7 +142,13 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-y-auto p-4">
+                <motion.div
+                  className="flex-1 overflow-y-auto p-4"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                  key={selectedMacro._id}
+                >
                   {/* Title */}
                   <div className="mb-4">
                     <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
@@ -159,7 +171,7 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
                       />
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Footer */}
                 <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">

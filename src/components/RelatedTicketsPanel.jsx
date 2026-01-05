@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Star, AlertCircle, Loader2, FileText, Hash } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { staggerContainer, staggerItem, fadeInUp, scaleIn, duration, easing } from '../utils/animations';
 
 // Helper to truncate text
 const truncateText = (text, maxLength = 100) => {
@@ -198,15 +200,21 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
       </div>
 
       {/* Ticket list */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+      <motion.div
+        className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
         {tickets.map((ticket, index) => {
           const scoreColors = getScoreColor(ticket.qualityScorePercent);
 
           return (
-            <div
+            <motion.div
               key={ticket._id}
               className="group relative bg-white dark:bg-zinc-800/40 hover:bg-gray-50 dark:hover:bg-zinc-800/60 rounded-xl border border-gray-200 dark:border-zinc-700/50 hover:border-gray-300 dark:hover:border-zinc-600/50 transition-all duration-200 shadow-sm dark:shadow-none"
-              style={{ animationDelay: `${index * 50}ms` }}
+              variants={staggerItem}
+              whileHover={{ y: -2, transition: { duration: duration.fast } }}
             >
               {/* Top row - badges */}
               <div className="flex items-center gap-2 px-3 pt-3 pb-2">
@@ -258,10 +266,10 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 };

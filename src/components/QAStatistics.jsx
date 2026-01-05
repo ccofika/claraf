@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -9,6 +10,7 @@ import {
   X, Check, Eye, Copy, FileImage, FileText, FileSpreadsheet,
   GripVertical, Maximize2, Minimize2, Save, Loader2
 } from 'lucide-react';
+import { staggerContainer, staggerItem, fadeInUp, modalOverlay, modalContent, scaleIn, duration, easing } from '../utils/animations';
 import {
   PieChart as RechartsPie, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -747,19 +749,29 @@ const QAStatistics = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: duration.normal }}
+    >
       {/* Custom grid styles */}
       <style dangerouslySetInnerHTML={{ __html: gridStyles }} />
 
       {/* Header with user switching */}
-      <div className="flex items-center justify-between">
+      <motion.div
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: duration.normal, ease: easing.smooth }}
+      >
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statistics</h1>
 
           {/* User switching cards */}
           <div className="flex gap-2 ml-4">
-            {statisticsUsers.map(u => (
-              <button
+            {statisticsUsers.map((u, index) => (
+              <motion.button
                 key={u._id}
                 onClick={() => setViewingUserId(u._id === user._id ? null : u._id)}
                 className={`
@@ -769,10 +781,15 @@ const QAStatistics = () => {
                     : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 dark:bg-neutral-900 dark:text-gray-300 dark:border-neutral-700 dark:hover:border-neutral-600'
                   }
                 `}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05, duration: duration.fast }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <User className="w-4 h-4" />
                 <span className="font-medium">{u.name}'s Statistics</span>
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -833,7 +850,7 @@ const QAStatistics = () => {
             </>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Viewing mode indicator */}
       {isViewMode && (
@@ -853,7 +870,12 @@ const QAStatistics = () => {
 
       {/* Statistics Grid */}
       {cards.length > 0 ? (
-        <div ref={gridRef}>
+        <motion.div
+          ref={gridRef}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: duration.normal, delay: 0.1 }}
+        >
           <GridLayout
             layout={getGridLayout()}
             cols={12}
@@ -1277,7 +1299,7 @@ const QAStatistics = () => {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
