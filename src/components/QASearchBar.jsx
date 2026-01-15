@@ -5,6 +5,7 @@ import {
   TrendingUp, Users, FileText, Target, UserCheck, ChevronDown
 } from 'lucide-react';
 import { Badge } from './ui/badge';
+import { DatePicker } from './ui/date-picker';
 import {
   dropdownVariants,
   staggerContainer,
@@ -19,9 +20,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [agentHighlightIndex, setAgentHighlightIndex] = useState(-1); // -1 means "All agents" option
 
   const searchInputRef = useRef(null);
   const agentDropdownRef = useRef(null);
+  const agentInputRef = useRef(null);
+  const agentListRef = useRef(null);
   const categoryDropdownRef = useRef(null);
 
   // Sync with currentFilters from parent
@@ -120,6 +124,78 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const filteredAgents = agents.filter(agent =>
     agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
   );
+
+  // Reset highlight index when search query changes
+  useEffect(() => {
+    if (showAgentDropdown) {
+      setAgentHighlightIndex(0); // Start at "All agents" when dropdown opens
+    }
+  }, [agentSearchQuery]);
+
+  // Set initial highlight when dropdown opens
+  useEffect(() => {
+    if (showAgentDropdown) {
+      setAgentHighlightIndex(0);
+    }
+  }, [showAgentDropdown]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (showAgentDropdown && agentListRef.current) {
+      const highlightedElement = agentListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [agentHighlightIndex, showAgentDropdown]);
+
+  // Keyboard handler for agent dropdown navigation
+  const handleAgentKeyDown = (e) => {
+    if (!showAgentDropdown) {
+      // Open dropdown on arrow down
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowAgentDropdown(true);
+        setAgentHighlightIndex(0);
+      }
+      return;
+    }
+
+    const totalItems = filteredAgents.length + 1; // +1 for "All agents" option
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setAgentHighlightIndex(prev => (prev + 1) % totalItems);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setAgentHighlightIndex(prev => (prev - 1 + totalItems) % totalItems);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (agentHighlightIndex === 0) {
+          // "All agents" selected
+          handleFilterChange('agent', '');
+          setAgentSearchQuery('');
+        } else if (agentHighlightIndex > 0 && agentHighlightIndex <= filteredAgents.length) {
+          // Agent selected (index is 1-based for agents since 0 is "All agents")
+          const selectedAgent = filteredAgents[agentHighlightIndex - 1];
+          if (selectedAgent) {
+            handleFilterChange('agent', selectedAgent._id);
+            setAgentSearchQuery(selectedAgent.name);
+          }
+        }
+        setShowAgentDropdown(false);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowAgentDropdown(false);
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <motion.div
@@ -389,6 +465,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
               </label>
               <div className="relative">
                 <input
+                  ref={agentInputRef}
                   type="text"
                   value={agentSearchQuery}
                   onChange={(e) => {
@@ -396,12 +473,14 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                     setShowAgentDropdown(true);
                   }}
                   onFocus={() => setShowAgentDropdown(true)}
+                  onKeyDown={handleAgentKeyDown}
                   placeholder="Search agents..."
                   className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
                 />
                 <AnimatePresence>
                 {showAgentDropdown && (
                   <motion.div
+                    ref={agentListRef}
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
@@ -410,26 +489,38 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                   >
                     <motion.button
                       whileTap={{ scale: 0.98 }}
+                      data-highlighted={agentHighlightIndex === 0}
                       onClick={() => {
                         handleFilterChange('agent', '');
                         setAgentSearchQuery('');
                         setShowAgentDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-900 dark:text-white"
+                      onMouseEnter={() => setAgentHighlightIndex(0)}
+                      className={`w-full px-3 py-2 text-left text-xs text-neutral-900 dark:text-white transition-colors ${
+                        agentHighlightIndex === 0
+                          ? 'bg-neutral-200 dark:bg-neutral-700'
+                          : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                      }`}
                     >
                       All agents
                     </motion.button>
                     {filteredAgents.length > 0 ? (
-                      filteredAgents.map(agent => (
+                      filteredAgents.map((agent, index) => (
                         <motion.button
                           key={agent._id}
                           whileTap={{ scale: 0.98 }}
+                          data-highlighted={agentHighlightIndex === index + 1}
                           onClick={() => {
                             handleFilterChange('agent', agent._id);
                             setAgentSearchQuery(agent.name);
                             setShowAgentDropdown(false);
                           }}
-                          className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-900 dark:text-white"
+                          onMouseEnter={() => setAgentHighlightIndex(index + 1)}
+                          className={`w-full px-3 py-2 text-left text-xs text-neutral-900 dark:text-white transition-colors ${
+                            agentHighlightIndex === index + 1
+                              ? 'bg-neutral-200 dark:bg-neutral-700'
+                              : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                          }`}
                         >
                           {agent.name}
                         </motion.button>
@@ -542,11 +633,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 <Calendar className="w-3 h-3 inline mr-1" />
                 Date From
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={currentFilters.dateFrom || ''}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
+                onChange={(date) => handleFilterChange('dateFrom', date)}
+                placeholder="Select start date"
+                size="sm"
+                className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
               />
             </motion.div>
 
@@ -555,11 +647,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 <Calendar className="w-3 h-3 inline mr-1" />
                 Date To
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={currentFilters.dateTo || ''}
-                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
+                onChange={(date) => handleFilterChange('dateTo', date)}
+                placeholder="Select end date"
+                size="sm"
+                className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
               />
             </motion.div>
           </motion.div>

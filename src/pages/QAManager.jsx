@@ -7,7 +7,7 @@ import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target, Eye, Upload,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
-  Keyboard, RefreshCw, ChevronDown, ChevronRight, AlertTriangle, Loader2, Hash, Save
+  Keyboard, RefreshCw, ChevronDown, ChevronRight, ChevronLeft, AlertTriangle, Loader2, Hash, Save, Send, Check, XCircle, ExternalLink
 } from 'lucide-react';
 import { staggerContainer, staggerItem, fadeInUp, tabContent, cardVariants, tableRow, modalOverlay, modalContent, duration, easing } from '../utils/animations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
@@ -120,6 +120,24 @@ const QAManager = () => {
   const [chooseMacroDialog, setChooseMacroDialog] = useState({ open: false, onSelect: null });
   const [saveAsMacroDialog, setSaveAsMacroDialog] = useState({ open: false, feedback: '' });
 
+  // Send Macro Ticket state (send ticket to another grader)
+  const [sendMacroDialog, setSendMacroDialog] = useState({ open: false });
+  const [pendingMacroTickets, setPendingMacroTickets] = useState([]);
+  const [declineConfirmDialog, setDeclineConfirmDialog] = useState({ open: false, macroTicket: null });
+
+  // Ticket form data ref (using ref instead of state to avoid parent re-renders on every keystroke)
+  // This allows TicketDialogContent to update form data without causing QAManager to re-render
+  const ticketFormDataRef = useRef({
+    agent: '',
+    ticketId: '',
+    status: 'Selected',
+    qualityScorePercent: '',
+    notes: '',
+    feedback: '',
+    dateEntered: null,
+    categories: []
+  });
+
   // Agent expansion state (for showing unresolved issues)
   const [expandedAgentId, setExpandedAgentId] = useState(null);
   const [agentIssues, setAgentIssues] = useState({ loading: false, data: null });
@@ -129,6 +147,79 @@ const QAManager = () => {
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Helper function to open ticket dialog and initialize form data ref
+  const openTicketDialog = useCallback((mode, data = null) => {
+    if (mode === 'create') {
+      ticketFormDataRef.current = {
+        agent: '',
+        ticketId: '',
+        status: 'Selected',
+        qualityScorePercent: '',
+        notes: '',
+        feedback: '',
+        dateEntered: new Date().toISOString().split('T')[0],
+        categories: []
+      };
+    } else if (mode === 'edit' && data) {
+      ticketFormDataRef.current = {
+        agent: data.agent?._id || data.agent || '',
+        ticketId: data.ticketId || '',
+        status: data.status || 'Selected',
+        dateEntered: data.dateEntered ? new Date(data.dateEntered).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        notes: data.notes || '',
+        feedback: data.feedback || '',
+        qualityScorePercent: data.qualityScorePercent !== undefined ? data.qualityScorePercent : '',
+        categories: data.categories || []
+      };
+    }
+    setTicketDialog({ open: true, mode, data });
+  }, []);
+
+  // State for unsaved changes modal
+  const [unsavedChangesModal, setUnsavedChangesModal] = useState({ open: false, onConfirm: null });
+  // Ref to track if edit form has unsaved changes (set by TicketDialogContent)
+  const hasUnsavedChangesRef = useRef(false);
+  // Ref to store original form data for comparison
+  const originalFormDataRef = useRef(null);
+
+  // Navigation helper: get current ticket index in the visible list
+  const getCurrentTicketIndex = useCallback((ticketId) => {
+    if (!ticketId || !Array.isArray(tickets)) return -1;
+    return tickets.findIndex(t => t._id === ticketId);
+  }, [tickets]);
+
+  // Navigation helper: navigate to previous/next ticket
+  const navigateToTicket = useCallback((direction, currentTicketId, mode) => {
+    const currentIndex = getCurrentTicketIndex(currentTicketId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= tickets.length) return;
+
+    const newTicket = tickets[newIndex];
+
+    if (mode === 'view') {
+      setViewDialog({ open: true, ticket: newTicket });
+    } else if (mode === 'edit') {
+      openTicketDialog('edit', newTicket);
+    }
+  }, [getCurrentTicketIndex, tickets, openTicketDialog]);
+
+  // Navigation with unsaved changes check (for edit mode)
+  const navigateWithUnsavedCheck = useCallback((direction, currentTicketId) => {
+    if (hasUnsavedChangesRef.current) {
+      setUnsavedChangesModal({
+        open: true,
+        onConfirm: () => {
+          setUnsavedChangesModal({ open: false, onConfirm: null });
+          navigateToTicket(direction, currentTicketId, 'edit');
+        }
+      });
+    } else {
+      navigateToTicket(direction, currentTicketId, 'edit');
+    }
+  }, [navigateToTicket]);
 
   // Fetch data
   useEffect(() => {
@@ -159,6 +250,8 @@ const QAManager = () => {
   useEffect(() => {
     fetchAgents(); // Always fetch agents for dropdowns
     fetchAgentsForFilter(); // Fetch all agents with tickets for filters
+    fetchAllExistingAgents(); // Fetch all existing agents for Send Ticket modal
+    fetchPendingMacroTickets(); // Fetch pending macro tickets from other graders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -196,7 +289,7 @@ const QAManager = () => {
           case 't':
           case 'T':
             e.preventDefault();
-            setTicketDialog({ open: true, mode: 'create', data: null });
+            openTicketDialog('create');
             return;
           case 'a':
           case 'A':
@@ -394,6 +487,66 @@ const QAManager = () => {
     } else {
       setExpandedAgentId(agentId);
       fetchAgentIssues(agentId);
+    }
+  };
+
+  // Fetch pending macro tickets (tickets sent by other graders)
+  const fetchPendingMacroTickets = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/macro-tickets/pending`, getAuthHeaders());
+      setPendingMacroTickets(response.data);
+    } catch (err) {
+      console.error('Error fetching pending macro tickets:', err);
+    }
+  };
+
+  // Send ticket to another grader
+  const handleSendMacroTicket = async (data) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/qa/macro-tickets`, data, getAuthHeaders());
+      toast.success(response.data.message);
+      setSendMacroDialog({ open: false });
+      fetchPendingMacroTickets(); // Refresh in case sent to self
+      return { success: true };
+    } catch (err) {
+      console.error('Error sending ticket:', err);
+      const message = err.response?.data?.message || 'Failed to send ticket';
+      toast.error(message);
+      return { success: false, error: message };
+    }
+  };
+
+  // Accept incoming ticket
+  const handleAcceptMacroTicket = async (macroTicketId) => {
+    try {
+      await axios.post(
+        `${API_URL}/api/qa/macro-tickets/${macroTicketId}/accept`,
+        {},
+        getAuthHeaders()
+      );
+      toast.success('Ticket accepted and added to your list');
+      fetchPendingMacroTickets();
+      fetchTickets(); // Refresh tickets to show the new one
+    } catch (err) {
+      console.error('Error accepting ticket:', err);
+      toast.error(err.response?.data?.message || 'Failed to accept ticket');
+    }
+  };
+
+  // Decline incoming ticket
+  const handleDeclineMacroTicket = async (macroTicketId) => {
+    try {
+      await axios.post(
+        `${API_URL}/api/qa/macro-tickets/${macroTicketId}/decline`,
+        {},
+        getAuthHeaders()
+      );
+      toast.success('Ticket declined');
+      fetchPendingMacroTickets();
+      setDeclineConfirmDialog({ open: false, macroTicket: null });
+    } catch (err) {
+      console.error('Error declining ticket:', err);
+      toast.error(err.response?.data?.message || 'Failed to decline ticket');
     }
   };
 
@@ -1537,7 +1690,15 @@ const QAManager = () => {
               <Hash className="w-4 h-4 mr-1.5" />
               Manage Macros
             </Button>
-            <Button size="sm" onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
+            <Button
+              size="sm"
+              onClick={() => setSendMacroDialog({ open: true })}
+              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+            >
+              <Send className="w-4 h-4 mr-1.5" />
+              Send Ticket
+            </Button>
+            <Button size="sm" onClick={() => openTicketDialog('create')}>
               <Plus className="w-4 h-4 mr-1.5" />
               New Ticket
             </Button>
@@ -1560,20 +1721,130 @@ const QAManager = () => {
           </div>
         )}
 
+        {/* Pending Tickets - Blue glowing cards above regular tickets */}
+        {pendingMacroTickets.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <Send className="w-4 h-4" />
+              Incoming Tickets ({pendingMacroTickets.length})
+            </h3>
+            {pendingMacroTickets.map((macroTicket) => (
+              <motion.div
+                key={macroTicket._id}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-400 dark:border-blue-500 rounded-lg p-4 shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Ticket ID</p>
+                      <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{macroTicket.ticketId}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Agent</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{macroTicket.agent?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Date</p>
+                      <p className="text-sm text-gray-700 dark:text-neutral-300">
+                        {new Date(macroTicket.dateEntered).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">From</p>
+                      <p className="text-sm text-gray-700 dark:text-neutral-300">
+                        {macroTicket.sentBy?.name || macroTicket.sentBy?.email}
+                      </p>
+                    </div>
+                    {macroTicket.notes && (
+                      <div className="max-w-xs">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Notes</p>
+                        <p className="text-sm text-gray-700 dark:text-neutral-300 truncate">
+                          <span dangerouslySetInnerHTML={{ __html: macroTicket.notes.substring(0, 100) + (macroTicket.notes.length > 100 ? '...' : '') }} />
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${macroTicket.ticketId}`, '_blank')}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                      title="Open in Intercom"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        // View ticket details
+                        setViewDialog({
+                          open: true,
+                          ticket: {
+                            _id: macroTicket._id,
+                            ticketId: macroTicket.ticketId,
+                            agent: macroTicket.agent,
+                            dateEntered: macroTicket.dateEntered,
+                            notes: macroTicket.notes,
+                            status: 'Pending',
+                            isMacroTicket: true
+                          }
+                        });
+                      }}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                      title="View details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleAcceptMacroTicket(macroTicket._id)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setDeclineConfirmDialog({ open: true, macroTicket })}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    >
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <LoadingSkeleton />
-        ) : tickets.length === 0 ? (
+        ) : tickets.length === 0 && pendingMacroTickets.length === 0 ? (
           <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg">
             <EmptyState
               icon={FileText}
               title="No tickets found"
               description="No tickets match your current filters."
               action={
-                <Button onClick={() => setTicketDialog({ open: true, mode: 'create', data: null })}>
+                <Button onClick={() => openTicketDialog('create')}>
                   <Plus className="w-4 h-4 mr-1.5" />
                   Create Ticket
                 </Button>
               }
+            />
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg">
+            <EmptyState
+              icon={FileText}
+              title="No regular tickets found"
+              description="You have pending macro tickets above, but no regular tickets match your filters."
             />
           </div>
         ) : (
@@ -1651,24 +1922,15 @@ const QAManager = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {ticket.status !== 'Graded' && (
-                          <button
-                            onClick={() => setGradeDialog({ open: true, ticket })}
-                            className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                            title="Grade"
-                          >
-                            <Target className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
-                          </button>
-                        )}
                         <button
-                          onClick={() => setFeedbackDialog({ open: true, ticket })}
+                          onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${ticket.ticketId}`, '_blank')}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                          title="Feedback"
+                          title="Open in Intercom"
                         >
-                          <MessageSquare className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                          <ExternalLink className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                         <button
-                          onClick={() => setTicketDialog({ open: true, mode: 'edit', data: ticket })}
+                          onClick={() => openTicketDialog('edit', ticket)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
                           title="Edit"
                         >
@@ -1680,6 +1942,13 @@ const QAManager = () => {
                           title="Archive"
                         >
                           <Archive className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ open: true, type: 'ticket', id: ticket._id, name: ticket.ticketId })}
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
                         </button>
                       </div>
                     </td>
@@ -1833,6 +2102,13 @@ const QAManager = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${ticket.ticketId}`, '_blank')}
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
+                          title="Open in Intercom"
+                        >
+                          <ExternalLink className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                        </button>
                         <button
                           onClick={() => handleRestoreTicket(ticket._id)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
@@ -2150,72 +2426,189 @@ const QAManager = () => {
   };
 
   // Ticket Dialog Component
+  // Uses local state for form data to avoid parent re-renders on every keystroke
+  // Parent ref (ticketFormDataRef) is updated on every change so parent can access latest data
   const TicketDialogContent = () => {
     const formRef = useRef(null);
     const [rightPanelMode, setRightPanelMode] = useState('ai'); // 'ai' | 'related'
-    const [formData, setFormData] = useState({
-      agent: '',
-      ticketId: '',
-      status: 'Selected',
-      dateEntered: new Date().toISOString().split('T')[0],
-      notes: '',
-      feedback: '',
-      qualityScorePercent: '',
-      categories: []
-    });
+    // Local state initialized from parent ref - changes don't re-render parent
+    const [formData, setFormDataLocal] = useState(() => ({ ...ticketFormDataRef.current }));
+    // Wrapper that updates both local state AND parent ref
+    const setFormData = useCallback((valueOrUpdater) => {
+      setFormDataLocal(prev => {
+        const newValue = typeof valueOrUpdater === 'function' ? valueOrUpdater(prev) : valueOrUpdater;
+        ticketFormDataRef.current = newValue; // Keep ref in sync for parent access
+        return newValue;
+      });
+    }, []);
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const [categorySearch, setCategorySearch] = useState('');
+    const [categoryHighlightIndex, setCategoryHighlightIndex] = useState(0);
     const categoryDropdownRef = useRef(null);
+    const categoryInputRef = useRef(null);
+    const categoryListRef = useRef(null);
+
+    // All available categories
+    const allCategories = [
+      'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
+      'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
+      'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
+      'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
+      'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
+      'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
+      'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
+      'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
+      'Games issues', 'Games | Providers | Rules', 'Games | Live games',
+      'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
+      'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
+      'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
+      'Reload', 'Responsible gambling', 'Roles', 'Rollover',
+      'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
+      'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
+      'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
+    ];
+
+    // Filter categories based on search (exclude already selected)
+    const filteredCategories = allCategories.filter(cat =>
+      cat.toLowerCase().includes(categorySearch.toLowerCase()) &&
+      !formData.categories.includes(cat)
+    );
     const [showChooseMacroModal, setShowChooseMacroModal] = useState(false);
     const { recordUsage } = useMacros();
 
     // Close category dropdown on click outside
+    // Reset highlight when search changes
+    useEffect(() => {
+      setCategoryHighlightIndex(0);
+    }, [categorySearch]);
+
+    // Scroll highlighted category into view
+    useEffect(() => {
+      if (showCategoryDropdown && categoryListRef.current) {
+        const highlighted = categoryListRef.current.querySelector('[data-highlighted="true"]');
+        if (highlighted) {
+          highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+    }, [categoryHighlightIndex, showCategoryDropdown]);
+
+    // Keyboard navigation for categories
+    const handleCategoryKeyDown = (e) => {
+      if (!showCategoryDropdown) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setShowCategoryDropdown(true);
+        }
+        return;
+      }
+
+      const totalItems = filteredCategories.length;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setCategoryHighlightIndex(prev => (prev + 1) % Math.max(totalItems, 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setCategoryHighlightIndex(prev => (prev - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (filteredCategories[categoryHighlightIndex]) {
+            const selected = filteredCategories[categoryHighlightIndex];
+            setFormData({ ...formData, categories: [...formData.categories, selected] });
+            setCategorySearch('');
+            setCategoryHighlightIndex(0);
+            // Keep dropdown open and focus on input
+            setTimeout(() => categoryInputRef.current?.focus(), 0);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setShowCategoryDropdown(false);
+          setCategorySearch('');
+          break;
+        case 'Backspace':
+          // If search is empty and backspace is pressed, remove last category
+          if (categorySearch === '' && formData.categories.length > 0) {
+            setFormData({ ...formData, categories: formData.categories.slice(0, -1) });
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
     useEffect(() => {
       const handleClickOutside = (event) => {
         if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
           setShowCategoryDropdown(false);
+          setCategorySearch('');
         }
       };
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Store original form data when entering edit mode (for unsaved changes detection)
     useEffect(() => {
-      if (ticketDialog.data) {
-        setFormData({
-          agent: ticketDialog.data.agent?._id || ticketDialog.data.agent || '',
-          ticketId: ticketDialog.data.ticketId || '',
-          status: ticketDialog.data.status || 'Selected',
-          dateEntered: ticketDialog.data.dateEntered ? new Date(ticketDialog.data.dateEntered).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          notes: ticketDialog.data.notes || '',
-          feedback: ticketDialog.data.feedback || '',
-          qualityScorePercent: ticketDialog.data.qualityScorePercent !== undefined ? ticketDialog.data.qualityScorePercent : '',
-          categories: ticketDialog.data.categories || []
-        });
-      } else {
-        setFormData({
-          agent: '',
-          ticketId: '',
-          status: 'Selected',
-          dateEntered: new Date().toISOString().split('T')[0],
-          notes: '',
-          feedback: '',
-          qualityScorePercent: '',
-          categories: []
-        });
+      if (ticketDialog.mode === 'edit' && ticketDialog.data) {
+        originalFormDataRef.current = { ...ticketFormDataRef.current };
+        hasUnsavedChangesRef.current = false;
       }
-    }, [ticketDialog.data]);
+      return () => {
+        // Reset when dialog closes
+        hasUnsavedChangesRef.current = false;
+        originalFormDataRef.current = null;
+      };
+    }, [ticketDialog.mode, ticketDialog.data?._id]);
 
-    // Ctrl+Enter to save
+    // Track unsaved changes by comparing current form data with original
+    useEffect(() => {
+      if (ticketDialog.mode === 'edit' && originalFormDataRef.current) {
+        const original = originalFormDataRef.current;
+        const hasChanges =
+          formData.agent !== original.agent ||
+          formData.ticketId !== original.ticketId ||
+          formData.status !== original.status ||
+          formData.qualityScorePercent !== original.qualityScorePercent ||
+          formData.notes !== original.notes ||
+          formData.feedback !== original.feedback ||
+          formData.dateEntered !== original.dateEntered ||
+          JSON.stringify(formData.categories) !== JSON.stringify(original.categories);
+        hasUnsavedChangesRef.current = hasChanges;
+      }
+    }, [formData, ticketDialog.mode]);
+
+    // Get navigation info for this ticket
+    const currentIndex = ticketDialog.data ? getCurrentTicketIndex(ticketDialog.data._id) : -1;
+    const canGoPrev = currentIndex > 0;
+    const canGoNext = currentIndex >= 0 && currentIndex < tickets.length - 1;
+
+    // Keyboard shortcuts: Ctrl+Enter to save, Alt+Arrow for navigation
     useEffect(() => {
       const handleKeyDown = (e) => {
+        // Ctrl+Enter to save
         if (e.ctrlKey && e.key === 'Enter') {
           e.preventDefault();
           formRef.current?.requestSubmit();
+          return;
+        }
+        // Alt+Left/Right for navigation (only in edit mode)
+        if (e.altKey && ticketDialog.mode === 'edit' && ticketDialog.data) {
+          if (e.key === 'ArrowLeft' && canGoPrev) {
+            e.preventDefault();
+            navigateWithUnsavedCheck('prev', ticketDialog.data._id);
+          } else if (e.key === 'ArrowRight' && canGoNext) {
+            e.preventDefault();
+            navigateWithUnsavedCheck('next', ticketDialog.data._id);
+          }
         }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [ticketDialog.mode, ticketDialog.data, canGoPrev, canGoNext]);
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -2226,9 +2619,40 @@ const QAManager = () => {
       }
     };
 
+    // Check if form has any data entered (for create mode)
+    const hasFormData = () => {
+      return (
+        formData.agent ||
+        formData.ticketId ||
+        formData.notes?.trim() ||
+        formData.feedback?.trim() ||
+        formData.qualityScorePercent ||
+        formData.categories?.length > 0
+      );
+    };
+
+    // Handle closing dialog with unsaved changes check
+    const handleCloseDialog = () => {
+      const shouldShowModal = ticketDialog.mode === 'create'
+        ? hasFormData()
+        : hasUnsavedChangesRef.current;
+
+      if (shouldShowModal) {
+        setUnsavedChangesModal({
+          open: true,
+          onConfirm: () => {
+            setUnsavedChangesModal({ open: false, onConfirm: null });
+            setTicketDialog({ ...ticketDialog, open: false });
+          }
+        });
+      } else {
+        setTicketDialog({ ...ticketDialog, open: false });
+      }
+    };
+
     return (
       <>
-      <Dialog open={ticketDialog.open} onOpenChange={(open) => setTicketDialog({ ...ticketDialog, open })}>
+      <Dialog open={ticketDialog.open} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
           {/* Header */}
           <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
@@ -2236,12 +2660,39 @@ const QAManager = () => {
               <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
                 {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
               </DialogTitle>
-              <button
-                onClick={() => setTicketDialog({ ...ticketDialog, open: false })}
-                className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Navigation arrows - only show in edit mode */}
+                {ticketDialog.mode === 'edit' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigateWithUnsavedCheck('prev', ticketDialog.data?._id)}
+                      disabled={!canGoPrev}
+                      className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Previous ticket"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateWithUnsavedCheck('next', ticketDialog.data?._id)}
+                      disabled={!canGoNext}
+                      className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Next ticket"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-gray-300 dark:bg-neutral-700 mx-1" />
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCloseDialog}
+                  className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -2349,82 +2800,79 @@ const QAManager = () => {
                         <span className="text-red-500 ml-1">*</span>
                       )}
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                      className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white transition-all text-left flex items-center justify-between ${
+                    {/* Selected categories as tags + search input */}
+                    <div
+                      className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-900 cursor-text min-h-[38px] ${
                         formData.categories.length === 0 && rightPanelMode === 'related'
-                          ? 'border-2 border-red-400 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-500/20 focus:ring-red-400 dark:focus:ring-red-500'
-                          : 'border border-gray-200 dark:border-neutral-800 focus:ring-gray-900 dark:focus:ring-gray-300'
-                      }`}
+                          ? 'border-2 border-red-400 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-500/20'
+                          : 'border border-gray-200 dark:border-neutral-800'
+                      } ${showCategoryDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                      onClick={() => categoryInputRef.current?.focus()}
                     >
-                      <span className={formData.categories.length === 0 ? 'text-gray-400 dark:text-neutral-500' : ''}>
-                        {formData.categories.length === 0
-                          ? 'Select categories...'
-                          : formData.categories.length === 1
-                            ? formData.categories[0]
-                            : `${formData.categories.length} categories selected`}
-                      </span>
-                      <ChevronDown className={`w-4 h-4 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
-                    </button>
+                      {formData.categories.map(cat => (
+                        <span
+                          key={cat}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
+                        >
+                          {cat}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) });
+                            }}
+                            className="hover:text-blue-900 dark:hover:text-blue-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        ref={categoryInputRef}
+                        type="text"
+                        value={categorySearch}
+                        onChange={(e) => {
+                          setCategorySearch(e.target.value);
+                          setShowCategoryDropdown(true);
+                        }}
+                        onFocus={() => setShowCategoryDropdown(true)}
+                        onKeyDown={handleCategoryKeyDown}
+                        placeholder={formData.categories.length === 0 ? "Search categories..." : ""}
+                        className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                      />
+                    </div>
                     {showCategoryDropdown && (
-                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {[
-                          'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
-                          'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
-                          'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
-                          'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
-                          'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
-                          'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
-                          'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
-                          'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
-                          'Games issues', 'Games | Providers | Rules', 'Games | Live games',
-                          'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
-                          'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
-                          'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
-                          'Reload', 'Responsible gambling', 'Roles', 'Rollover',
-                          'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
-                          'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
-                          'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
-                        ].map(cat => (
-                          <label
-                            key={cat}
-                            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.categories.includes(cat)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData({ ...formData, categories: [...formData.categories, cat] });
-                                } else {
-                                  setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) });
-                                }
-                              }}
-                              className="w-4 h-4 rounded border-gray-300 dark:border-neutral-600 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-gray-900 dark:text-white">{cat}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {formData.categories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {formData.categories.map(cat => (
-                          <span
-                            key={cat}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
-                          >
-                            {cat}
+                      <div
+                        ref={categoryListRef}
+                        className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      >
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((cat, index) => (
                             <button
+                              key={cat}
                               type="button"
-                              onClick={() => setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) })}
-                              className="hover:text-blue-900 dark:hover:text-blue-300"
+                              data-highlighted={categoryHighlightIndex === index}
+                              onClick={() => {
+                                setFormData({ ...formData, categories: [...formData.categories, cat] });
+                                setCategorySearch('');
+                                setCategoryHighlightIndex(0);
+                                setTimeout(() => categoryInputRef.current?.focus(), 0);
+                              }}
+                              onMouseEnter={() => setCategoryHighlightIndex(index)}
+                              className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                                categoryHighlightIndex === index
+                                  ? 'bg-blue-100 dark:bg-blue-900/30'
+                                  : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                              }`}
                             >
-                              <X className="w-3 h-3" />
+                              {cat}
                             </button>
-                          </span>
-                        ))}
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                            {categorySearch ? 'No categories found' : 'All categories selected'}
+                          </div>
+                        )}
                       </div>
                     )}
                     {formData.categories.length === 0 && rightPanelMode === 'related' && (
@@ -2483,7 +2931,7 @@ const QAManager = () => {
 
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-neutral-800">
-                  <Button type="button" variant="secondary" onClick={() => setTicketDialog({ ...ticketDialog, open: false })}>
+                  <Button type="button" variant="secondary" onClick={handleCloseDialog}>
                     Cancel
                   </Button>
                   <Button type="submit">
@@ -2694,13 +3142,260 @@ const QAManager = () => {
     );
   };
 
+  // Send Ticket Form Component
+  const SendMacroForm = ({ agents, onSubmit, onCancel }) => {
+    const [formData, setFormData] = useState({
+      agent: '',
+      ticketId: '',
+      notes: '',
+      dateEntered: new Date().toISOString().split('T')[0]
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [agentSearch, setAgentSearch] = useState('');
+    const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+    const [highlightIndex, setHighlightIndex] = useState(0);
+    const agentDropdownRef = useRef(null);
+    const agentListRef = useRef(null);
+
+    // Filter agents based on search
+    const filteredAgents = agents.filter(agent =>
+      agent.name.toLowerCase().includes(agentSearch.toLowerCase())
+    );
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target)) {
+          setShowAgentDropdown(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Reset highlight on search change
+    useEffect(() => {
+      setHighlightIndex(0);
+    }, [agentSearch]);
+
+    // Scroll highlighted item into view
+    useEffect(() => {
+      if (showAgentDropdown && agentListRef.current) {
+        const highlighted = agentListRef.current.querySelector('[data-highlighted="true"]');
+        if (highlighted) {
+          highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+    }, [highlightIndex, showAgentDropdown]);
+
+    // Handle keyboard navigation
+    const handleAgentKeyDown = (e) => {
+      if (!showAgentDropdown) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setShowAgentDropdown(true);
+        }
+        return;
+      }
+
+      const totalItems = filteredAgents.length;
+      if (totalItems === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setHighlightIndex(prev => (prev + 1) % totalItems);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setHighlightIndex(prev => (prev - 1 + totalItems) % totalItems);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (filteredAgents[highlightIndex]) {
+            const selected = filteredAgents[highlightIndex];
+            setFormData({ ...formData, agent: selected._id });
+            setAgentSearch(selected.name);
+            setShowAgentDropdown(false);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setShowAgentDropdown(false);
+          break;
+        default:
+          break;
+      }
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      if (!formData.agent || !formData.ticketId) {
+        toast.error('Agent and Ticket ID are required');
+        return;
+      }
+      setIsSubmitting(true);
+      const result = await onSubmit(formData);
+      setIsSubmitting(false);
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div ref={agentDropdownRef} className="relative">
+          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
+            Agent <span className="text-red-500">*</span>
+          </Label>
+          <input
+            type="text"
+            value={agentSearch}
+            onChange={(e) => {
+              setAgentSearch(e.target.value);
+              setShowAgentDropdown(true);
+              // Clear selection if search doesn't match
+              if (formData.agent) {
+                const currentAgent = agents.find(a => a._id === formData.agent);
+                if (currentAgent && !currentAgent.name.toLowerCase().includes(e.target.value.toLowerCase())) {
+                  setFormData({ ...formData, agent: '' });
+                }
+              }
+            }}
+            onFocus={() => setShowAgentDropdown(true)}
+            onKeyDown={handleAgentKeyDown}
+            placeholder="Search agents..."
+            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+          />
+          {showAgentDropdown && (
+            <div
+              ref={agentListRef}
+              className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+            >
+              {filteredAgents.length > 0 ? (
+                filteredAgents.map((agent, index) => (
+                  <button
+                    key={agent._id}
+                    type="button"
+                    data-highlighted={highlightIndex === index}
+                    onClick={() => {
+                      setFormData({ ...formData, agent: agent._id });
+                      setAgentSearch(agent.name);
+                      setShowAgentDropdown(false);
+                    }}
+                    onMouseEnter={() => setHighlightIndex(index)}
+                    className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                      highlightIndex === index
+                        ? 'bg-blue-100 dark:bg-blue-900/30'
+                        : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                    }`}
+                  >
+                    {agent.name}
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                  No agents found
+                </div>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 dark:text-neutral-500 mt-1">
+            The ticket will be sent to the grader assigned to this agent.
+          </p>
+        </div>
+
+        <div>
+          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
+            Ticket ID <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            value={formData.ticketId}
+            onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
+            placeholder="e.g., INC123456"
+            required
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
+            Date Entered
+          </Label>
+          <DatePicker
+            value={formData.dateEntered}
+            onChange={(date) => setFormData({ ...formData, dateEntered: date })}
+            placeholder="Select date"
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
+            Notes
+          </Label>
+          <TicketRichTextEditor
+            value={formData.notes}
+            onChange={(html) => setFormData({ ...formData, notes: html })}
+            placeholder="Add any notes about this ticket..."
+            rows={4}
+          />
+        </div>
+
+        <DialogFooter className="gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-1.5" />
+                Send Ticket
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
   // View Ticket Details Dialog Component - Full Screen 50/50 Layout
   const ViewTicketDialogContent = () => {
     const [rightPanelMode, setRightPanelMode] = useState('ai'); // 'ai' | 'related'
 
-    if (!viewDialog.ticket) return null;
-
     const ticket = viewDialog.ticket;
+
+    // Navigation info for this ticket (must be before hooks for consistent hook order)
+    const currentIndex = ticket ? getCurrentTicketIndex(ticket._id) : -1;
+    const canGoPrev = currentIndex > 0;
+    const canGoNext = currentIndex >= 0 && currentIndex < tickets.length - 1;
+
+    // Keyboard shortcuts: Alt+Arrow for navigation in view mode
+    // Must be called before early return to maintain hook order
+    useEffect(() => {
+      if (!ticket) return;
+
+      const handleKeyDown = (e) => {
+        if (e.altKey) {
+          if (e.key === 'ArrowLeft' && canGoPrev) {
+            e.preventDefault();
+            navigateToTicket('prev', ticket._id, 'view');
+          } else if (e.key === 'ArrowRight' && canGoNext) {
+            e.preventDefault();
+            navigateToTicket('next', ticket._id, 'view');
+          }
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [ticket?._id, canGoPrev, canGoNext]);
+
+    // Early return after all hooks
+    if (!ticket) return null;
 
     // Check if user can edit this ticket
     // Non-archived tickets can always be edited
@@ -2735,13 +3430,33 @@ const QAManager = () => {
                     size="sm"
                     onClick={() => {
                       setViewDialog({ open: false, ticket: null });
-                      setTicketDialog({ open: true, mode: 'edit', data: ticket });
+                      openTicketDialog('edit', ticket);
                     }}
                   >
                     <Edit className="w-4 h-4 mr-1.5" />
                     Edit Ticket
                   </Button>
                 )}
+                {/* Navigation arrows */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => navigateToTicket('prev', ticket._id, 'view')}
+                    disabled={!canGoPrev}
+                    className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Previous ticket"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => navigateToTicket('next', ticket._id, 'view')}
+                    disabled={!canGoNext}
+                    className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Next ticket"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="w-px h-4 bg-gray-300 dark:bg-neutral-700" />
                 <button
                   onClick={() => setViewDialog({ open: false, ticket: null })}
                   className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
@@ -3253,12 +3968,99 @@ const QAManager = () => {
         onSave={() => setSaveAsMacroDialog({ open: false, feedback: '' })}
       />
 
+      {/* Send Ticket Modal */}
+      <Dialog open={sendMacroDialog.open} onOpenChange={(open) => setSendMacroDialog({ open })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Send className="w-5 h-5 text-blue-500" />
+              Send Ticket
+            </DialogTitle>
+          </DialogHeader>
+          <SendMacroForm
+            agents={allExistingAgents}
+            onSubmit={handleSendMacroTicket}
+            onCancel={() => setSendMacroDialog({ open: false })}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Decline Ticket Confirmation Modal */}
+      <Dialog open={declineConfirmDialog.open} onOpenChange={(open) => !open && setDeclineConfirmDialog({ open: false, macroTicket: null })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Decline Ticket
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-neutral-400 py-2">
+            Are you sure you want to decline this ticket? This action cannot be undone.
+          </p>
+          {declineConfirmDialog.macroTicket && (
+            <div className="bg-gray-50 dark:bg-neutral-800 rounded-lg p-3 text-sm">
+              <p><span className="text-gray-500 dark:text-neutral-400">Ticket ID:</span> {declineConfirmDialog.macroTicket.ticketId}</p>
+              <p><span className="text-gray-500 dark:text-neutral-400">Agent:</span> {declineConfirmDialog.macroTicket.agent?.name}</p>
+              <p><span className="text-gray-500 dark:text-neutral-400">From:</span> {declineConfirmDialog.macroTicket.sentBy?.name || declineConfirmDialog.macroTicket.sentBy?.email}</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setDeclineConfirmDialog({ open: false, macroTicket: null })}
+            >
+              Cancel
+            </Button>
+            <Button
+              ref={(el) => el && declineConfirmDialog.open && setTimeout(() => el.focus(), 0)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => handleDeclineMacroTicket(declineConfirmDialog.macroTicket._id)}
+            >
+              Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Confirmation Modal */}
+      <Dialog open={unsavedChangesModal.open} onOpenChange={(open) => !open && setUnsavedChangesModal({ open: false, onConfirm: null })}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Nesačuvane promene
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-neutral-400 py-2">
+            Imate nesačuvane promene na ovom tiketu. Da li ste sigurni da želite da napustite bez čuvanja?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setUnsavedChangesModal({ open: false, onConfirm: null })}
+            >
+              Otkaži
+            </Button>
+            <Button
+              ref={(el) => el && unsavedChangesModal.open && setTimeout(() => el.focus(), 0)}
+              onClick={() => {
+                if (unsavedChangesModal.onConfirm) {
+                  unsavedChangesModal.onConfirm();
+                }
+              }}
+            >
+              Izađi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Command Palette */}
       <QACommandPalette
         isOpen={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
         onTicketSelect={(ticket) => {
-          setTicketDialog({ open: true, mode: 'edit', data: ticket });
+          openTicketDialog('edit', ticket);
           setShowCommandPalette(false);
         }}
         currentFilters={filters}

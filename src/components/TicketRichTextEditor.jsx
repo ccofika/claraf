@@ -54,10 +54,167 @@ const TicketRichTextEditor = ({
     position: null
   });
 
-  // Initialize editor with HTML content
+  // Undo/Redo history with debouncing
+  // History saves on: pause in typing (500ms), word boundaries (space/enter), paste, blur
+  const historyRef = useRef([]);
+  const historyIndexRef = useRef(-1);
+  const isUndoRedoRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+  const lastSavedContentRef = useRef('');
+  const MAX_HISTORY = 50;
+  const DEBOUNCE_DELAY = 500; // ms to wait before saving after typing stops
+
+  // Save state to history (internal function)
+  const saveToHistoryInternal = useCallback((html) => {
+    if (isUndoRedoRef.current) {
+      return;
+    }
+
+    // Don't save if it's the same as the last saved state
+    if (html === lastSavedContentRef.current) {
+      return;
+    }
+
+    const history = historyRef.current;
+    const currentIndex = historyIndexRef.current;
+
+    // Remove any redo states if we're not at the end
+    if (currentIndex < history.length - 1) {
+      history.splice(currentIndex + 1);
+    }
+
+    // Add new state
+    history.push(html);
+    lastSavedContentRef.current = html;
+
+    // Limit history size
+    if (history.length > MAX_HISTORY) {
+      history.shift();
+    }
+
+    historyIndexRef.current = history.length - 1;
+  }, []);
+
+  // Debounced save - called on every input, but only saves after pause
+  const saveToHistoryDebounced = useCallback((html) => {
+    if (isUndoRedoRef.current) {
+      isUndoRedoRef.current = false;
+      return;
+    }
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer - save after pause in typing
+    debounceTimerRef.current = setTimeout(() => {
+      saveToHistoryInternal(html);
+    }, DEBOUNCE_DELAY);
+  }, [saveToHistoryInternal]);
+
+  // Immediate save - for boundaries like space, enter, paste
+  const saveToHistoryImmediate = useCallback((html) => {
+    if (isUndoRedoRef.current) {
+      isUndoRedoRef.current = false;
+      return;
+    }
+
+    // Clear any pending debounced save
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    saveToHistoryInternal(html);
+  }, [saveToHistoryInternal]);
+
+  // Undo function
+  const handleUndo = useCallback(() => {
+    // First, save current state if there are unsaved changes
+    if (editorRef.current) {
+      const currentHtml = editorRef.current.innerHTML;
+      if (currentHtml !== lastSavedContentRef.current) {
+        saveToHistoryInternal(currentHtml);
+      }
+    }
+
+    const history = historyRef.current;
+    const currentIndex = historyIndexRef.current;
+
+    if (currentIndex > 0) {
+      isUndoRedoRef.current = true;
+      historyIndexRef.current = currentIndex - 1;
+      const previousState = history[historyIndexRef.current];
+      lastSavedContentRef.current = previousState;
+
+      if (editorRef.current) {
+        // Save cursor position
+        const selection = window.getSelection();
+        const hadSelection = selection.rangeCount > 0;
+
+        editorRef.current.innerHTML = previousState;
+        onChange?.(previousState);
+
+        // Move cursor to end
+        if (hadSelection) {
+          const range = document.createRange();
+          range.selectNodeContents(editorRef.current);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  }, [onChange, saveToHistoryInternal]);
+
+  // Redo function
+  const handleRedo = useCallback(() => {
+    const history = historyRef.current;
+    const currentIndex = historyIndexRef.current;
+
+    if (currentIndex < history.length - 1) {
+      isUndoRedoRef.current = true;
+      historyIndexRef.current = currentIndex + 1;
+      const nextState = history[historyIndexRef.current];
+      lastSavedContentRef.current = nextState;
+
+      if (editorRef.current) {
+        // Save cursor position
+        const selection = window.getSelection();
+        const hadSelection = selection.rangeCount > 0;
+
+        editorRef.current.innerHTML = nextState;
+        onChange?.(nextState);
+
+        // Move cursor to end
+        if (hadSelection) {
+          const range = document.createRange();
+          range.selectNodeContents(editorRef.current);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  }, [onChange]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Initialize editor with HTML content and history
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = value || '';
+      // Initialize history with the initial value
+      historyRef.current = [value || ''];
+      historyIndexRef.current = 0;
     }
   }, []);
 
@@ -163,14 +320,22 @@ const TicketRichTextEditor = ({
     const html = e.target.innerHTML;
     onChange?.(html);
 
+    // Save to history for undo/redo (debounced - saves after typing pause)
+    saveToHistoryDebounced(html);
+
     // Check for macro trigger after input
     setTimeout(() => checkMacroTrigger(), 0);
-  }, [onChange, checkMacroTrigger]);
+  }, [onChange, checkMacroTrigger, saveToHistoryDebounced]);
 
   const handlePaste = async (e) => {
     // CRITICAL: Prevent default IMMEDIATELY before any async operations
     // Otherwise browser will perform default paste while we're collecting clipboard data
     e.preventDefault();
+
+    // Save current state to history before paste (for proper undo)
+    if (editorRef.current) {
+      saveToHistoryImmediate(editorRef.current.innerHTML);
+    }
 
     const clipboardData = e.clipboardData || window.clipboardData;
     const items = clipboardData.items;
@@ -300,6 +465,41 @@ const TicketRichTextEditor = ({
     }
   };
 
+  // URL regex pattern for detecting links
+  const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/gi;
+
+  // Create a clickable link element
+  const createLinkElement = (url) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.textContent = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.className = 'editor-link';
+    link.style.cssText = 'color: #2563eb; text-decoration: underline; cursor: pointer;';
+    return link;
+  };
+
+  // Parse text and create elements with links converted
+  const parseTextWithLinks = (text) => {
+    const fragment = document.createDocumentFragment();
+    const parts = text.split(urlRegex);
+
+    parts.forEach(part => {
+      if (!part) return;
+
+      if (urlRegex.test(part)) {
+        // Reset regex lastIndex since we're using 'g' flag
+        urlRegex.lastIndex = 0;
+        fragment.appendChild(createLinkElement(part));
+      } else {
+        fragment.appendChild(document.createTextNode(part));
+      }
+    });
+
+    return fragment;
+  };
+
   const insertPlainText = (text) => {
     if (!text || !editorRef.current) return;
 
@@ -319,7 +519,9 @@ const TicketRichTextEditor = ({
         fragment.appendChild(document.createElement('br'));
       }
       if (line) {
-        fragment.appendChild(document.createTextNode(line));
+        // Parse line for links and create appropriate elements
+        const lineFragment = parseTextWithLinks(line);
+        fragment.appendChild(lineFragment);
       }
     });
 
@@ -504,6 +706,14 @@ const TicketRichTextEditor = ({
   const handleClick = (e) => {
     const target = e.target;
 
+    // Check if clicked on a link
+    if (target.tagName === 'A' && target.href) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(target.href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // Check if clicked on an image
     if (target.tagName === 'IMG' && target.classList.contains('ticket-inline-image')) {
       e.preventDefault();
@@ -518,6 +728,30 @@ const TicketRichTextEditor = ({
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       editorRef.current?.blur();
+      return;
+    }
+
+    // Ctrl+Z for undo
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault();
+      handleUndo();
+      return;
+    }
+
+    // Ctrl+Shift+Z or Ctrl+Y for redo
+    if ((e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) ||
+        (e.key === 'y' && (e.ctrlKey || e.metaKey))) {
+      e.preventDefault();
+      handleRedo();
+      return;
+    }
+
+    // Save to history immediately on word/line boundaries (space, enter)
+    // This creates natural undo points at word and line boundaries
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (editorRef.current) {
+        saveToHistoryImmediate(editorRef.current.innerHTML);
+      }
     }
   };
 
@@ -530,6 +764,10 @@ const TicketRichTextEditor = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => {
             setIsFocused(false);
+            // Save any pending changes to history on blur
+            if (editorRef.current) {
+              saveToHistoryImmediate(editorRef.current.innerHTML);
+            }
             // Delay closing macro trigger to allow click on dropdown
             setTimeout(() => {
               if (!document.activeElement?.closest('.macro-trigger-dropdown')) {
@@ -600,6 +838,15 @@ const TicketRichTextEditor = ({
         .ticket-rich-editor img.ticket-inline-image {
           vertical-align: middle;
         }
+        .ticket-rich-editor a,
+        .ticket-rich-editor a.editor-link {
+          color: #2563eb !important;
+          text-decoration: underline !important;
+          cursor: pointer;
+        }
+        .ticket-rich-editor a:hover {
+          color: #1d4ed8 !important;
+        }
       `}</style>
     </>
   );
@@ -612,6 +859,16 @@ export const TicketContentDisplay = ({ content, className = '' }) => {
 
   const handleClick = (e) => {
     const target = e.target;
+
+    // Handle link clicks
+    if (target.tagName === 'A' && target.href) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(target.href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Handle image clicks
     if (target.tagName === 'IMG') {
       e.preventDefault();
       const fullUrl = target.getAttribute('data-full-url') || target.src;
@@ -619,15 +876,16 @@ export const TicketContentDisplay = ({ content, className = '' }) => {
     }
   };
 
-  // Process content to add proper image styling
+  // Process content to add proper image and link styling
   const processedContent = React.useMemo(() => {
     if (!content) return '';
 
-    // Parse HTML and update image styles for display
+    // Parse HTML and update styles for display
     const parser = new DOMParser();
     const doc = parser.parseFromString(content, 'text/html');
-    const images = doc.querySelectorAll('img');
 
+    // Style images
+    const images = doc.querySelectorAll('img');
     images.forEach(img => {
       img.style.cssText = `
         max-width: 100px;
@@ -643,6 +901,14 @@ export const TicketContentDisplay = ({ content, className = '' }) => {
         transition: transform 0.2s, box-shadow 0.2s;
       `;
       img.classList.add('ticket-display-image');
+    });
+
+    // Style links
+    const links = doc.querySelectorAll('a');
+    links.forEach(link => {
+      link.style.cssText = 'color: #2563eb; text-decoration: underline; cursor: pointer;';
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
     });
 
     return doc.body.innerHTML;
@@ -669,6 +935,14 @@ export const TicketContentDisplay = ({ content, className = '' }) => {
         .ticket-content-display img.ticket-display-image:hover {
           transform: scale(1.05);
           box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .ticket-content-display a {
+          color: #2563eb !important;
+          text-decoration: underline !important;
+          cursor: pointer;
+        }
+        .ticket-content-display a:hover {
+          color: #1d4ed8 !important;
         }
       `}</style>
     </>
