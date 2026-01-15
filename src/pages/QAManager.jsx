@@ -25,6 +25,7 @@ import QASummaries from '../components/QASummaries';
 import QAImportTickets from '../components/QAImportTickets';
 import StatisticsPage from '../components/statistics/StatisticsPage';
 import QAShortcutsModal from '../components/QAShortcutsModal';
+import QAActiveOverview from '../components/QAActiveOverview';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import ShareButton from '../components/Chat/ShareButton';
 import TicketRichTextEditor, { TicketContentDisplay } from '../components/TicketRichTextEditor';
@@ -51,7 +52,7 @@ const QAManager = () => {
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics', 'import-tickets'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics', 'import-tickets', 'active-overview'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -648,6 +649,34 @@ const QAManager = () => {
     } catch (err) {
       console.error('Error bulk archiving:', err);
       toast.error('Failed to archive tickets');
+    }
+  };
+
+  const [archivingAll, setArchivingAll] = useState(false);
+
+  const handleArchiveAll = async () => {
+    if (tickets.length === 0) {
+      toast.error('No tickets to archive');
+      return;
+    }
+
+    // Confirm action
+    if (!window.confirm(`Are you sure you want to archive all ${tickets.length} tickets? This will move them to the Archive tab.`)) {
+      return;
+    }
+
+    try {
+      setArchivingAll(true);
+      const allTicketIds = tickets.map(t => t._id);
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-archive`, { ticketIds: allTicketIds }, getAuthHeaders());
+      setTickets([]);
+      setSelectedTickets([]);
+      toast.success(`All ${allTicketIds.length} tickets archived successfully`);
+    } catch (err) {
+      console.error('Error archiving all tickets:', err);
+      toast.error('Failed to archive tickets');
+    } finally {
+      setArchivingAll(false);
     }
   };
 
@@ -1492,6 +1521,18 @@ const QAManager = () => {
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
           </div>
           <div className="flex items-center gap-2">
+            {tickets.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleArchiveAll}
+                disabled={archivingAll}
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+              >
+                <Archive className="w-4 h-4 mr-1.5" />
+                {archivingAll ? 'Archiving...' : 'Archive All'}
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={() => setManageMacrosDialog({ open: true })}>
               <Hash className="w-4 h-4 mr-1.5" />
               Manage Macros
@@ -3029,6 +3070,12 @@ const QAManager = () => {
                   Statistics
                 </TabsTrigger>
               )}
+              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+                <TabsTrigger value="active-overview" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                  <Target className="w-4 h-4 inline mr-1.5" />
+                  Active Overview
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
         </div>
@@ -3136,6 +3183,17 @@ const QAManager = () => {
                   transition={{ duration: duration.normal, ease: easing.smooth }}
                 >
                   <StatisticsPage />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="active-overview">
+                <motion.div
+                  key="active-overview"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: duration.normal, ease: easing.smooth }}
+                >
+                  <QAActiveOverview />
                 </motion.div>
               </TabsContent>
             </AnimatePresence>
