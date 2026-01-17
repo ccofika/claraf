@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Sparkles, X, Filter, Calendar, Tag,
-  TrendingUp, Users, FileText, Target, UserCheck, ChevronDown
+  Users, FileText, Target, UserCheck, ChevronDown
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { DatePicker } from './ui/date-picker';
@@ -14,7 +14,7 @@ import {
   easing
 } from '../utils/animations';
 
-const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders = [], isArchive = false }) => {
+const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders = [] }) => {
   const [searchMode, setSearchMode] = useState('text'); // 'ai' or 'text' - default is now 'text'
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
@@ -83,7 +83,6 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       scoreMax: 100,
       search: '',
       categories: [],
-      priority: '',
       tags: '',
       grader: '',
       searchMode: 'text'
@@ -92,7 +91,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   };
 
   const getActiveFilterCount = () => {
-    const filterKeys = ['agent', 'status', 'priority', 'tags', 'grader'];
+    const filterKeys = ['agent', 'status', 'tags', 'grader'];
     let count = 0;
 
     filterKeys.forEach(key => {
@@ -536,25 +535,6 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
               </div>
             </motion.div>
 
-            {/* Priority */}
-            <motion.div variants={staggerItem}>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                <TrendingUp className="w-3 h-3 inline mr-1" />
-                Priority
-              </label>
-              <select
-                value={currentFilters.priority || ''}
-                onChange={(e) => handleFilterChange('priority', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
-              >
-                <option value="">All priorities</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
-              </select>
-            </motion.div>
-
             {/* Status */}
             <motion.div variants={staggerItem}>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
@@ -572,8 +552,8 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
               </select>
             </motion.div>
 
-            {/* Grader - Only shown in Archive tab for admins */}
-            {isArchive && graders.length > 0 && (
+            {/* Grader */}
+            {graders.length > 0 && (
               <motion.div variants={staggerItem}>
                 <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   <UserCheck className="w-3 h-3 inline mr-1" />
@@ -627,33 +607,36 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
               />
             </motion.div>
 
-            {/* Date Range */}
-            <motion.div variants={staggerItem}>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                <Calendar className="w-3 h-3 inline mr-1" />
-                Date From
-              </label>
-              <DatePicker
-                value={currentFilters.dateFrom || ''}
-                onChange={(date) => handleFilterChange('dateFrom', date)}
-                placeholder="Select start date"
-                size="sm"
-                className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
-              />
-            </motion.div>
-
-            <motion.div variants={staggerItem}>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                <Calendar className="w-3 h-3 inline mr-1" />
-                Date To
-              </label>
-              <DatePicker
-                value={currentFilters.dateTo || ''}
-                onChange={(date) => handleFilterChange('dateTo', date)}
-                placeholder="Select end date"
-                size="sm"
-                className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
-              />
+            {/* Date Range - Full width row */}
+            <motion.div variants={staggerItem} className="col-span-full">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    <Calendar className="w-3 h-3 inline mr-1" />
+                    Date From
+                  </label>
+                  <DatePicker
+                    value={currentFilters.dateFrom || ''}
+                    onChange={(date) => handleFilterChange('dateFrom', date)}
+                    placeholder="Select start date"
+                    size="sm"
+                    className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    <Calendar className="w-3 h-3 inline mr-1" />
+                    Date To
+                  </label>
+                  <DatePicker
+                    value={currentFilters.dateTo || ''}
+                    onChange={(date) => handleFilterChange('dateTo', date)}
+                    placeholder="Select end date"
+                    size="sm"
+                    className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950"
+                  />
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         </motion.div>

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
-  Users, CheckCircle, Target, Eye, Upload, Play,
+  Users, CheckCircle, Target, Eye, Upload, Play, ClipboardList,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
   Keyboard, RefreshCw, ChevronDown, ChevronRight, ChevronLeft, AlertTriangle, Loader2, Hash, Save, Send, Check, XCircle, ExternalLink
 } from 'lucide-react';
@@ -63,6 +63,7 @@ const QAManager = () => {
   const [agents, setAgents] = useState([]);
   const [allExistingAgents, setAllExistingAgents] = useState([]); // All existing agents in system
   const [agentsForFilter, setAgentsForFilter] = useState([]); // Agents who have tickets (for filters)
+  const [graders, setGraders] = useState([]); // QA graders for filter
   const [tickets, setTickets] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [pagination, setPagination] = useState({
@@ -83,8 +84,8 @@ const QAManager = () => {
     scoreMax: 100,
     search: '',
     categories: [],
-    priority: '',
     tags: '',
+    grader: '',
     searchMode: 'text'
   });
 
@@ -98,8 +99,8 @@ const QAManager = () => {
     scoreMax: 100,
     search: '',
     categories: [],
-    priority: '',
     tags: '',
+    grader: '',
     searchMode: 'text'
   });
 
@@ -158,9 +159,14 @@ const QAManager = () => {
   const [extensionActive, setExtensionActive] = useState(false);
   const extensionLogsRef = useRef(null);
 
-  // Listen for extension messages (logs, status updates)
+  // Assignments state (for tracking MaestroQA assignments created by bot)
+  const [assignmentsDialog, setAssignmentsDialog] = useState({ open: false, agentId: null, agentName: '' });
+  const [assignments, setAssignments] = useState([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+
+  // Listen for extension messages (logs, status updates, assignments)
   useEffect(() => {
-    const handleExtensionMessage = (event) => {
+    const handleExtensionMessage = async (event) => {
       if (event.data && event.data.type === 'CLARA_EXTENSION_LOG') {
         const logEntry = {
           timestamp: new Date().toLocaleTimeString(),
@@ -184,6 +190,78 @@ const QAManager = () => {
             level: event.data.cancelled ? 'warning' : 'success'
           };
           setExtensionLogs(prev => [...prev, logEntry]);
+        }
+      } else if (event.data && event.data.type === 'CLARA_ASSIGNMENT_CREATED') {
+        // Assignment created by extension - save to backend
+        try {
+          const data = event.data.data;
+          await axios.post(`${API_URL}/api/qa/assignments`, {
+            agentId: data.agentId,
+            assignmentName: data.assignmentName,
+            ticketIds: data.ticketIds,
+            rubricName: data.rubricName,
+            qaEmail: data.qaEmail
+          }, getAuthHeaders());
+          console.log('Assignment saved to backend:', data.assignmentName);
+        } catch (err) {
+          console.error('Failed to save assignment:', err);
+        }
+      } else if (event.data && event.data.type === 'CLARA_TICKET_GRADED') {
+        // Ticket graded - update ticket in Clara and mark in assignment
+        try {
+          const data = event.data.data;
+          console.log('Received CLARA_TICKET_GRADED:', data);
+
+          // Update the ticket in Clara with quality score and status change
+          if (data.ticketObjectId && data.qualityScore !== null && data.qualityScore !== undefined) {
+            try {
+              await axios.post(
+                `${API_URL}/api/qa/tickets/${data.ticketObjectId}/grade`,
+                { qualityScorePercent: data.qualityScore },
+                getAuthHeaders()
+              );
+              console.log(`Ticket ${data.ticketId} updated with score ${data.qualityScore}% and status Graded`);
+            } catch (gradeErr) {
+              console.error('Failed to update ticket score:', gradeErr);
+            }
+          } else {
+            console.log('Missing ticketObjectId or qualityScore, skipping ticket update');
+          }
+
+          // Mark ticket as graded in assignment tracking
+          const activeRes = await axios.get(
+            `${API_URL}/api/qa/assignments/${data.agentId}/active`,
+            getAuthHeaders()
+          );
+          if (activeRes.data.assignment) {
+            await axios.post(
+              `${API_URL}/api/qa/assignments/${activeRes.data.assignment._id}/graded/${data.ticketId}`,
+              {},
+              getAuthHeaders()
+            );
+            console.log('Ticket marked as graded in assignment:', data.ticketId);
+          }
+        } catch (err) {
+          console.error('Failed to process ticket graded:', err);
+        }
+      } else if (event.data && event.data.type === 'CLARA_TASK_COMPLETED') {
+        // Task completed - update assignment status
+        try {
+          const data = event.data.data;
+          const activeRes = await axios.get(
+            `${API_URL}/api/qa/assignments/${data.agentId}/active`,
+            getAuthHeaders()
+          );
+          if (activeRes.data.assignment) {
+            await axios.put(
+              `${API_URL}/api/qa/assignments/${activeRes.data.assignment._id}`,
+              { status: 'completed', completedAt: new Date() },
+              getAuthHeaders()
+            );
+            console.log('Assignment marked as completed');
+          }
+        } catch (err) {
+          console.error('Failed to mark assignment as completed:', err);
         }
       }
     };
@@ -343,6 +421,7 @@ const QAManager = () => {
     fetchAgentsForFilter(); // Fetch all agents with tickets for filters
     fetchAllExistingAgents(); // Fetch all existing agents for Send Ticket modal
     fetchPendingMacroTickets(); // Fetch pending macro tickets from other graders
+    fetchGraders(); // Fetch QA graders for filter
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -558,6 +637,17 @@ const QAManager = () => {
     }
   };
 
+  // Fetch graders for filter
+  const fetchGraders = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/analytics/graders`, getAuthHeaders());
+      setGraders(response.data);
+    } catch (err) {
+      console.error('Error fetching graders:', err);
+      // Don't show error toast - graders filter is optional
+    }
+  };
+
   // Fetch agent's unresolved issues when expanding
   const fetchAgentIssues = async (agentId) => {
     try {
@@ -663,7 +753,7 @@ const QAManager = () => {
       if (filters.categories && filters.categories.length > 0) {
         params.append('categories', filters.categories.join(','));
       }
-      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.grader) params.append('createdBy', filters.grader);
       params.append('isArchived', activeTab === 'archive');
 
       if (useAISearch) {
@@ -1228,6 +1318,28 @@ const QAManager = () => {
 
       const selectedTickets = validation.tickets;
 
+      // Check for existing active assignment for this agent
+      let hasExistingAssignment = false;
+      let existingAssignmentName = null;
+      let gradedTicketIds = [];
+
+      try {
+        const assignmentRes = await axios.get(
+          `${API_URL}/api/qa/assignments/${agentId}/active`,
+          getAuthHeaders()
+        );
+        if (assignmentRes.data.assignment) {
+          hasExistingAssignment = true;
+          existingAssignmentName = assignmentRes.data.assignment.assignmentName;
+          gradedTicketIds = assignmentRes.data.assignment.gradedTicketIds || [];
+          console.log('Found existing assignment:', existingAssignmentName);
+          console.log('Already graded tickets:', gradedTicketIds);
+        }
+      } catch (err) {
+        // No existing assignment, will create new one
+        console.log('No existing assignment found, will create new one');
+      }
+
       // Get the CSV content for the extension
       const csvResponse = await axios.post(
         `${API_URL}/api/qa/export/maestro/${agentId}`,
@@ -1249,6 +1361,10 @@ const QAManager = () => {
         csvContent: csvResponse.data,
         fileName: `${agent.name.replace(/\s+/g, '_')}_tickets.csv`,
         qaEmail: userEmail,
+        // Existing assignment info
+        hasExistingAssignment: hasExistingAssignment,
+        existingAssignmentName: existingAssignmentName,
+        gradedTicketIds: gradedTicketIds,
         tickets: selectedTickets.map(t => ({
           _id: t._id,
           ticketId: t.ticketId,
@@ -1267,7 +1383,8 @@ const QAManager = () => {
         data: taskData
       }, '*');
 
-      toast.success(`Starting grading for ${agent.name} (${selectedTickets.length} tickets)`);
+      const mode = hasExistingAssignment ? 'adding to existing' : 'creating new';
+      toast.success(`Starting grading for ${agent.name} (${selectedTickets.length} tickets, ${mode} assignment)`);
 
       // Also try to communicate with extension directly if it's installed
       // This uses a custom event that the extension can listen to
@@ -1289,6 +1406,32 @@ const QAManager = () => {
     }));
     // Switch to tickets tab
     setActiveTab('tickets');
+  };
+
+  // View assignments for an agent
+  const handleViewAssignments = async (agentId) => {
+    const agent = agents.find(a => a._id === agentId);
+    if (!agent) {
+      toast.error('Agent not found');
+      return;
+    }
+
+    setAssignmentsDialog({ open: true, agentId, agentName: agent.name });
+    setAssignmentsLoading(true);
+
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/assignments/${agentId}`,
+        getAuthHeaders()
+      );
+      setAssignments(response.data.assignments || []);
+    } catch (err) {
+      console.error('Error fetching assignments:', err);
+      toast.error('Failed to load assignments');
+      setAssignments([]);
+    } finally {
+      setAssignmentsLoading(false);
+    }
   };
 
   const handleExportSelectedTickets = async () => {
@@ -1617,13 +1760,6 @@ const QAManager = () => {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          <Button
-            onClick={handleExportSelectedTickets}
-            size="sm"
-          >
-            <Download className="w-4 h-4 mr-1.5" />
-            Export Selected
-          </Button>
         </div>
 
         {/* Stats Grid */}
@@ -1765,6 +1901,20 @@ const QAManager = () => {
                           >
                             <Download className="w-3.5 h-3.5" />
                             Export
+                          </button>
+                          <button
+                            onClick={() => handleStartGrading(stat.agentId)}
+                            className="text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 flex items-center gap-1.5 transition-colors"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            Grade
+                          </button>
+                          <button
+                            onClick={() => handleViewAssignments(stat.agentId)}
+                            className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-1.5 transition-colors"
+                          >
+                            <ClipboardList className="w-3.5 h-3.5" />
+                            Assignments
                           </button>
                         </div>
                       </td>
@@ -2057,6 +2207,7 @@ const QAManager = () => {
             currentFilters={ticketsFilters}
             onFilterChange={setTicketsFilters}
             agents={agents}
+            graders={graders}
           />
         </div>
 
@@ -2396,31 +2547,17 @@ const QAManager = () => {
             currentFilters={archiveFilters}
             onFilterChange={setArchiveFilters}
             agents={agentsForFilter}
+            graders={graders}
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Archive</h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
-              {isAISearch
-                ? `Found ${tickets.length} semantically similar tickets`
-                : 'Archived tickets from all QA agents'}
-            </p>
-          </div>
-          {/* Regenerate Embeddings Button - useful when switching models or updating ticket content */}
-          <button
-            onClick={handleRegenerateEmbeddings}
-            disabled={regeneratingEmbeddings}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg
-              bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300
-              hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Regenerate AI embeddings for better semantic search"
-          >
-            <Zap className="w-3.5 h-3.5" />
-            {regeneratingEmbeddings ? 'Regenerating...' : 'Refresh AI Index'}
-          </button>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Archive</h2>
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+            {isAISearch
+              ? `Found ${tickets.length} semantically similar tickets`
+              : 'Archived tickets from all QA agents'}
+          </p>
         </div>
 
         {loading ? (
@@ -4281,6 +4418,100 @@ const QAManager = () => {
       {feedbackDialog.open && <FeedbackDialogContent />}
       {viewDialog.open && <ViewTicketDialogContent />}
       {deleteDialog.open && <DeleteDialogContent />}
+
+      {/* Assignments Dialog */}
+      <Dialog open={assignmentsDialog.open} onOpenChange={(open) => setAssignmentsDialog({ ...assignmentsDialog, open })}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-purple-500" />
+              Assignments - {assignmentsDialog.agentName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {assignmentsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 dark:text-neutral-400">
+                <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No assignments found for this agent</p>
+                <p className="text-xs mt-1">Assignments will appear here after the bot creates them</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {assignments.map((assignment) => (
+                  <div
+                    key={assignment._id}
+                    className="p-4 border border-gray-200 dark:border-neutral-700 rounded-lg bg-gray-50 dark:bg-neutral-800/50"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">{assignment.assignmentName}</h4>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400">
+                          Created: {new Date(assignment.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          assignment.status === 'completed'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : assignment.status === 'in_progress'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300'
+                        }`}>
+                          {assignment.status === 'completed' ? 'Completed' : assignment.status === 'in_progress' ? 'In Progress' : 'Created'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500 dark:text-neutral-400">Total Tickets:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-white">{assignment.ticketIds?.length || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 dark:text-neutral-400">Graded:</span>
+                        <span className="ml-2 font-medium text-green-600 dark:text-green-400">{assignment.gradedTicketIds?.length || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 dark:text-neutral-400">Pending:</span>
+                        <span className="ml-2 font-medium text-orange-600 dark:text-orange-400">
+                          {(assignment.ticketIds?.length || 0) - (assignment.gradedTicketIds?.length || 0)}
+                        </span>
+                      </div>
+                    </div>
+                    {assignment.ticketIds && assignment.ticketIds.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-neutral-700">
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Ticket IDs:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {assignment.ticketIds.slice(0, 10).map((ticketId, idx) => (
+                            <span
+                              key={idx}
+                              className={`px-1.5 py-0.5 text-xs rounded ${
+                                assignment.gradedTicketIds?.includes(ticketId)
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300'
+                              }`}
+                            >
+                              {ticketId}
+                            </span>
+                          ))}
+                          {assignment.ticketIds.length > 10 && (
+                            <span className="px-1.5 py-0.5 text-xs text-gray-400">
+                              +{assignment.ticketIds.length - 10} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Macro Modals */}
       <ManageMacrosModal
