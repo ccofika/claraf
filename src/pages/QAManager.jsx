@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
-  Users, CheckCircle, Target, Eye, Upload,
+  Users, CheckCircle, Target, Eye, Upload, Play,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
   Keyboard, RefreshCw, ChevronDown, ChevronRight, ChevronLeft, AlertTriangle, Loader2, Hash, Save, Send, Check, XCircle, ExternalLink
 } from 'lucide-react';
@@ -35,6 +35,8 @@ import ManageMacrosModal from '../components/ManageMacrosModal';
 import ChooseMacroModal from '../components/ChooseMacroModal';
 import SaveAsMacroModal from '../components/SaveAsMacroModal';
 import { useMacros } from '../hooks/useMacros';
+import ScorecardEditor from '../components/ScorecardEditor';
+import { getScorecardConfig, getScorecardValues, getScorecardCategories, hasScorecard, requiresVariantSelection } from '../data/scorecardConfig';
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -135,12 +137,77 @@ const QAManager = () => {
     notes: '',
     feedback: '',
     dateEntered: null,
-    categories: []
+    categories: [],
+    scorecardVariant: null,
+    scorecardValues: {}
   });
 
   // Agent expansion state (for showing unresolved issues)
   const [expandedAgentId, setExpandedAgentId] = useState(null);
   const [agentIssues, setAgentIssues] = useState({ loading: false, data: null });
+
+  // Validation state for grading prerequisites
+  const [validationErrors, setValidationErrors] = useState({
+    invalidTickets: {}, // { ticketId: { missing: ['feedback', 'categories', ...] } }
+    highlightedAgentId: null, // Agent ID that needs maestroName
+    validationMode: false // Whether we're showing validation errors
+  });
+
+  // Extension logs state
+  const [extensionLogs, setExtensionLogs] = useState([]);
+  const [extensionActive, setExtensionActive] = useState(false);
+  const extensionLogsRef = useRef(null);
+
+  // Listen for extension messages (logs, status updates)
+  useEffect(() => {
+    const handleExtensionMessage = (event) => {
+      if (event.data && event.data.type === 'CLARA_EXTENSION_LOG') {
+        const logEntry = {
+          timestamp: new Date().toLocaleTimeString(),
+          message: event.data.message,
+          level: event.data.level || 'info'
+        };
+        setExtensionLogs(prev => [...prev, logEntry]);
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          if (extensionLogsRef.current) {
+            extensionLogsRef.current.scrollTop = extensionLogsRef.current.scrollHeight;
+          }
+        }, 50);
+      } else if (event.data && event.data.type === 'CLARA_EXTENSION_STATUS') {
+        setExtensionActive(event.data.active);
+        if (!event.data.active) {
+          // Extension finished or cancelled
+          const logEntry = {
+            timestamp: new Date().toLocaleTimeString(),
+            message: event.data.reason || 'Extension stopped',
+            level: event.data.cancelled ? 'warning' : 'success'
+          };
+          setExtensionLogs(prev => [...prev, logEntry]);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleExtensionMessage);
+    return () => window.removeEventListener('message', handleExtensionMessage);
+  }, []);
+
+  // Cancel extension grading
+  const handleCancelExtension = () => {
+    window.postMessage({ type: 'CLARA_CANCEL_GRADING' }, '*');
+    const event = new CustomEvent('clara-cancel-grading');
+    document.dispatchEvent(event);
+    setExtensionLogs(prev => [...prev, {
+      timestamp: new Date().toLocaleTimeString(),
+      message: 'Cancel signal sent to extension...',
+      level: 'warning'
+    }]);
+  };
+
+  // Clear extension logs
+  const handleClearExtensionLogs = () => {
+    setExtensionLogs([]);
+  };
 
   // Selection state
   const [selectedTickets, setSelectedTickets] = useState([]);
@@ -159,9 +226,15 @@ const QAManager = () => {
         notes: '',
         feedback: '',
         dateEntered: new Date().toISOString().split('T')[0],
-        categories: []
+        categories: [],
+        scorecardVariant: null,
+        scorecardValues: {}
       };
     } else if (mode === 'edit' && data) {
+      // Get scorecard values (plain object from backend)
+      const scorecardValuesObj = data.scorecardValues && typeof data.scorecardValues === 'object'
+        ? { ...data.scorecardValues }
+        : {};
       ticketFormDataRef.current = {
         agent: data.agent?._id || data.agent || '',
         ticketId: data.ticketId || '',
@@ -170,7 +243,9 @@ const QAManager = () => {
         notes: data.notes || '',
         feedback: data.feedback || '',
         qualityScorePercent: data.qualityScorePercent !== undefined ? data.qualityScorePercent : '',
-        categories: data.categories || []
+        categories: data.categories || [],
+        scorecardVariant: data.scorecardVariant || null,
+        scorecardValues: scorecardValuesObj
       };
     }
     setTicketDialog({ open: true, mode, data });
@@ -229,6 +304,22 @@ const QAManager = () => {
       fetchAgents();
     } else if (activeTab === 'tickets' || activeTab === 'archive') {
       fetchTickets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Track previous tab for validation clearing logic
+  const prevTabRef = useRef(activeTab);
+
+  // Clear validation errors only when switching AWAY from the tab showing errors
+  useEffect(() => {
+    const prevTab = prevTabRef.current;
+    prevTabRef.current = activeTab;
+
+    // Only clear if we were on tickets tab (where errors show) and now switching away
+    // This allows the validation to set errors AND switch to tickets without clearing
+    if (validationErrors.validationMode && prevTab === 'tickets' && activeTab !== 'tickets') {
+      clearValidationErrors();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -677,6 +768,11 @@ const QAManager = () => {
       setAgents(agents.map(a => a._id === id ? response.data : a));
       setAgentDialog({ open: false, mode: 'create', data: null });
       toast.success('Agent updated successfully');
+
+      // Clear validation errors if maestroName was added for the highlighted agent
+      if (validationErrors.highlightedAgentId === id && formData.maestroName) {
+        clearValidationErrors();
+      }
     } catch (err) {
       console.error('Error updating agent:', err);
       toast.error(err.response?.data?.message || 'Failed to update agent');
@@ -738,7 +834,24 @@ const QAManager = () => {
   // Ticket CRUD
   const handleCreateTicket = async (formData) => {
     try {
-      const response = await axios.post(`${API_URL}/api/qa/tickets`, formData, getAuthHeaders());
+      // Build clean request body to ensure all fields are sent
+      const requestBody = {
+        agent: formData.agent,
+        ticketId: formData.ticketId,
+        status: formData.status,
+        dateEntered: formData.dateEntered,
+        notes: formData.notes,
+        feedback: formData.feedback,
+        qualityScorePercent: formData.qualityScorePercent,
+        categories: formData.categories,
+        scorecardVariant: formData.scorecardVariant,
+        scorecardValues: formData.scorecardValues
+      };
+      console.log('Creating ticket with requestBody:', requestBody);
+      console.log('Scorecard variant:', requestBody.scorecardVariant);
+      console.log('Scorecard values:', requestBody.scorecardValues);
+      const response = await axios.post(`${API_URL}/api/qa/tickets`, requestBody, getAuthHeaders());
+      console.log('Created ticket response:', response.data);
       const currentTickets = Array.isArray(tickets) ? tickets : [];
       setTickets([response.data, ...currentTickets]);
       setTicketDialog({ open: false, mode: 'create', data: null });
@@ -751,15 +864,46 @@ const QAManager = () => {
 
   const handleUpdateTicket = async (id, formData) => {
     try {
-      console.log('Updating ticket with formData:', formData);
-      console.log('Categories being sent:', formData.categories);
-      const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, formData, getAuthHeaders());
+      // Build clean request body to ensure all fields are sent
+      const requestBody = {
+        agent: formData.agent,
+        ticketId: formData.ticketId,
+        status: formData.status,
+        dateEntered: formData.dateEntered,
+        notes: formData.notes,
+        feedback: formData.feedback,
+        qualityScorePercent: formData.qualityScorePercent,
+        categories: formData.categories,
+        scorecardVariant: formData.scorecardVariant,
+        scorecardValues: formData.scorecardValues
+      };
+      console.log('Updating ticket with requestBody:', requestBody);
+      console.log('Categories being sent:', requestBody.categories);
+      console.log('Scorecard variant being sent:', requestBody.scorecardVariant);
+      console.log('Scorecard values being sent:', requestBody.scorecardValues);
+      const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, requestBody, getAuthHeaders());
       console.log('Response from server:', response.data);
       console.log('Categories in response:', response.data.categories);
+      console.log('Scorecard in response:', response.data.scorecardVariant, response.data.scorecardValues);
       const currentTickets = Array.isArray(tickets) ? tickets : [];
       setTickets(currentTickets.map(t => t._id === id ? response.data : t));
       setTicketDialog({ open: false, mode: 'create', data: null });
       toast.success('Ticket updated successfully');
+
+      // Clear validation error for this ticket if it was fixed
+      if (validationErrors.invalidTickets[id]) {
+        setValidationErrors(prev => {
+          const newInvalidTickets = { ...prev.invalidTickets };
+          delete newInvalidTickets[id];
+          // If no more invalid tickets, clear validation mode
+          const hasRemainingErrors = Object.keys(newInvalidTickets).length > 0;
+          return {
+            ...prev,
+            invalidTickets: newInvalidTickets,
+            validationMode: hasRemainingErrors
+          };
+        });
+      }
     } catch (err) {
       console.error('Error updating ticket:', err);
       toast.error(err.response?.data?.message || 'Failed to update ticket');
@@ -943,6 +1087,196 @@ const QAManager = () => {
       console.error('Error exporting selected tickets:', err);
       console.error('Error details:', err.response?.data);
       toast.error(err.response?.data?.message || 'Failed to export selected tickets');
+    }
+  };
+
+  // Start grading with Chrome extension
+  // Validate ticket for grading - returns array of missing fields
+  const validateTicketForGrading = (ticket, agentPosition) => {
+    const missing = [];
+
+    // Check ticket ID
+    if (!ticket.ticketId) {
+      missing.push('Ticket ID');
+    }
+
+    // Check scorecard variant for Senior position FIRST (needed to get correct fields)
+    const isSenior = agentPosition?.toLowerCase().includes('senior');
+    if (isSenior && !ticket.scorecardVariant) {
+      missing.push('Scorecard Type');
+    }
+
+    // Get expected scorecard fields based on position and variant
+    const expectedFields = getScorecardValues(agentPosition, ticket.scorecardVariant);
+
+    if (expectedFields.length === 0) {
+      // Position doesn't have a scorecard config
+      missing.push('Scorecard Configuration');
+    } else {
+      // Check that ALL expected fields exist and have values
+      const missingFields = [];
+      for (const field of expectedFields) {
+        const value = ticket.scorecardValues?.[field.key];
+        if (value === null || value === undefined) {
+          missingFields.push(field.label);
+        }
+      }
+
+      if (missingFields.length > 0) {
+        missing.push(`Scorecard: ${missingFields.join(', ')}`);
+      }
+    }
+
+    // Check categories - must have at least one
+    if (!ticket.categories || ticket.categories.length === 0) {
+      missing.push('Categories');
+    }
+
+    // Check feedback
+    if (!ticket.feedback || ticket.feedback.trim() === '') {
+      missing.push('Feedback');
+    }
+
+    return missing;
+  };
+
+  // Validate all tickets for an agent before grading
+  const validateGradingPrerequisites = async (agentId) => {
+    const agent = agents.find(a => a._id === agentId);
+    if (!agent) {
+      return { valid: false, error: 'Agent not found' };
+    }
+
+    // Check maestroName first
+    if (!agent.maestroName) {
+      setValidationErrors({
+        invalidTickets: {},
+        highlightedAgentId: agentId,
+        validationMode: true
+      });
+      setActiveTab('agents');
+      toast.error('MaestroQA name missing. Please add it to continue.');
+      return { valid: false, error: 'maestroName' };
+    }
+
+    // Get selected tickets for this agent
+    const ticketsResponse = await axios.get(
+      `${API_URL}/api/qa/tickets?agent=${agentId}&status=Selected&isArchived=false&limit=1000`,
+      getAuthHeaders()
+    );
+    const selectedTickets = ticketsResponse.data.tickets || [];
+
+    if (selectedTickets.length === 0) {
+      return { valid: false, error: 'No selected tickets found for this agent' };
+    }
+
+    // Validate each ticket
+    const invalidTickets = {};
+    for (const ticket of selectedTickets) {
+      const missing = validateTicketForGrading(ticket, agent.position);
+      if (missing.length > 0) {
+        invalidTickets[ticket._id] = { missing, ticketId: ticket.ticketId };
+      }
+    }
+
+    // If any tickets are invalid, show them
+    if (Object.keys(invalidTickets).length > 0) {
+      setValidationErrors({
+        invalidTickets,
+        highlightedAgentId: null,
+        validationMode: true
+      });
+      // Navigate to tickets tab with agent filter
+      setTicketsFilters(prev => ({
+        ...prev,
+        agent: agentId,
+        status: 'Selected'
+      }));
+      setActiveTab('tickets');
+      toast.error(`${Object.keys(invalidTickets).length} ticket(s) have missing information. Please complete them to continue.`);
+      return { valid: false, error: 'invalidTickets', invalidTickets };
+    }
+
+    return { valid: true, tickets: selectedTickets };
+  };
+
+  // Clear validation errors
+  const clearValidationErrors = () => {
+    setValidationErrors({
+      invalidTickets: {},
+      highlightedAgentId: null,
+      validationMode: false
+    });
+  };
+
+  const handleStartGrading = async (agentId) => {
+    try {
+      // Clear any previous validation errors
+      clearValidationErrors();
+
+      const agent = agents.find(a => a._id === agentId);
+      if (!agent) {
+        toast.error('Agent not found');
+        return;
+      }
+
+      // Validate prerequisites
+      const validation = await validateGradingPrerequisites(agentId);
+      if (!validation.valid) {
+        return; // Validation function handles the UI updates
+      }
+
+      const selectedTickets = validation.tickets;
+
+      // Get the CSV content for the extension
+      const csvResponse = await axios.post(
+        `${API_URL}/api/qa/export/maestro/${agentId}`,
+        {},
+        { ...getAuthHeaders(), responseType: 'text' }
+      );
+
+      // Get user email from auth context
+      const userEmail = user?.email || '';
+
+      // Prepare task data for extension
+      const taskData = {
+        agentId: agent._id,
+        agentName: agent.name,
+        maestroName: agent.maestroName,
+        position: agent.position,
+        rubricName: agent.position, // e.g., "Senior Scorecard"
+        ticketCount: selectedTickets.length,
+        csvContent: csvResponse.data,
+        fileName: `${agent.name.replace(/\s+/g, '_')}_tickets.csv`,
+        qaEmail: userEmail,
+        tickets: selectedTickets.map(t => ({
+          _id: t._id,
+          ticketId: t.ticketId,
+          scorecardValues: t.scorecardValues,
+          scorecardVariant: t.scorecardVariant,
+          categories: t.categories,
+          feedback: t.feedback,
+          notes: t.notes
+        }))
+      };
+
+      // Send message to extension via window.postMessage
+      // The extension content script will listen for this
+      window.postMessage({
+        type: 'CLARA_START_GRADING',
+        data: taskData
+      }, '*');
+
+      toast.success(`Starting grading for ${agent.name} (${selectedTickets.length} tickets)`);
+
+      // Also try to communicate with extension directly if it's installed
+      // This uses a custom event that the extension can listen to
+      const event = new CustomEvent('clara-start-grading', { detail: taskData });
+      document.dispatchEvent(event);
+
+    } catch (err) {
+      console.error('Error starting grading:', err);
+      toast.error(err.response?.data?.message || 'Failed to start grading');
     }
   };
 
@@ -1329,9 +1663,9 @@ const QAManager = () => {
           <motion.div variants={staggerItem}>
             <StatCard
               icon={Users}
-              label="Active Agents"
-              value={dashboardStats.activeAgents || 0}
-              trend={`${agents.length || 0} total agents`}
+              label="Total Agents"
+              value={agents.length || 0}
+              trend="In your roster"
               accent="purple"
             />
           </motion.div>
@@ -1504,16 +1838,23 @@ const QAManager = () => {
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Position</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Team</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
                 {sortedAgents.map((agent) => {
                   const isExpanded = expandedAgentId === agent._id;
+                  const isHighlightedForValidation = validationErrors.validationMode && validationErrors.highlightedAgentId === agent._id;
                   return (
                     <React.Fragment key={agent._id}>
-                      <tr className="group hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
+                      <tr
+                        className={`group transition-colors ${
+                          isHighlightedForValidation
+                            ? 'bg-red-50 dark:bg-red-900/20 ring-2 ring-red-400 dark:ring-red-500 ring-inset'
+                            : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
+                        }`}
+                        title={isHighlightedForValidation ? 'MaestroQA Name is required' : ''}
+                      >
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleAgentExpand(agent._id)}
@@ -1531,14 +1872,14 @@ const QAManager = () => {
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.position || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-neutral-500">{agent.team || '-'}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            agent.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400'
-                          }`}>
-                            {agent.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleStartGrading(agent._id)}
+                              className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+                              title="Start Grading (Extension)"
+                            >
+                              <Play className="w-4 h-4 text-gray-500 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400" />
+                            </button>
                             <button
                               onClick={() => handleViewAgentTickets(agent._id)}
                               className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
@@ -1555,10 +1896,14 @@ const QAManager = () => {
                             </button>
                             <button
                               onClick={() => setAgentDialog({ open: true, mode: 'edit', data: agent })}
-                              className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded transition-colors"
-                              title="Edit"
+                              className={`p-1.5 rounded transition-colors ${
+                                isHighlightedForValidation
+                                  ? 'bg-red-100 dark:bg-red-900/50 ring-2 ring-red-400 dark:ring-red-500 animate-pulse'
+                                  : 'hover:bg-gray-200 dark:hover:bg-neutral-700'
+                              }`}
+                              title={isHighlightedForValidation ? 'Click to add MaestroQA Name' : 'Edit'}
                             >
-                              <Edit className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+                              <Edit className={`w-4 h-4 ${isHighlightedForValidation ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-neutral-400'}`} />
                             </button>
                             <button
                               onClick={() => setDeleteDialog({ open: true, type: 'agent', id: agent._id, name: agent.name })}
@@ -1646,6 +1991,54 @@ const QAManager = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Extension Logs Panel */}
+        {extensionLogs.length > 0 && (
+          <div className="mt-6 bg-gray-900 dark:bg-black border border-gray-700 dark:border-neutral-800 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 dark:bg-neutral-900 border-b border-gray-700 dark:border-neutral-800">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${extensionActive ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+                <span className="text-sm font-medium text-white">Extension Logs</span>
+                <span className="text-xs text-gray-400">({extensionLogs.length} entries)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {extensionActive && (
+                  <button
+                    onClick={handleCancelExtension}
+                    className="px-3 py-1 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  onClick={handleClearExtensionLogs}
+                  className="px-3 py-1 text-xs font-medium bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div
+              ref={extensionLogsRef}
+              className="p-3 max-h-64 overflow-y-auto font-mono text-xs space-y-1"
+            >
+              {extensionLogs.map((log, idx) => (
+                <div
+                  key={idx}
+                  className={`flex gap-2 ${
+                    log.level === 'error' ? 'text-red-400' :
+                    log.level === 'warning' ? 'text-yellow-400' :
+                    log.level === 'success' ? 'text-green-400' :
+                    'text-gray-300'
+                  }`}
+                >
+                  <span className="text-gray-500 flex-shrink-0">[{log.timestamp}]</span>
+                  <span className="break-all">{log.message}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1848,11 +2241,12 @@ const QAManager = () => {
             />
           </div>
         ) : (
-          <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
+          <div className="py-4 -my-4 px-2 -mx-2 overflow-visible">
+            <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-visible">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800 rounded-t-lg">
                 <tr>
-                  <th className="px-4 py-2.5 w-8">
+                  <th className="px-4 py-2.5 w-8 rounded-tl-lg">
                     <input
                       type="checkbox"
                       checked={selectedTickets.length === tickets.length && tickets.length > 0}
@@ -1871,19 +2265,28 @@ const QAManager = () => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Date</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Score</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider rounded-tr-lg">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-neutral-800" ref={ticketListRef}>
-                {sortedTickets.map((ticket, index) => (
+                {sortedTickets.map((ticket, index) => {
+                  const ticketValidationError = validationErrors.invalidTickets[ticket._id];
+                  const hasValidationError = validationErrors.validationMode && ticketValidationError;
+
+                  return (
                   <tr
                     key={ticket._id}
                     data-ticket-index={index}
-                    className={`group transition-colors cursor-pointer ${
-                      focusedTicketIndex === index
+                    className={`group transition-colors cursor-pointer relative ${
+                      hasValidationError
+                        ? 'bg-red-50 dark:bg-red-900/20'
+                        : focusedTicketIndex === index
                         ? 'bg-blue-50 dark:bg-blue-900/20'
                         : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
                     }`}
+                    style={hasValidationError ? {
+                      boxShadow: '0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 0 2px rgba(239, 68, 68, 0.6)'
+                    } : undefined}
                     onClick={(e) => {
                       // Don't open dialog if clicking on checkbox or action buttons
                       if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) {
@@ -1893,6 +2296,15 @@ const QAManager = () => {
                       setViewDialog({ open: true, ticket });
                     }}
                   >
+                    {/* Validation error tooltip */}
+                    {hasValidationError && (
+                      <div className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
+                          <span className="text-red-400 dark:text-red-600 font-semibold">Missing:</span> {ticketValidationError.missing.join(', ')}
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900 dark:border-t-gray-100" />
+                        </div>
+                      </div>
+                    )}
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -1953,15 +2365,17 @@ const QAManager = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
-            </table>
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              totalItems={pagination.total}
-              onPageChange={handlePageChange}
-            />
+              </table>
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -2148,9 +2562,7 @@ const QAManager = () => {
       name: '',
       position: '',
       team: '',
-      goalMinDate: '',
-      goalMaxDate: '',
-      isActive: true
+      maestroName: ''
     });
 
     useEffect(() => {
@@ -2159,18 +2571,14 @@ const QAManager = () => {
           name: agentDialog.data.name || '',
           position: agentDialog.data.position || '',
           team: agentDialog.data.team || '',
-          goalMinDate: agentDialog.data.goalMinDate ? new Date(agentDialog.data.goalMinDate).toISOString().split('T')[0] : '',
-          goalMaxDate: agentDialog.data.goalMaxDate ? new Date(agentDialog.data.goalMaxDate).toISOString().split('T')[0] : '',
-          isActive: agentDialog.data.isActive !== undefined ? agentDialog.data.isActive : true
+          maestroName: agentDialog.data.maestroName || ''
         });
       } else {
         setFormData({
           name: '',
           position: '',
           team: '',
-          goalMinDate: '',
-          goalMaxDate: '',
-          isActive: true
+          maestroName: ''
         });
       }
     }, [agentDialog.data]);
@@ -2236,34 +2644,33 @@ const QAManager = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Goal Min Date</Label>
-                <DatePicker
-                  value={formData.goalMinDate}
-                  onChange={(value) => setFormData({ ...formData, goalMinDate: value })}
-                  className="text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5">Goal Max Date</Label>
-                <DatePicker
-                  value={formData.goalMaxDate}
-                  onChange={(value) => setFormData({ ...formData, goalMaxDate: value })}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="rounded border-gray-300 dark:border-neutral-600"
+            <div>
+              <Label className={`text-xs mb-1.5 ${
+                validationErrors.validationMode && validationErrors.highlightedAgentId === agentDialog.data?._id && !formData.maestroName
+                  ? 'text-red-600 dark:text-red-400 font-medium'
+                  : 'text-gray-600 dark:text-neutral-400'
+              }`}>
+                MaestroQA Name {validationErrors.validationMode && validationErrors.highlightedAgentId === agentDialog.data?._id && !formData.maestroName && <span className="text-red-500">*</span>}
+              </Label>
+              <Input
+                value={formData.maestroName}
+                onChange={(e) => setFormData({ ...formData, maestroName: e.target.value })}
+                placeholder="Agent name as it appears in MaestroQA"
+                className={`text-sm ${
+                  validationErrors.validationMode && validationErrors.highlightedAgentId === agentDialog.data?._id && !formData.maestroName
+                    ? 'ring-2 ring-red-400 dark:ring-red-500 border-red-400 dark:border-red-500 focus:ring-red-500'
+                    : ''
+                }`}
               />
-              <Label htmlFor="isActive" className="text-xs text-gray-600 dark:text-neutral-400">Active Agent</Label>
+              <p className={`text-[10px] mt-1 ${
+                validationErrors.validationMode && validationErrors.highlightedAgentId === agentDialog.data?._id && !formData.maestroName
+                  ? 'text-red-500 dark:text-red-400'
+                  : 'text-gray-400 dark:text-neutral-500'
+              }`}>
+                {validationErrors.validationMode && validationErrors.highlightedAgentId === agentDialog.data?._id && !formData.maestroName
+                  ? 'Required for grading. Enter the agent name as it appears in MaestroQA.'
+                  : 'Used by the grading extension to identify the agent'}
+              </p>
             </div>
 
             <DialogFooter className="pt-4 border-t border-gray-200 dark:border-neutral-800">
@@ -2448,8 +2855,13 @@ const QAManager = () => {
     const categoryInputRef = useRef(null);
     const categoryListRef = useRef(null);
 
-    // All available categories
-    const allCategories = [
+    // Get selected agent's position for scorecard config
+    const selectedAgent = agents.find(a => a._id === formData.agent);
+    const agentPosition = selectedAgent?.position || null;
+    const agentHasScorecard = agentPosition && hasScorecard(agentPosition);
+
+    // Default categories (fallback when no scorecard config)
+    const defaultCategories = [
       'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
       'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
       'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
@@ -2467,6 +2879,11 @@ const QAManager = () => {
       'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
       'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
     ];
+
+    // Get categories based on agent position (from scorecard config or default)
+    const allCategories = agentHasScorecard
+      ? getScorecardCategories(agentPosition)
+      : defaultCategories;
 
     // Filter categories based on search (exclude already selected)
     const filteredCategories = allCategories.filter(cat =>
@@ -2576,7 +2993,9 @@ const QAManager = () => {
           formData.notes !== original.notes ||
           formData.feedback !== original.feedback ||
           formData.dateEntered !== original.dateEntered ||
-          JSON.stringify(formData.categories) !== JSON.stringify(original.categories);
+          JSON.stringify(formData.categories) !== JSON.stringify(original.categories) ||
+          formData.scorecardVariant !== original.scorecardVariant ||
+          JSON.stringify(formData.scorecardValues) !== JSON.stringify(original.scorecardValues);
         hasUnsavedChangesRef.current = hasChanges;
       }
     }, [formData, ticketDialog.mode]);
@@ -2627,7 +3046,9 @@ const QAManager = () => {
         formData.notes?.trim() ||
         formData.feedback?.trim() ||
         formData.qualityScorePercent ||
-        formData.categories?.length > 0
+        formData.categories?.length > 0 ||
+        formData.scorecardVariant ||
+        Object.keys(formData.scorecardValues || {}).length > 0
       );
     };
 
@@ -2696,10 +3117,10 @@ const QAManager = () => {
             </div>
           </DialogHeader>
 
-          {/* Main Content - 50/50 Split */}
+          {/* Main Content - 60/40 Split */}
           <form ref={formRef} onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
             {/* LEFT SIDE - Ticket Form */}
-            <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+            <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
                 {/* Top Section: Agent, Ticket ID, Date Entered */}
                 <div className="grid grid-cols-3 gap-4">
@@ -2763,6 +3184,21 @@ const QAManager = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Scorecard Editor - only show if agent has scorecard */}
+                {agentHasScorecard && (
+                  <ScorecardEditor
+                    agentPosition={agentPosition}
+                    variant={formData.scorecardVariant}
+                    onVariantChange={(variant) => {
+                      // When variant changes, reset scorecard values
+                      setFormData({ ...formData, scorecardVariant: variant, scorecardValues: {} });
+                    }}
+                    values={formData.scorecardValues}
+                    onChange={(values) => setFormData({ ...formData, scorecardValues: values })}
+                    disabled={false}
+                  />
+                )}
 
                 {/* Bottom Section: Status, Quality Score, Category */}
                 <div className="grid grid-cols-3 gap-4">
@@ -2942,7 +3378,7 @@ const QAManager = () => {
             </div>
 
             {/* RIGHT SIDE - AI/Related Toggle Panel */}
-            <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+            <div className="w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
               {/* Subtle grid pattern overlay */}
               <div
                 className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
@@ -3467,10 +3903,10 @@ const QAManager = () => {
             </div>
           </DialogHeader>
 
-          {/* Main Content - 50/50 Split */}
+          {/* Main Content - 60/40 Split */}
           <div className="flex flex-1 overflow-hidden">
             {/* LEFT SIDE - Ticket Information */}
-            <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+            <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Top Section: Agent, Ticket ID, Date Entered */}
                 <div className="grid grid-cols-3 gap-4">
@@ -3523,6 +3959,18 @@ const QAManager = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Scorecard Values (readonly) */}
+                {ticket.agent?.position && hasScorecard(ticket.agent.position) && ticket.scorecardValues && Object.keys(ticket.scorecardValues).length > 0 && (
+                  <ScorecardEditor
+                    agentPosition={ticket.agent.position}
+                    variant={ticket.scorecardVariant}
+                    onVariantChange={() => {}}
+                    values={ticket.scorecardValues || {}}
+                    onChange={() => {}}
+                    disabled={true}
+                  />
+                )}
 
                 {/* Bottom Section: Status, Quality Score */}
                 <div className="grid grid-cols-2 gap-4">
@@ -3607,7 +4055,7 @@ const QAManager = () => {
             </div>
 
             {/* RIGHT SIDE - AI/Related Toggle Panel */}
-            <div className="w-1/2 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+            <div className="w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
               {/* Subtle grid pattern overlay */}
               <div
                 className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
@@ -3801,116 +4249,24 @@ const QAManager = () => {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <AnimatePresence mode="wait">
-              <TabsContent value="dashboard">
-                <motion.div
-                  key="dashboard"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  {renderDashboard()}
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="agents">
-                <motion.div
-                  key="agents"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  {renderAgents()}
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="tickets">
-                <motion.div
-                  key="tickets"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  {renderTickets()}
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="archive">
-                <motion.div
-                  key="archive"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  {renderArchive()}
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="analytics">
-                <motion.div
-                  key="analytics"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <QAAnalyticsDashboard />
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="summaries">
-                <motion.div
-                  key="summaries"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <QASummaries />
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="import-tickets">
-                <motion.div
-                  key="import-tickets"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <QAImportTickets agents={agents} currentUser={user} />
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="all-agents">
-                <motion.div
-                  key="all-agents"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <QAAllAgents />
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="statistics">
-                <motion.div
-                  key="statistics"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <StatisticsPage />
-                </motion.div>
-              </TabsContent>
-              <TabsContent value="active-overview">
-                <motion.div
-                  key="active-overview"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: duration.normal, ease: easing.smooth }}
-                >
-                  <QAActiveOverview />
-                </motion.div>
-              </TabsContent>
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: duration.normal, ease: easing.smooth }}
+              >
+                {activeTab === 'dashboard' && renderDashboard()}
+                {activeTab === 'agents' && renderAgents()}
+                {activeTab === 'tickets' && renderTickets()}
+                {activeTab === 'archive' && renderArchive()}
+                {activeTab === 'analytics' && <QAAnalyticsDashboard />}
+                {activeTab === 'summaries' && <QASummaries />}
+                {activeTab === 'import-tickets' && <QAImportTickets agents={agents} currentUser={user} />}
+                {activeTab === 'all-agents' && <QAAllAgents />}
+                {activeTab === 'statistics' && <StatisticsPage />}
+                {activeTab === 'active-overview' && <QAActiveOverview />}
+              </motion.div>
             </AnimatePresence>
           </Tabs>
         </div>

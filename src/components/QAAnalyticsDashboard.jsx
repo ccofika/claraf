@@ -5,7 +5,7 @@ import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { TrendingUp, TrendingDown, Users, FileText, Target, Calendar, Award, AlertCircle, UserCheck } from 'lucide-react';
+import { TrendingUp, TrendingDown, FileText, Target, Award, AlertCircle, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   staggerContainer,
@@ -259,7 +259,7 @@ const QAAnalyticsDashboard = () => {
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard title="Total Tickets" value={overview?.totalTickets || 0} change={overview?.ticketsChange} trend={overview?.ticketsChange > 0 ? 'up' : overview?.ticketsChange < 0 ? 'down' : 'neutral'} icon={FileText} index={0} />
         <MetricCard title="Avg Quality Score" value={`${overview?.avgQualityScore || 0}%`} change={overview?.qualityChange} trend={overview?.qualityChange > 0 ? 'up' : overview?.qualityChange < 0 ? 'down' : 'neutral'} icon={Target} index={1} />
-        <MetricCard title="Active Agents" value={overview?.activeAgents || 0} icon={Users} index={2} />
+        <MetricCard title="Pending Review" value={(overview?.totalTickets || 0) - (overview?.gradedTickets || 0)} icon={AlertCircle} index={2} />
         <MetricCard title="Grading Rate" value={`${overview?.gradingRate || 0}%`} change={overview?.gradingRateChange} trend={overview?.gradingRateChange > 0 ? 'up' : overview?.gradingRateChange < 0 ? 'down' : 'neutral'} icon={Award} index={3} />
       </motion.div>
 
@@ -452,7 +452,7 @@ const QAAnalyticsDashboard = () => {
                 { metric: 'Total Tickets Reviewed', value: overview?.totalTickets || 0, status: timeRange === 'all' ? 'All Time' : `Last ${timeRange.replace('d', ' days')}`, statusClass: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
                 { metric: 'Average Quality Score', value: `${overview?.avgQualityScore || 0}%`, status: (overview?.avgQualityScore || 0) >= 80 ? 'Excellent' : (overview?.avgQualityScore || 0) >= 60 ? 'Good' : 'Needs Work', statusClass: (overview?.avgQualityScore || 0) >= 80 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : (overview?.avgQualityScore || 0) >= 60 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
                 { metric: 'Grading Completion Rate', value: `${overview?.gradingRate || 0}%`, status: (overview?.gradingRate || 0) >= 90 ? 'On Track' : (overview?.gradingRate || 0) >= 70 ? 'Behind' : 'Critical', statusClass: (overview?.gradingRate || 0) >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : (overview?.gradingRate || 0) >= 70 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
-                { metric: 'Active Agents Being Reviewed', value: overview?.activeAgents || 0, status: 'Unique Agents', statusClass: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' },
+                { metric: 'Pending Review', value: (overview?.totalTickets || 0) - (overview?.gradedTickets || 0), status: (overview?.totalTickets || 0) - (overview?.gradedTickets || 0) === 0 ? 'All Done' : 'Awaiting', statusClass: (overview?.totalTickets || 0) - (overview?.gradedTickets || 0) === 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' },
                 { metric: 'Feedback Coverage', value: `${feedbackStats?.feedbackRate || 0}%`, status: (feedbackStats?.feedbackRate || 0) >= 80 ? 'Complete' : (feedbackStats?.feedbackRate || 0) >= 50 ? 'Partial' : 'Low', statusClass: (feedbackStats?.feedbackRate || 0) >= 80 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : (feedbackStats?.feedbackRate || 0) >= 50 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' }
               ].map((row, index) => (
                 <motion.tr key={row.metric} initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.05 }} className="border-b border-neutral-100 dark:border-neutral-800/50">

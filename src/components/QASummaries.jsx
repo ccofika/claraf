@@ -349,7 +349,7 @@ const QASummaries = () => {
   const renderSummaryDetail = () => {
     if (!viewingSummary) {
       return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <motion.div key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <Card className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 h-full min-h-[400px] flex flex-col items-center justify-center">
             <CardContent className="flex flex-col items-center justify-center text-center py-12">
               <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="w-16 h-16 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700 flex items-center justify-center mb-4">
@@ -366,7 +366,7 @@ const QASummaries = () => {
     const ticketCount = (viewingSummary.metadata?.ticketCount?.selected || 0) + (viewingSummary.metadata?.ticketCount?.graded || 0) + (viewingSummary.metadata?.ticketCount?.both || 0);
 
     return (
-      <motion.div key={viewingSummary._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: duration.normal }}>
+      <motion.div key={viewingSummary._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: duration.normal }}>
         <Card className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
