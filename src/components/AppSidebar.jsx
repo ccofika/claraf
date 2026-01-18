@@ -74,6 +74,29 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
   const navigate = useNavigate();
   const { totalUnreadCount } = useChat();
   const { logout, user } = useAuth();
+  const [hasQAAccess, setHasQAAccess] = React.useState(false);
+
+  // Fetch QA access from API
+  React.useEffect(() => {
+    const checkQAAccess = async () => {
+      if (!user?.email) {
+        setHasQAAccess(false);
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/qa/check-access`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setHasQAAccess(response.data.hasAccess);
+      } catch (err) {
+        console.error('Error checking QA access:', err);
+        setHasQAAccess(false);
+      }
+    };
+    checkQAAccess();
+  }, [user?.email]);
 
   const navItems = [
     { id: 'workspaces', icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Workspaces' },
@@ -101,14 +124,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     });
   }
 
-  // Add QA Manager for specific emails only
-  const qaAllowedEmails = [
-    'filipkozomara@mebit.io',
-    'vasilijevitorovic@mebit.io',
-    'nevena@mebit.io',
-    'mladenjorganovic@mebit.io'
-  ];
-  const hasQAAccess = user?.email && qaAllowedEmails.includes(user.email);
+  // Add QA Manager for users with QA access (checked via API)
   if (hasQAAccess) {
     navItems.push({
       id: 'qa-manager',

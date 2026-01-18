@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const isRefreshingRef = useRef(false);
   const failedQueueRef = useRef([]);
+  const isRedirectingRef = useRef(false); // Prevent multiple redirects
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -61,14 +62,18 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // Any error during profile fetch = invalid session, force redirect
-      console.log('🚪 Profile fetch failed, clearing session and redirecting to login...');
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId');
-      setToken(null);
-      setUser(null);
-      setLoading(false);
-      delete axios.defaults.headers.common['Authorization'];
-      window.location.href = '/login';
+      // But only if not already redirecting (interceptor might handle it)
+      if (!isRedirectingRef.current) {
+        console.log('🚪 Profile fetch failed, clearing session and redirecting to login...');
+        isRedirectingRef.current = true;
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        setToken(null);
+        setUser(null);
+        setLoading(false);
+        delete axios.defaults.headers.common['Authorization'];
+        window.location.href = '/login';
+      }
     }
   };
 
@@ -97,9 +102,15 @@ export const AuthProvider = ({ children }) => {
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
+        const requestUrl = originalRequest?.url || '';
+
+        // IMPORTANT: Skip interceptor for refresh and logout endpoints to prevent loops
+        const isAuthEndpoint = requestUrl.includes('/api/auth/refresh') ||
+                               requestUrl.includes('/api/auth/logout') ||
+                               requestUrl.includes('/api/auth/login');
 
         // If error is 401 and we haven't tried refreshing yet
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
           if (isRefreshingRef.current) {
             // If already refreshing, queue this request
             return new Promise((resolve, reject) => {
@@ -145,15 +156,30 @@ export const AuthProvider = ({ children }) => {
               prom.reject(refreshError);
             });
             failedQueueRef.current = [];
-            // Inline logout to avoid stale closure issues
-            localStorage.removeItem('token');
-            localStorage.removeItem('userId');
-            delete axios.defaults.headers.common['Authorization'];
-            window.location.href = '/login';
+
+            // Prevent multiple redirects
+            if (!isRedirectingRef.current) {
+              isRedirectingRef.current = true;
+              // Inline logout to avoid stale closure issues
+              localStorage.removeItem('token');
+              localStorage.removeItem('userId');
+              delete axios.defaults.headers.common['Authorization'];
+              window.location.href = '/login';
+            }
             return Promise.reject(refreshError);
           } finally {
             isRefreshingRef.current = false;
           }
+        }
+
+        // Handle 401 on auth endpoints (refresh failed) - redirect to login
+        if (error.response?.status === 401 && isAuthEndpoint && !isRedirectingRef.current) {
+          console.log('🚪 Auth endpoint returned 401, redirecting to login...');
+          isRedirectingRef.current = true;
+          localStorage.removeItem('token');
+          localStorage.removeItem('userId');
+          delete axios.defaults.headers.common['Authorization'];
+          window.location.href = '/login';
         }
 
         return Promise.reject(error);
