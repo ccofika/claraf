@@ -146,15 +146,16 @@ const GlowRing = ({ isActive, delay = 0 }) => (
   />
 );
 
-// Button Component
+// Button Component with Glass variant
 const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, disabled, type = 'button' }) => {
-  const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+  const baseStyles = 'inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:pointer-events-none';
 
   const variants = {
-    default: 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 focus:ring-gray-900 dark:focus:ring-gray-300',
-    secondary: 'bg-white dark:bg-neutral-800 text-black dark:text-white border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:ring-gray-200 dark:focus:ring-neutral-600',
+    default: 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 dark:focus:ring-gray-300',
+    secondary: 'bg-white dark:bg-neutral-800 text-black dark:text-white border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 dark:focus:ring-neutral-600',
     ghost: 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300',
-    destructive: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-red-600 dark:focus:ring-red-500',
+    destructive: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-2 focus:ring-offset-2 focus:ring-red-600 dark:focus:ring-red-500',
+    glass: '',
   };
 
   const sizes = {
@@ -162,6 +163,61 @@ const Button = ({ children, variant = 'default', size = 'default', className = '
     default: 'px-4 py-2 text-sm',
     lg: 'px-6 py-3 text-base',
   };
+
+  // Glass variant with animated gradient border
+  if (variant === 'glass') {
+    return (
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        className={`relative ${baseStyles} ${sizes[size]} text-gray-900 dark:text-white ${className}`}
+      >
+        {/* Animated gradient border - Light theme */}
+        <div
+          className="absolute inset-0 rounded-xl dark:hidden"
+          style={{
+            padding: '1px',
+            background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.03) 40%, rgba(0,0,0,0.03) 60%, rgba(0,0,0,0.12) 100%)',
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            animation: 'rotateGradient 4s ease-in-out infinite',
+          }}
+        />
+        {/* Animated gradient border - Dark theme */}
+        <div
+          className="absolute inset-0 rounded-xl hidden dark:block"
+          style={{
+            padding: '1px',
+            background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.2) 100%)',
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            animation: 'rotateGradient 4s ease-in-out infinite',
+          }}
+        />
+        {/* Inner glass background - Light theme */}
+        <div
+          className="absolute inset-[1px] rounded-[11px] dark:hidden transition-all duration-200"
+          style={{
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(250,250,250,0.98) 50%, rgba(255,255,255,0.95) 100%)',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.1)',
+          }}
+        />
+        {/* Inner glass background - Dark theme */}
+        <div
+          className="absolute inset-[1px] rounded-[11px] hidden dark:block transition-all duration-200"
+          style={{
+            background: 'linear-gradient(145deg, rgba(30,30,30,0.9) 0%, rgba(20,20,20,0.95) 50%, rgba(25,25,25,0.9) 100%)',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.4)',
+          }}
+        />
+        {/* Content */}
+        <span className="relative z-10 inline-flex items-center">{children}</span>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -636,9 +692,9 @@ const SendTicketModal = ({ open, onOpenChange, agents, onSubmit }) => {
                         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                           <Button
                             type="button"
-                            variant="secondary"
+                            variant="ghost"
                             onClick={() => onOpenChange(false)}
-                            className="px-5 py-2.5 rounded-xl"
+                            className="px-5 py-2.5"
                           >
                             Cancel
                           </Button>
@@ -651,8 +707,9 @@ const SendTicketModal = ({ open, onOpenChange, agents, onSubmit }) => {
                         >
                           <Button
                             type="submit"
+                            variant="glass"
                             disabled={isSubmitting}
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white min-w-[140px] px-6 py-2.5 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow duration-200"
+                            className="min-w-[140px] px-6 py-2.5 text-blue-600 dark:text-blue-400"
                           >
                             <AnimatePresence mode="wait">
                               {isSubmitting ? (
@@ -687,6 +744,22 @@ const SendTicketModal = ({ open, onOpenChange, agents, onSubmit }) => {
                           </Button>
                         </motion.div>
                       </div>
+
+                      {/* CSS for glass animation */}
+                      <style>{`
+                        @keyframes rotateGradient {
+                          0% { --gradient-angle: 135deg; }
+                          25% { --gradient-angle: 225deg; }
+                          50% { --gradient-angle: 315deg; }
+                          75% { --gradient-angle: 45deg; }
+                          100% { --gradient-angle: 135deg; }
+                        }
+                        @property --gradient-angle {
+                          syntax: '<angle>';
+                          initial-value: 135deg;
+                          inherits: false;
+                        }
+                      `}</style>
                     </motion.form>
                   </div>
                 </motion.div>

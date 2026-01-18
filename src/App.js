@@ -32,7 +32,20 @@ import QuickLinks from './pages/QuickLinks';
 // import AffiliateBonusFinder from './pages/AffiliateBonusFinder';
 import KYC from './pages/KYC';
 import DeveloperDashboard from './pages/DeveloperDashboard';
-import QAManager from './pages/QAManager';
+import {
+  QAManagerLayout,
+  QADashboard,
+  QAAgents,
+  QATickets,
+  QAArchive,
+  QAAnalyticsDashboard,
+  QASummaries,
+  QAImportTickets,
+  QAAllAgents,
+  StatisticsPage,
+  QAActiveOverview,
+  QABugsPage
+} from './pages/qa-manager';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
 
@@ -132,16 +145,33 @@ function App() {
                           }
                         />
 
+                        {/* QA Manager routes with nested routing */}
                         <Route
                           path="/qa-manager"
                           element={
                             <PrivateRoute>
                               <PageLayout activeSection="qa-manager">
-                                <QAManager />
+                                <QAManagerLayout />
                               </PageLayout>
                             </PrivateRoute>
                           }
-                        />
+                        >
+                          {/* Default redirect to dashboard */}
+                          <Route index element={<Navigate to="dashboard" replace />} />
+                          <Route path="dashboard" element={<QADashboard />} />
+                          <Route path="agents" element={<QAAgents />} />
+                          <Route path="tickets" element={<QATickets />} />
+                          <Route path="tickets/:ticketId" element={<QATickets />} />
+                          <Route path="tickets/:ticketId/edit" element={<QATickets />} />
+                          <Route path="archive" element={<QAArchive />} />
+                          <Route path="analytics" element={<QAAnalyticsDashboard />} />
+                          <Route path="summaries" element={<QASummaries />} />
+                          <Route path="all-agents" element={<QAAllAgents />} />
+                          <Route path="statistics" element={<StatisticsPage />} />
+                          <Route path="import-tickets" element={<QAImportTickets />} />
+                          <Route path="active-overview" element={<QAActiveOverview />} />
+                          <Route path="bugs" element={<QABugsPage />} />
+                        </Route>
 
                         <Route
                           path="/kyc-agent-stats"

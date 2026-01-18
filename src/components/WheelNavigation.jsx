@@ -117,10 +117,10 @@ const getPageConfig = (user) => {
       hasSubpages: true,
       subpageType: 'qa',
       staticSubpages: [
-        { id: 'dashboard', label: 'Dashboard', icon: Dashboard, path: '/qa-manager?tab=dashboard' },
-        { id: 'agents', label: 'Agents', icon: UserMultiple, path: '/qa-manager?tab=agents' },
-        { id: 'tickets', label: 'Tickets', icon: Document, path: '/qa-manager?tab=tickets' },
-        { id: 'archive', label: 'Archive', icon: Archive, path: '/qa-manager?tab=archive' },
+        { id: 'dashboard', label: 'Dashboard', icon: Dashboard, path: '/qa-manager/dashboard' },
+        { id: 'agents', label: 'Agents', icon: UserMultiple, path: '/qa-manager/agents' },
+        { id: 'tickets', label: 'Tickets', icon: Document, path: '/qa-manager/tickets' },
+        { id: 'archive', label: 'Archive', icon: Archive, path: '/qa-manager/archive' },
       ],
     });
     pages.push({
