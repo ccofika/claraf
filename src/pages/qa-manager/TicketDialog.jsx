@@ -620,6 +620,7 @@ const TicketDialog = ({
                   <SimilarFeedbacksPanel
                     notes={formData.notes}
                     ticketId={ticketDialog.data?._id}
+                    categories={formData.categories || []}
                     onCopyFeedback={(feedback) => {
                       const currentFeedback = formData.feedback || '';
                       const separator = currentFeedback.trim() ? '\n\n' : '';

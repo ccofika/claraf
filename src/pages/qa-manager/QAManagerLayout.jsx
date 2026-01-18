@@ -1047,6 +1047,7 @@ const ViewTicketDialog = ({
                 <SimilarFeedbacksPanel
                   notes={ticket.notes}
                   ticketId={ticket._id}
+                  categories={ticket.categories || []}
                 />
               ) : (
                 <RelatedTicketsPanel

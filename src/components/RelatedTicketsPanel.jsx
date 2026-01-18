@@ -80,7 +80,8 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
       params.append('agent', agentId);
       // Send categories as comma-separated for backend to handle
       validCategories.forEach(cat => params.append('categories', cat));
-      params.append('isArchived', 'false');
+      // Use relatedMode to get ALL tickets (archived + non-archived, all graders)
+      params.append('relatedMode', 'true');
       params.append('limit', '50');
       params.append('sortBy', 'qualityScorePercent');
       params.append('sortOrder', 'asc'); // Worst first

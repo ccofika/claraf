@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Copy, Loader2, AlertCircle, Check, FileText, User, Star, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import { staggerContainer, staggerItem, fadeInUp, scaleIn, duration, easing } fr
 // Cache for similar feedbacks results - persists across component remounts
 const resultsCache = new Map();
 
-const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
+const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback, categories = [] }) => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
 
@@ -26,6 +26,14 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
   const [copiedId, setCopiedId] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Reset state when ticket changes
+  useEffect(() => {
+    setResults([]);
+    setError(null);
+    setHasSearched(false);
+    setCopiedId(null);
+  }, [ticketId]);
+
   const getAuthHeaders = () => ({
     headers: { Authorization: `Bearer ${user?.token}` }
   });
@@ -33,7 +41,8 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
   // Manual search function - triggered by button click
   const handleSearch = useCallback(async () => {
     const plainText = stripHtml(notes);
-    const cacheKey = plainText?.trim();
+    // Include categories in cache key to prevent stale results when categories change
+    const cacheKey = `${plainText?.trim()}|${(categories || []).sort().join(',')}`;
 
     if (!plainText || plainText.trim().length < 10) {
       setError('Please add at least 10 characters of notes first');
@@ -57,6 +66,7 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
         {
           notes: plainText,
           excludeTicketId: ticketId,
+          categories: categories, // Filter by matching categories for better accuracy
           limit: 10
         },
         getAuthHeaders()
@@ -78,7 +88,7 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback }) => {
     } finally {
       setLoading(false);
     }
-  }, [notes, ticketId, API_URL, user?.token]);
+  }, [notes, ticketId, categories, API_URL, user?.token]);
 
   const handleCopy = async (feedback, id) => {
     try {
