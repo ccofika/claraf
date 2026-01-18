@@ -7,11 +7,11 @@ import {
   Plus, Edit, Trash2, Filter, Download, Archive, RotateCcw, X,
   Users, CheckCircle, Target, Eye, Upload, Play, ClipboardList,
   FileText, ArrowUpDown, MessageSquare, Sparkles, Tag, TrendingUp, Zap, BarChart3, Search, UsersRound,
-  Keyboard, RefreshCw, ChevronDown, ChevronRight, ChevronLeft, AlertTriangle, Loader2, Hash, Save, Send, Check, XCircle, ExternalLink
+  Keyboard, RefreshCw, ChevronDown, ChevronRight, ChevronLeft, AlertTriangle, Loader2, Hash, Save, Send, Check, XCircle, ExternalLink, Bug
 } from 'lucide-react';
 import { staggerContainer, staggerItem, fadeInUp, tabContent, cardVariants, tableRow, modalOverlay, modalContent, duration, easing } from '../utils/animations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
@@ -37,6 +37,39 @@ import SaveAsMacroModal from '../components/SaveAsMacroModal';
 import { useMacros } from '../hooks/useMacros';
 import ScorecardEditor from '../components/ScorecardEditor';
 import { getScorecardConfig, getScorecardValues, getScorecardCategories, hasScorecard, requiresVariantSelection } from '../data/scorecardConfig';
+import SendTicketModal from '../components/SendTicketModal';
+import BugReportButton from '../components/BugReportButton';
+import BugReportsAdmin from '../components/BugReportsAdmin';
+
+// Minimal Button Component (moved outside to prevent re-renders)
+const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, disabled, type = 'button' }) => {
+  const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+
+  const variants = {
+    default: 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 focus:ring-gray-900 dark:focus:ring-gray-300',
+    secondary: 'bg-white dark:bg-neutral-800 text-black dark:text-white border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:ring-gray-200 dark:focus:ring-neutral-600',
+    ghost: 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300',
+    destructive: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-red-600 dark:focus:ring-red-500',
+  };
+
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs',
+    default: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base',
+  };
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
+
 const QAManager = () => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
@@ -54,7 +87,7 @@ const QAManager = () => {
   // Watch for tab changes from URL (e.g., from wheel navigation)
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics', 'import-tickets', 'active-overview'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'agents', 'tickets', 'archive', 'analytics', 'summaries', 'all-agents', 'statistics', 'import-tickets', 'active-overview', 'bugs'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -1434,6 +1467,26 @@ const QAManager = () => {
     }
   };
 
+  // Reset/delete an assignment
+  const handleResetAssignment = async (assignmentId) => {
+    if (!window.confirm('Are you sure you want to reset this assignment? This will delete all tracking data for this assignment.')) {
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `${API_URL}/api/qa/assignments/${assignmentId}`,
+        getAuthHeaders()
+      );
+      // Remove from local state
+      setAssignments(prev => prev.filter(a => a._id !== assignmentId));
+      toast.success('Assignment reset successfully');
+    } catch (err) {
+      console.error('Error resetting assignment:', err);
+      toast.error('Failed to reset assignment');
+    }
+  };
+
   const handleExportSelectedTickets = async () => {
     try {
       // Fetch all tickets that are not graded and not archived
@@ -1516,35 +1569,6 @@ const QAManager = () => {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  };
-
-  // Minimal Button Component
-  const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, disabled, type = 'button' }) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
-
-    const variants = {
-      default: 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 focus:ring-gray-900 dark:focus:ring-gray-300',
-      secondary: 'bg-white dark:bg-neutral-800 text-black dark:text-white border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:ring-gray-200 dark:focus:ring-neutral-600',
-      ghost: 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300',
-      destructive: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-red-600 dark:focus:ring-red-500',
-    };
-
-    const sizes = {
-      sm: 'px-3 py-1.5 text-xs',
-      default: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
-    };
-
-    return (
-      <button
-        type={type}
-        onClick={onClick}
-        disabled={disabled}
-        className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-      >
-        {children}
-      </button>
-    );
   };
 
   // Minimal Stat Card Component
@@ -3715,227 +3739,6 @@ const QAManager = () => {
     );
   };
 
-  // Send Ticket Form Component
-  const SendMacroForm = ({ agents, onSubmit, onCancel }) => {
-    const [formData, setFormData] = useState({
-      agent: '',
-      ticketId: '',
-      notes: '',
-      dateEntered: new Date().toISOString().split('T')[0]
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [agentSearch, setAgentSearch] = useState('');
-    const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-    const [highlightIndex, setHighlightIndex] = useState(0);
-    const agentDropdownRef = useRef(null);
-    const agentListRef = useRef(null);
-
-    // Filter agents based on search
-    const filteredAgents = agents.filter(agent =>
-      agent.name.toLowerCase().includes(agentSearch.toLowerCase())
-    );
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-      const handleClickOutside = (event) => {
-        if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target)) {
-          setShowAgentDropdown(false);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    // Reset highlight on search change
-    useEffect(() => {
-      setHighlightIndex(0);
-    }, [agentSearch]);
-
-    // Scroll highlighted item into view
-    useEffect(() => {
-      if (showAgentDropdown && agentListRef.current) {
-        const highlighted = agentListRef.current.querySelector('[data-highlighted="true"]');
-        if (highlighted) {
-          highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }
-    }, [highlightIndex, showAgentDropdown]);
-
-    // Handle keyboard navigation
-    const handleAgentKeyDown = (e) => {
-      if (!showAgentDropdown) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setShowAgentDropdown(true);
-        }
-        return;
-      }
-
-      const totalItems = filteredAgents.length;
-      if (totalItems === 0) return;
-
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          setHighlightIndex(prev => (prev + 1) % totalItems);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          setHighlightIndex(prev => (prev - 1 + totalItems) % totalItems);
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (filteredAgents[highlightIndex]) {
-            const selected = filteredAgents[highlightIndex];
-            setFormData({ ...formData, agent: selected._id });
-            setAgentSearch(selected.name);
-            setShowAgentDropdown(false);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          setShowAgentDropdown(false);
-          break;
-        default:
-          break;
-      }
-    };
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!formData.agent || !formData.ticketId) {
-        toast.error('Agent and Ticket ID are required');
-        return;
-      }
-      setIsSubmitting(true);
-      const result = await onSubmit(formData);
-      setIsSubmitting(false);
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div ref={agentDropdownRef} className="relative">
-          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-            Agent <span className="text-red-500">*</span>
-          </Label>
-          <input
-            type="text"
-            value={agentSearch}
-            onChange={(e) => {
-              setAgentSearch(e.target.value);
-              setShowAgentDropdown(true);
-              // Clear selection if search doesn't match
-              if (formData.agent) {
-                const currentAgent = agents.find(a => a._id === formData.agent);
-                if (currentAgent && !currentAgent.name.toLowerCase().includes(e.target.value.toLowerCase())) {
-                  setFormData({ ...formData, agent: '' });
-                }
-              }
-            }}
-            onFocus={() => setShowAgentDropdown(true)}
-            onKeyDown={handleAgentKeyDown}
-            placeholder="Search agents..."
-            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-          />
-          {showAgentDropdown && (
-            <div
-              ref={agentListRef}
-              className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-            >
-              {filteredAgents.length > 0 ? (
-                filteredAgents.map((agent, index) => (
-                  <button
-                    key={agent._id}
-                    type="button"
-                    data-highlighted={highlightIndex === index}
-                    onClick={() => {
-                      setFormData({ ...formData, agent: agent._id });
-                      setAgentSearch(agent.name);
-                      setShowAgentDropdown(false);
-                    }}
-                    onMouseEnter={() => setHighlightIndex(index)}
-                    className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
-                      highlightIndex === index
-                        ? 'bg-blue-100 dark:bg-blue-900/30'
-                        : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
-                    }`}
-                  >
-                    {agent.name}
-                  </button>
-                ))
-              ) : (
-                <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
-                  No agents found
-                </div>
-              )}
-            </div>
-          )}
-          <p className="text-xs text-gray-500 dark:text-neutral-500 mt-1">
-            The ticket will be sent to the grader assigned to this agent.
-          </p>
-        </div>
-
-        <div>
-          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-            Ticket ID <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            value={formData.ticketId}
-            onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
-            placeholder="e.g., INC123456"
-            required
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-            Date Entered
-          </Label>
-          <DatePicker
-            value={formData.dateEntered}
-            onChange={(date) => setFormData({ ...formData, dateEntered: date })}
-            placeholder="Select date"
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-            Notes
-          </Label>
-          <TicketRichTextEditor
-            value={formData.notes}
-            onChange={(html) => setFormData({ ...formData, notes: html })}
-            placeholder="Add any notes about this ticket..."
-            rows={4}
-          />
-        </div>
-
-        <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-1.5" />
-                Send Ticket
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </form>
-    );
-  };
-
   // View Ticket Details Dialog Component - Full Screen 50/50 Layout
   const ViewTicketDialogContent = () => {
     const [rightPanelMode, setRightPanelMode] = useState('ai'); // 'ai' | 'related'
@@ -4376,6 +4179,12 @@ const QAManager = () => {
                   Active Overview
                 </TabsTrigger>
               )}
+              {user?.email === 'filipkozomara@mebit.io' && (
+                <TabsTrigger value="bugs" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
+                  <Bug className="w-4 h-4 inline mr-1.5" />
+                  Bugs
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
         </div>
@@ -4403,6 +4212,7 @@ const QAManager = () => {
                 {activeTab === 'all-agents' && <QAAllAgents />}
                 {activeTab === 'statistics' && <StatisticsPage />}
                 {activeTab === 'active-overview' && <QAActiveOverview />}
+                {activeTab === 'bugs' && <BugReportsAdmin getAuthHeaders={getAuthHeaders} userEmail={user?.email} />}
               </motion.div>
             </AnimatePresence>
           </Tabs>
@@ -4463,6 +4273,13 @@ const QAManager = () => {
                         }`}>
                           {assignment.status === 'completed' ? 'Completed' : assignment.status === 'in_progress' ? 'In Progress' : 'Created'}
                         </span>
+                        <button
+                          onClick={() => handleResetAssignment(assignment._id)}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                          title="Reset assignment"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-sm">
@@ -4555,22 +4372,13 @@ const QAManager = () => {
         onSave={() => setSaveAsMacroDialog({ open: false, feedback: '' })}
       />
 
-      {/* Send Ticket Modal */}
-      <Dialog open={sendMacroDialog.open} onOpenChange={(open) => setSendMacroDialog({ open })}>
-        <DialogContent className="bg-white dark:bg-neutral-900 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Send className="w-5 h-5 text-blue-500" />
-              Send Ticket
-            </DialogTitle>
-          </DialogHeader>
-          <SendMacroForm
-            agents={allExistingAgents}
-            onSubmit={handleSendMacroTicket}
-            onCancel={() => setSendMacroDialog({ open: false })}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Send Ticket Modal - Premium Animated */}
+      <SendTicketModal
+        open={sendMacroDialog.open}
+        onOpenChange={(open) => setSendMacroDialog({ open })}
+        agents={allExistingAgents}
+        onSubmit={handleSendMacroTicket}
+      />
 
       {/* Decline Ticket Confirmation Modal */}
       <Dialog open={declineConfirmDialog.open} onOpenChange={(open) => !open && setDeclineConfirmDialog({ open: false, macroTicket: null })}>
@@ -4658,6 +4466,9 @@ const QAManager = () => {
         open={showShortcutsModal}
         onClose={() => setShowShortcutsModal(false)}
       />
+
+      {/* Bug Report Floating Button */}
+      <BugReportButton getAuthHeaders={getAuthHeaders} />
     </motion.div>
   );
 };
