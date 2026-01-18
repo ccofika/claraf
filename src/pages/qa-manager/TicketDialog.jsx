@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
-  AlertTriangle, Sparkles, Users
+  AlertTriangle, Sparkles, Users, ExternalLink
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -308,6 +308,16 @@ const TicketDialog = ({
                     </button>
                     <div className="w-px h-4 bg-gray-300 dark:bg-neutral-700 mx-1" />
                   </>
+                )}
+                {formData.ticketId && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${formData.ticketId}`, '_blank')}
+                    className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                    title="Open in Intercom"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
                 )}
                 <button
                   type="button"

@@ -5,7 +5,7 @@ import {
   BarChart3, FileText, UsersRound, TrendingUp, Target, Bug,
   Keyboard, RefreshCw, Search, AlertTriangle, Loader2, X, Check,
   RotateCcw, ClipboardList, Edit, Hash, ChevronLeft, ChevronRight,
-  MessageSquare, Users, Sparkles
+  MessageSquare, Users, Sparkles, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
@@ -810,6 +810,16 @@ const ViewTicketDialog = ({
                   <Edit className="w-4 h-4 mr-1.5" />
                   Edit Ticket
                 </Button>
+              )}
+              {ticket.ticketId && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${ticket.ticketId}`, '_blank')}
+                  className="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                  title="Open in Intercom"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </button>
               )}
               <div className="flex items-center gap-1">
                 <button

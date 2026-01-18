@@ -20,15 +20,55 @@ export const AuthProvider = ({ children }) => {
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+  // Define logout function FIRST (before useEffects that use it)
+  const performLogout = async (forceRedirect = false) => {
+    console.log('🚪 performLogout called, forceRedirect:', forceRedirect);
+
+    // If force redirect, skip backend call and just clear everything immediately
+    if (forceRedirect) {
+      console.log('🔄 Force redirecting to /login...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      delete axios.defaults.headers.common['Authorization'];
+      window.location.href = '/login';
+      return; // Don't continue, page will reload
+    }
+
+    // Normal logout - try to call backend
+    try {
+      await axios.post(
+        `${API_URL}/api/auth/logout`,
+        {},
+        { withCredentials: true }
+      );
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      setToken(null);
+      setUser(null);
+      setLoading(false);
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  };
+
   const fetchUserProfile = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/auth/profile`);
       setUser(response.data);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      logout();
-    } finally {
+      // Any error during profile fetch = invalid session, force redirect
+      console.log('🚪 Profile fetch failed, clearing session and redirecting to login...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      setToken(null);
+      setUser(null);
       setLoading(false);
+      delete axios.defaults.headers.common['Authorization'];
+      window.location.href = '/login';
     }
   };
 
@@ -99,12 +139,17 @@ export const AuthProvider = ({ children }) => {
             originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
             return axios(originalRequest);
           } catch (refreshError) {
-            // Refresh failed, logout user
+            // Refresh failed, logout user and force redirect to login
+            console.log('🚪 Token refresh failed, forcing redirect to login...');
             failedQueueRef.current.forEach((prom) => {
               prom.reject(refreshError);
             });
             failedQueueRef.current = [];
-            logout();
+            // Inline logout to avoid stale closure issues
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            delete axios.defaults.headers.common['Authorization'];
+            window.location.href = '/login';
             return Promise.reject(refreshError);
           } finally {
             isRefreshingRef.current = false;
@@ -187,25 +232,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      // Call backend logout to revoke refresh token
-      await axios.post(
-        `${API_URL}/api/auth/logout`,
-        {},
-        { withCredentials: true }
-      );
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear local state regardless of backend call success
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId'); // Clear userId for Socket.io
-      setToken(null);
-      setUser(null);
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  };
+  // Wrapper for external use (exposed via context)
+  const logout = (forceRedirect = false) => performLogout(forceRedirect);
 
   const value = {
     user,

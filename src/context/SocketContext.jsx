@@ -16,7 +16,7 @@ export const useSocket = () => {
 };
 
 export const SocketProvider = ({ children }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
@@ -48,8 +48,17 @@ export const SocketProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('❌ Failed to refresh token for socket:', error);
+      // If refresh fails with 401, session is invalid - force logout and redirect
+      if (error.response?.status === 401) {
+        console.log('🚪 Token refresh failed (401), forcing logout...');
+        // Disconnect socket to prevent reconnection attempts
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+        }
+        logout(true); // Force redirect to login
+      }
     }
-  }, []);
+  }, [logout]);
 
   // Initialize socket connection
   useEffect(() => {
