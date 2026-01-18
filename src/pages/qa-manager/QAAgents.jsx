@@ -118,11 +118,10 @@ const QAAgents = () => {
                 className="w-full mt-1 px-3 py-2 border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
               >
                 <option value="">Select position</option>
-                <option value="Junior">Junior</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Senior">Senior</option>
-                <option value="Senior - Generic">Senior - Generic</option>
-                <option value="Senior - Payments">Senior - Payments</option>
+                <option value="Notes">Notes</option>
+                <option value="Junior Scorecard">Junior Scorecard</option>
+                <option value="Medior Scorecard">Medior Scorecard</option>
+                <option value="Senior Scorecard">Senior Scorecard</option>
               </select>
             </div>
             <div>
