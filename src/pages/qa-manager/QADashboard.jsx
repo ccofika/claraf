@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   FileText, CheckCircle, Target, Users, Eye, Download, Play, ClipboardList,
-  Keyboard, RefreshCw
+  Keyboard, RefreshCw, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import { staggerContainer, staggerItem, duration, easing } from '../../utils/animations';
 import { useQAManager } from '../../context/QAManagerContext';
@@ -232,6 +232,82 @@ const QADashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Extension Download Section */}
+      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Clara QA Extension</h3>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Automatski ocenjuj tikete na MaestroQA</p>
+        </div>
+        <div className="p-6 space-y-4">
+          {/* Download Link */}
+          <div className="flex items-center gap-3">
+            <a
+              href="https://drive.google.com/drive/folders/1tRIFuCGWfafcu4k10FM5Hc8K2FaDWmaY"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 !text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download Extension
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          {/* Setup Instructions */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Setup uputstvo:</h4>
+            <ol className="space-y-2 text-sm text-gray-600 dark:text-neutral-400">
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">1</span>
+                <span>Downloaduj folder sa Google Drive linka iznad.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">2</span>
+                <span>Extraktuj ZIP tako da ostane samo <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800 rounded text-xs font-mono">"extension"</code> folder.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">3</span>
+                <span>Idi na <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800 rounded text-xs font-mono">chrome://extensions/</code> u Chrome-u.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">4</span>
+                <span>U gornjem desnom uglu uključi <strong className="text-gray-900 dark:text-white">Developer mode</strong>.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">5</span>
+                <span>Klikni na <strong className="text-gray-900 dark:text-white">"Load unpacked"</strong> sa leve strane.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-700 dark:text-neutral-300">6</span>
+                <span>U file exploreru klikni jednom na <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800 rounded text-xs font-mono">extension</code> folder i klikni <strong className="text-gray-900 dark:text-white">"Select Folder"</strong>.</span>
+              </li>
+            </ol>
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-3">
+              Ekstenzija je tada dodata u tvoj browser i možeš da koristiš Grade funkciju koja će sama oceniti tvoje tikete na Maestru. :)
+            </p>
+          </div>
+
+          {/* Important Note */}
+          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Važno!</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  <strong>Assignment ne smeš da započneš sam na Maestru</strong> inače ova funkcija neće raditi. Moraš da isključivo ocenjuješ preko Clare sve tikete kako bi radilo bez greške.
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-2">
+                  Ne brini - neće ništa pokvariti, štaviše uživo ćeš pratiti šta radi pa možeš posle i da prekontrolišeš. :D
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
