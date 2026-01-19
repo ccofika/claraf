@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight,
-  AlertCircle, Check, X, Loader2, Square, CheckSquare
+  AlertCircle, Check, X, Loader2, Square, CheckSquare, Sparkles
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Input } from './ui/input';
@@ -50,6 +50,9 @@ const QAAllAgents = () => {
     team: ''
   });
   const [mergeSubmitting, setMergeSubmitting] = useState(false);
+
+  // AI Analysis state
+  const [analyzing, setAnalyzing] = useState(false);
 
   // Auth headers
   const getAuthHeaders = useCallback(() => ({
@@ -272,6 +275,30 @@ const QAAllAgents = () => {
     }
   };
 
+  // Run AI analysis of agent issues
+  const handleRunAnalysis = async () => {
+    try {
+      setAnalyzing(true);
+      toast.info('Running AI analysis... This may take a few minutes.');
+
+      const response = await axios.post(
+        `${API_URL}/api/qa/all-agents/analyze-issues`,
+        {},
+        getAuthHeaders()
+      );
+
+      const { stats } = response.data;
+      toast.success(
+        `Analysis complete! ${stats.agentsAnalyzed} agents analyzed, ${stats.totalUnresolved} unresolved issues found.`
+      );
+    } catch (err) {
+      console.error('Error running analysis:', err);
+      toast.error(err.response?.data?.message || 'Failed to run analysis');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   // Pagination component
   const Pagination = () => (
     <div className="flex items-center justify-between px-6 py-3 border-t border-neutral-200 dark:border-neutral-800">
@@ -358,33 +385,56 @@ const QAAllAgents = () => {
           </p>
         </div>
 
-        {/* Merge button - visible when 2 agents selected */}
-        <AnimatePresence>
-        {selectedAgents.length === 2 && (
+        <div className="flex items-center gap-3">
+          {/* AI Analysis button */}
           <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={openMergeDialog}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+            onClick={handleRunAnalysis}
+            disabled={analyzing}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <GitMerge className="w-4 h-4" />
-            Merge Selected ({selectedAgents.length})
+            {analyzing ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                <Loader2 className="w-4 h-4" />
+              </motion.div>
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            {analyzing ? 'Analyzing...' : 'Run AI Analysis'}
           </motion.button>
-        )}
-        </AnimatePresence>
 
-        {selectedAgents.length === 1 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-sm text-neutral-500 dark:text-neutral-400"
-          >
-            Select one more agent to merge
-          </motion.div>
-        )}
+          {/* Merge button - visible when 2 agents selected */}
+          <AnimatePresence>
+          {selectedAgents.length === 2 && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={openMergeDialog}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+            >
+              <GitMerge className="w-4 h-4" />
+              Merge Selected ({selectedAgents.length})
+            </motion.button>
+          )}
+          </AnimatePresence>
+
+          {selectedAgents.length === 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-neutral-500 dark:text-neutral-400"
+            >
+              Select one more agent to merge
+            </motion.div>
+          )}
+        </div>
       </motion.div>
 
       {/* Search */}
