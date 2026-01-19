@@ -194,11 +194,15 @@ const TicketDialog = ({
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex >= 0 && currentIndex < tickets.length - 1;
 
+  // Determine base path based on source
+  const source = ticketDialog.source || 'tickets';
+  const basePath = source === 'archive' ? '/qa-manager/archive' : '/qa-manager/tickets';
+
   // Navigate to ticket with URL update
   const handleNavigateTicket = (direction) => {
     navigateWithUnsavedCheck(direction, ticketDialog.data?._id, (newTicket) => {
       if (routerNavigate && newTicket) {
-        routerNavigate(`/qa-manager/tickets/${newTicket._id}/edit`);
+        routerNavigate(`${basePath}/${newTicket._id}/edit`);
       }
     });
   };
@@ -257,7 +261,7 @@ const TicketDialog = ({
     const closeAndNavigate = () => {
       setTicketDialog({ ...ticketDialog, open: false });
       if (routerNavigate) {
-        routerNavigate('/qa-manager/tickets');
+        routerNavigate(basePath);
       }
     };
 

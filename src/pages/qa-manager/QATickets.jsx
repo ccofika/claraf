@@ -61,9 +61,9 @@ const QATickets = () => {
       const ticket = tickets.find(t => t._id === ticketId || t.ticketId === ticketId);
       if (ticket) {
         if (isEditMode) {
-          openTicketDialog('edit', ticket);
+          openTicketDialog('edit', ticket, 'tickets');
         } else {
-          setViewDialog({ open: true, ticket });
+          setViewDialog({ open: true, ticket, source: 'tickets' });
         }
       }
     }
@@ -217,7 +217,8 @@ const QATickets = () => {
                           notes: macroTicket.notes,
                           status: 'Pending',
                           isMacroTicket: true
-                        }
+                        },
+                        source: 'tickets'
                       });
                     }}
                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"

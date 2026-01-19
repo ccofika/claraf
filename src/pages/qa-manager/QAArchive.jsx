@@ -1,10 +1,16 @@
 import React, { useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Archive, RotateCcw, Trash2, ExternalLink, Sparkles } from 'lucide-react';
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, StatusBadge, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
 import QASearchBar from '../../components/QASearchBar';
 
 const QAArchive = () => {
+  const { ticketId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isEditMode = location.pathname.endsWith('/edit');
+
   const {
     loading,
     tickets,
@@ -22,6 +28,7 @@ const QAArchive = () => {
     handleRestoreTicket,
     handlePageChange,
     fetchArchivedTickets,
+    openTicketDialog,
   } = useQAManager();
 
   // Reset pagination to page 1 when component mounts
@@ -33,6 +40,25 @@ const QAArchive = () => {
   useEffect(() => {
     fetchArchivedTickets();
   }, [fetchArchivedTickets, archiveFilters]);
+
+  // Handle URL-based dialog opening (like QATickets does)
+  useEffect(() => {
+    if (ticketId && tickets.length > 0) {
+      const ticket = tickets.find(t => t._id === ticketId || t.ticketId === ticketId);
+      if (ticket) {
+        if (isEditMode) {
+          openTicketDialog('edit', ticket, 'archive');
+        } else {
+          setViewDialog({ open: true, ticket, source: 'archive' });
+        }
+      }
+    }
+  }, [ticketId, isEditMode, tickets, setViewDialog, openTicketDialog]);
+
+  // Navigate to ticket view with archive source
+  const handleViewTicket = (ticket) => {
+    navigate(`/qa-manager/archive/${ticket._id}`);
+  };
 
   // For AI search, tickets are already sorted by relevance, don't re-sort
   const isAISearch = archiveFilters.searchMode === 'ai' && archiveFilters.search && archiveFilters.search.trim().length > 0;
@@ -118,7 +144,7 @@ const QAArchive = () => {
                       return;
                     }
                     setFocusedTicketIndex(index);
-                    setViewDialog({ open: true, ticket });
+                    handleViewTicket(ticket);
                   }}
                 >
                   {isAISearch && (

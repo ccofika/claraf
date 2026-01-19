@@ -95,11 +95,11 @@ export const QAManagerProvider = ({ children }) => {
   const [agentDialog, setAgentDialog] = useState({ open: false, mode: 'create', data: null });
   const [addExistingAgentDialog, setAddExistingAgentDialog] = useState({ open: false });
   const [similarAgentDialog, setSimilarAgentDialog] = useState({ open: false, similarAgents: [], newAgentName: '' });
-  const [ticketDialog, setTicketDialog] = useState({ open: false, mode: 'create', data: null });
+  const [ticketDialog, setTicketDialog] = useState({ open: false, mode: 'create', data: null, source: 'tickets' });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null, name: '' });
   const [gradeDialog, setGradeDialog] = useState({ open: false, ticket: null });
   const [feedbackDialog, setFeedbackDialog] = useState({ open: false, ticket: null });
-  const [viewDialog, setViewDialog] = useState({ open: false, ticket: null });
+  const [viewDialog, setViewDialog] = useState({ open: false, ticket: null, source: null });
 
   // Macro dialog state
   const [manageMacrosDialog, setManageMacrosDialog] = useState({ open: false });
@@ -967,7 +967,7 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // DIALOG HELPERS
   // ============================================
-  const openTicketDialog = useCallback((mode, data = null) => {
+  const openTicketDialog = useCallback((mode, data = null, source = 'tickets') => {
     if (mode === 'create') {
       ticketFormDataRef.current = {
         agent: '',
@@ -998,7 +998,7 @@ export const QAManagerProvider = ({ children }) => {
         scorecardValues: scorecardValuesObj
       };
     }
-    setTicketDialog({ open: true, mode, data });
+    setTicketDialog({ open: true, mode, data, source });
   }, []);
 
   const getCurrentTicketIndex = useCallback((ticketId) => {

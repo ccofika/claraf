@@ -164,6 +164,8 @@ function App() {
                           <Route path="tickets/:ticketId" element={<QATickets />} />
                           <Route path="tickets/:ticketId/edit" element={<QATickets />} />
                           <Route path="archive" element={<QAArchive />} />
+                          <Route path="archive/:ticketId" element={<QAArchive />} />
+                          <Route path="archive/:ticketId/edit" element={<QAArchive />} />
                           <Route path="analytics" element={<QAAnalyticsDashboard />} />
                           <Route path="summaries" element={<QASummaries />} />
                           <Route path="all-agents" element={<QAAllAgents />} />

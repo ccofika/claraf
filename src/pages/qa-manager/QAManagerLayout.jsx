@@ -558,7 +558,7 @@ const QAManagerLayoutInner = () => {
         onViewTicket={async (ticketId) => {
           let ticket = tickets.find(t => t._id === ticketId || t.ticketId === ticketId);
           if (ticket) {
-            setViewDialog({ open: true, ticket });
+            setViewDialog({ open: true, ticket, source: 'tickets' });
           }
         }}
       />
@@ -731,6 +731,9 @@ const ViewTicketDialog = ({
   const [rightPanelMode, setRightPanelMode] = useState('ai');
 
   const ticket = viewDialog.ticket;
+  // Determine the source page - default to 'tickets' if not specified
+  const source = viewDialog.source || 'tickets';
+  const basePath = source === 'archive' ? '/qa-manager/archive' : '/qa-manager/tickets';
 
   const currentIndex = ticket ? getCurrentTicketIndex(ticket._id) : -1;
   const canGoPrev = currentIndex > 0;
@@ -738,21 +741,21 @@ const ViewTicketDialog = ({
 
   // Close dialog and navigate back
   const handleClose = () => {
-    setViewDialog({ open: false, ticket: null });
-    routerNavigate('/qa-manager/tickets');
+    setViewDialog({ open: false, ticket: null, source: null });
+    routerNavigate(basePath);
   };
 
   // Navigate to edit
   const handleEditClick = () => {
-    setViewDialog({ open: false, ticket: null });
-    routerNavigate(`/qa-manager/tickets/${ticket._id}/edit`);
+    setViewDialog({ open: false, ticket: null, source: null });
+    routerNavigate(`${basePath}/${ticket._id}/edit`);
   };
 
   // Navigate to ticket with URL update
   const handleNavigateTicket = (direction) => {
     const newTicket = navigateToTicket(direction, ticket._id, 'view');
     if (newTicket && routerNavigate) {
-      routerNavigate(`/qa-manager/tickets/${newTicket._id}`);
+      routerNavigate(`${basePath}/${newTicket._id}`);
     }
   };
 
