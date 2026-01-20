@@ -121,6 +121,17 @@ export const useMacros = () => {
     }
   }, []);
 
+  // Get QA graders for sharing
+  const fetchQAGraders = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/macros/graders`, getAuthHeaders());
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching QA graders:', err);
+      return [];
+    }
+  }, []);
+
   return {
     macros,
     loading,
@@ -132,7 +143,8 @@ export const useMacros = () => {
     updateMacro,
     deleteMacro,
     recordUsage,
-    getMacroTickets
+    getMacroTickets,
+    fetchQAGraders
   };
 };
 

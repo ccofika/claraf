@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Tag, ListChecks } from 'lucide-react';
+import { Hash, Tag, ListChecks, Globe, Users } from 'lucide-react';
 import { useMacros } from '../hooks/useMacros';
 
 const MacroTriggerDropdown = ({
@@ -176,22 +176,35 @@ const MacroTriggerDropdown = ({
                   e.preventDefault(); // Prevent blur on editor
                   onSelect(macro);
                 }}
-                className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors ${
+                className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
                   index === selectedIndex
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                     : 'hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
                 }`}
               >
-                <Hash className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
-                <span className="text-sm truncate flex-1">{macro.title}</span>
-                {(hasCategories || hasScorecard) && (
+                <div className="flex items-center gap-2">
+                  <Hash className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+                  <span className="text-sm truncate flex-1">{macro.title}</span>
+                  {/* Icons for visibility and extra data */}
                   <span className="flex items-center gap-1 flex-shrink-0">
+                    {macro.isPublic && (
+                      <Globe className="w-3 h-3 text-blue-500 opacity-70" />
+                    )}
+                    {!macro.isOwner && !macro.isPublic && macro.isSharedWithMe && (
+                      <Users className="w-3 h-3 text-green-500 opacity-70" />
+                    )}
                     {hasCategories && (
                       <Tag className="w-3 h-3 text-blue-500 opacity-70" />
                     )}
                     {hasScorecard && (
                       <ListChecks className="w-3 h-3 text-purple-500 opacity-70" />
                     )}
+                  </span>
+                </div>
+                {/* Show creator name for non-owned macros */}
+                {!macro.isOwner && (
+                  <span className="text-xs text-purple-500 dark:text-purple-400 ml-5.5 pl-[22px]">
+                    by {macro.createdBy?.name || 'Unknown'}
                   </span>
                 )}
               </button>

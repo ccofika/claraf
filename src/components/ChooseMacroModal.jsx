@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
-import { X, Search, FileText, Hash, Check, Tag, ListChecks, MessageSquare, ChevronDown } from 'lucide-react';
+import { X, Search, FileText, Hash, Check, Tag, ListChecks, MessageSquare, ChevronDown, Globe, Users } from 'lucide-react';
 import { TicketContentDisplay } from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
 import { staggerContainer, staggerItem, fadeInUp, fadeInRight, duration, easing } from '../utils/animations';
@@ -201,25 +201,40 @@ const ChooseMacroModal = ({
                         variants={staggerItem}
                         whileHover={{ x: 4, transition: { duration: duration.fast } }}
                       >
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {macro.title}
-                        </p>
-                        {(macroHasCategories || macroHasScorecard) && (
-                          <div className="flex items-center gap-2 mt-1">
-                            {macroHasCategories && (
-                              <span className="text-xs text-blue-500 flex items-center gap-0.5">
-                                <Tag className="w-3 h-3" />
-                                {macro.categories.length}
-                              </span>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1">
+                            {macro.title}
+                          </p>
+                          {/* Visibility icons */}
+                          <span className="flex items-center gap-1 flex-shrink-0">
+                            {macro.isPublic && (
+                              <Globe className="w-3.5 h-3.5 text-blue-500" title="Public" />
                             )}
-                            {macroHasScorecard && (
-                              <span className="text-xs text-purple-500 flex items-center gap-0.5">
-                                <ListChecks className="w-3 h-3" />
-                                SC
-                              </span>
+                            {!macro.isOwner && !macro.isPublic && macro.isSharedWithMe && (
+                              <Users className="w-3.5 h-3.5 text-green-500" title="Shared with you" />
                             )}
-                          </div>
-                        )}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          {/* Show creator name for non-owned macros */}
+                          {!macro.isOwner && (
+                            <span className="text-xs text-purple-500">
+                              by {macro.createdBy?.name || 'Unknown'}
+                            </span>
+                          )}
+                          {macroHasCategories && (
+                            <span className="text-xs text-blue-500 flex items-center gap-0.5">
+                              <Tag className="w-3 h-3" />
+                              {macro.categories.length}
+                            </span>
+                          )}
+                          {macroHasScorecard && (
+                            <span className="text-xs text-purple-500 flex items-center gap-0.5">
+                              <ListChecks className="w-3 h-3" />
+                              SC
+                            </span>
+                          )}
+                        </div>
                       </motion.button>
                     );
                   })}

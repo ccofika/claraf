@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Copy } from 'lucide-react';
+import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Copy, Globe, Users } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import ScorecardEditor from './ScorecardEditor';
 import { useMacros } from '../hooks/useMacros';
@@ -21,7 +21,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     createMacro,
     updateMacro,
     deleteMacro,
-    getMacroTickets
+    getMacroTickets,
+    fetchQAGraders
   } = useMacros();
 
   const [selectedMacro, setSelectedMacro] = useState(null);
@@ -34,8 +35,19 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     title: '',
     feedback: '',
     categories: [],
-    scorecardData: {}
+    scorecardData: {},
+    isPublic: false,
+    sharedWith: []
   });
+
+  // QA Graders for sharing
+  const [qaGraders, setQaGraders] = useState([]);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [shareSearch, setShareSearch] = useState('');
+  const [shareHighlightIndex, setShareHighlightIndex] = useState(0);
+  const shareDropdownRef = useRef(null);
+  const shareInputRef = useRef(null);
+  const shareListRef = useRef(null);
 
   // Category dropdown state
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -82,31 +94,40 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     !formData.categories.includes(cat)
   );
 
-  // Fetch macros on open
+  // Fetch macros and graders on open
   useEffect(() => {
     if (open) {
       fetchMacros();
+      fetchQAGraders().then(graders => setQaGraders(graders || []));
       setSelectedMacro(null);
       setIsCreating(false);
-      setFormData({ title: '', feedback: '', categories: [], scorecardData: {} });
+      setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
       setSelectedScorecardPosition('Junior Scorecard');
+      setShareSearch('');
+      setShowShareDropdown(false);
     }
-  }, [open, fetchMacros]);
+  }, [open, fetchMacros, fetchQAGraders]);
 
   // Update form when macro is selected
   useEffect(() => {
     if (selectedMacro) {
+      // Extract sharedWith user IDs from the array of objects
+      const sharedWithIds = (selectedMacro.sharedWith || []).map(s => s.userId || s);
       setFormData({
         title: selectedMacro.title,
         feedback: selectedMacro.feedback,
         categories: selectedMacro.categories || [],
-        scorecardData: selectedMacro.scorecardData || {}
+        scorecardData: selectedMacro.scorecardData || {},
+        isPublic: selectedMacro.isPublic || false,
+        sharedWith: sharedWithIds
       });
       setIsCreating(false);
       loadUsedInTickets(selectedMacro._id);
       // Set initial scorecard position to first one that has data, or Junior
       const positionsWithData = SCORECARD_POSITIONS.filter(pos => selectedMacro.scorecardData?.[pos]);
       setSelectedScorecardPosition(positionsWithData[0] || 'Junior Scorecard');
+      setShareSearch('');
+      setShowShareDropdown(false);
     }
   }, [selectedMacro]);
 
@@ -181,6 +202,93 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         break;
     }
   };
+
+  // Share dropdown - filter graders
+  const filteredGraders = qaGraders.filter(grader =>
+    grader.name.toLowerCase().includes(shareSearch.toLowerCase()) &&
+    !formData.sharedWith.includes(grader._id)
+  );
+
+  // Reset share highlight when search changes
+  useEffect(() => {
+    setShareHighlightIndex(0);
+  }, [shareSearch]);
+
+  // Scroll share highlighted item into view
+  useEffect(() => {
+    if (showShareDropdown && shareListRef.current) {
+      const highlighted = shareListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlighted) {
+        highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [shareHighlightIndex, showShareDropdown]);
+
+  // Close share dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (shareDropdownRef.current && !shareDropdownRef.current.contains(event.target)) {
+        setShowShareDropdown(false);
+        setShareSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleShareKeyDown = (e) => {
+    if (!showShareDropdown) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowShareDropdown(true);
+      }
+      return;
+    }
+
+    const totalItems = filteredGraders.length;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setShareHighlightIndex(prev => (prev + 1) % Math.max(totalItems, 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setShareHighlightIndex(prev => (prev - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredGraders[shareHighlightIndex]) {
+          const selected = filteredGraders[shareHighlightIndex];
+          setFormData(prev => ({ ...prev, sharedWith: [...prev.sharedWith, selected._id] }));
+          setShareSearch('');
+          setShareHighlightIndex(0);
+          setTimeout(() => shareInputRef.current?.focus(), 0);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowShareDropdown(false);
+        setShareSearch('');
+        break;
+      case 'Backspace':
+        if (shareSearch === '' && formData.sharedWith.length > 0) {
+          setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.slice(0, -1) }));
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Helper to get grader name by ID
+  const getGraderName = (graderId) => {
+    const grader = qaGraders.find(g => g._id === graderId);
+    return grader?.name || 'Unknown';
+  };
+
+  // Check if current user is the owner of the selected macro
+  const isOwner = isCreating || (selectedMacro && selectedMacro.isOwner);
 
   // Get scorecard config for selected position
   const currentScorecardConfig = getScorecardConfig(selectedScorecardPosition);
@@ -289,30 +397,41 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const handleCreateNew = () => {
     setSelectedMacro(null);
     setIsCreating(true);
-    setFormData({ title: '', feedback: '', categories: [], scorecardData: {} });
+    setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
     setUsedInTickets({ tickets: [], total: 0, hasMore: false });
     setSelectedScorecardPosition('Junior Scorecard');
+    setShareSearch('');
+    setShowShareDropdown(false);
   };
 
   // Handle save
   const handleSave = async () => {
-    if (!formData.title.trim()) {
-      toast.error('Title is required');
-      return;
-    }
-    if (!formData.feedback.trim()) {
-      toast.error('Feedback content is required');
-      return;
+    // Only validate content if owner
+    if (isOwner) {
+      if (!formData.title.trim()) {
+        toast.error('Title is required');
+        return;
+      }
+      if (!formData.feedback.trim()) {
+        toast.error('Feedback content is required');
+        return;
+      }
     }
 
     setIsSaving(true);
     try {
       const dataToSave = {
-        title: formData.title,
-        feedback: formData.feedback,
-        categories: formData.categories,
-        scorecardData: formData.scorecardData
+        isPublic: formData.isPublic,
+        sharedWith: formData.sharedWith
       };
+
+      // Only include content if owner
+      if (isOwner) {
+        dataToSave.title = formData.title;
+        dataToSave.feedback = formData.feedback;
+        dataToSave.categories = formData.categories;
+        dataToSave.scorecardData = formData.scorecardData;
+      }
 
       if (isCreating) {
         const result = await createMacro(dataToSave);
@@ -425,13 +544,33 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                       variants={staggerItem}
                       whileHover={{ x: 4, transition: { duration: duration.fast } }}
                     >
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {macro.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1">
+                          {macro.title}
+                        </p>
+                        {/* Visibility icons */}
+                        <span className="flex items-center gap-1 flex-shrink-0">
+                          {macro.isPublic && (
+                            <Globe className="w-3.5 h-3.5 text-blue-500" title="Public" />
+                          )}
+                          {!macro.isOwner && !macro.isPublic && macro.isSharedWithMe && (
+                            <Users className="w-3.5 h-3.5 text-green-500" title="Shared with you" />
+                          )}
+                          {macro.isOwner && macro.sharedWith?.length > 0 && (
+                            <Users className="w-3.5 h-3.5 text-green-500" title={`Shared with ${macro.sharedWith.length}`} />
+                          )}
+                        </span>
+                      </div>
                       <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
-                        Used {macro.usageCount || 0} times
-                        {(macro.categories?.length > 0 || Object.keys(macro.scorecardData || {}).length > 0) && (
-                          <span className="ml-2 text-blue-500">+data</span>
+                        {macro.isOwner ? (
+                          <>
+                            Used {macro.usageCount || 0} times
+                            {(macro.categories?.length > 0 || Object.keys(macro.scorecardData || {}).length > 0) && (
+                              <span className="ml-2 text-blue-500">+data</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-purple-500">by {macro.createdBy?.name || 'Unknown'}</span>
                         )}
                       </p>
                     </motion.button>
@@ -464,6 +603,30 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto p-6">
+                  {/* Created by info for non-owned macros */}
+                  {!isCreating && selectedMacro && !selectedMacro.isOwner && (
+                    <div className="mb-4 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                      <p className="text-sm text-purple-700 dark:text-purple-300">
+                        <span className="font-medium">Created by:</span> {selectedMacro.createdBy?.name || 'Unknown'}
+                        {selectedMacro.isPublic && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                            <Globe className="w-3 h-3" />
+                            Public
+                          </span>
+                        )}
+                        {selectedMacro.isSharedWithMe && !selectedMacro.isPublic && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
+                            <Users className="w-3 h-3" />
+                            Shared with you
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                        You can change visibility settings but cannot edit the content.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Two column layout for form */}
                   <div className="flex gap-6">
                     {/* Left column - Title, Feedback, Used In */}
@@ -471,23 +634,26 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                       {/* Title */}
                       <div>
                         <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                          Title <span className="text-red-500">*</span>
+                          Title {isOwner && <span className="text-red-500">*</span>}
                         </Label>
                         <Input
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                           placeholder="e.g., ontario-ip-issue"
                           className="bg-white dark:bg-neutral-800"
+                          disabled={!isOwner}
                         />
-                        <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-                          Use a descriptive name. Type # followed by part of the title to quickly insert this macro.
-                        </p>
+                        {isOwner && (
+                          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                            Use a descriptive name. Type # followed by part of the title to quickly insert this macro.
+                          </p>
+                        )}
                       </div>
 
                       {/* Feedback Content */}
                       <div>
                         <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                          Feedback Content <span className="text-red-500">*</span>
+                          Feedback Content {isOwner && <span className="text-red-500">*</span>}
                         </Label>
                         <TicketRichTextEditor
                           value={formData.feedback}
@@ -495,6 +661,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                           placeholder="Enter the feedback template content..."
                           rows={10}
                           className="min-h-[200px]"
+                          disabled={!isOwner}
                         />
                       </div>
 
@@ -557,8 +724,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                           Categories (optional)
                         </Label>
                         <div
-                          className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showCategoryDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
-                          onClick={() => categoryInputRef.current?.focus()}
+                          className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 ${isOwner ? 'cursor-text' : 'cursor-not-allowed opacity-75'} min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showCategoryDropdown && isOwner ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                          onClick={() => isOwner && categoryInputRef.current?.focus()}
                         >
                           {formData.categories.map(cat => (
                             <span
@@ -566,33 +733,37 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                               className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
                             >
                               {cat}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setFormData(prev => ({ ...prev, categories: prev.categories.filter(c => c !== cat) }));
-                                }}
-                                className="hover:text-blue-900 dark:hover:text-blue-300"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
+                              {isOwner && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFormData(prev => ({ ...prev, categories: prev.categories.filter(c => c !== cat) }));
+                                  }}
+                                  className="hover:text-blue-900 dark:hover:text-blue-300"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
                             </span>
                           ))}
-                          <input
-                            ref={categoryInputRef}
-                            type="text"
-                            value={categorySearch}
-                            onChange={(e) => {
-                              setCategorySearch(e.target.value);
-                              setShowCategoryDropdown(true);
-                            }}
-                            onFocus={() => setShowCategoryDropdown(true)}
-                            onKeyDown={handleCategoryKeyDown}
-                            placeholder={formData.categories.length === 0 ? "Search categories..." : ""}
-                            className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
-                          />
+                          {isOwner && (
+                            <input
+                              ref={categoryInputRef}
+                              type="text"
+                              value={categorySearch}
+                              onChange={(e) => {
+                                setCategorySearch(e.target.value);
+                                setShowCategoryDropdown(true);
+                              }}
+                              onFocus={() => setShowCategoryDropdown(true)}
+                              onKeyDown={handleCategoryKeyDown}
+                              placeholder={formData.categories.length === 0 ? "Search categories..." : ""}
+                              className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                            />
+                          )}
                         </div>
-                        {showCategoryDropdown && (
+                        {showCategoryDropdown && isOwner && (
                           <div
                             ref={categoryListRef}
                             className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
@@ -629,6 +800,117 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
                           Categories will be applied when this macro is used.
                         </p>
+                      </div>
+
+                      {/* Visibility Section - Public & Share */}
+                      <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50 dark:bg-neutral-800/50">
+                        <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-2 block">
+                          Visibility
+                        </Label>
+
+                        {/* Public Checkbox */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, isPublic: !prev.isPublic }))}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors ${
+                              formData.isPublic
+                                ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
+                                : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                            }`}
+                          >
+                            <Globe className="w-4 h-4" />
+                            <span className="text-sm">Public</span>
+                          </button>
+                          <span className="text-xs text-gray-500 dark:text-neutral-400">
+                            {formData.isPublic ? 'Visible to all QA graders' : 'Private macro'}
+                          </span>
+                        </div>
+
+                        {/* Share with Dropdown */}
+                        <div ref={shareDropdownRef} className="relative">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Users className="w-3.5 h-3.5 text-gray-500 dark:text-neutral-400" />
+                            <span className="text-xs text-gray-600 dark:text-neutral-400">Share with</span>
+                          </div>
+                          <div
+                            className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showShareDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                            onClick={() => shareInputRef.current?.focus()}
+                          >
+                            {formData.sharedWith.map(userId => (
+                              <span
+                                key={userId}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full"
+                              >
+                                {getGraderName(userId)}
+                                {isOwner && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.filter(id => id !== userId) }));
+                                    }}
+                                    className="hover:text-green-900 dark:hover:text-green-300"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                            <input
+                              ref={shareInputRef}
+                              type="text"
+                              value={shareSearch}
+                              onChange={(e) => {
+                                setShareSearch(e.target.value);
+                                setShowShareDropdown(true);
+                              }}
+                              onFocus={() => setShowShareDropdown(true)}
+                              onKeyDown={handleShareKeyDown}
+                              placeholder={formData.sharedWith.length === 0 ? "Search QA graders..." : ""}
+                              className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                            />
+                          </div>
+                          {showShareDropdown && (
+                            <div
+                              ref={shareListRef}
+                              className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-32 overflow-y-auto"
+                            >
+                              {filteredGraders.length > 0 ? (
+                                filteredGraders.map((grader, index) => (
+                                  <button
+                                    key={grader._id}
+                                    type="button"
+                                    data-highlighted={shareHighlightIndex === index}
+                                    onClick={() => {
+                                      setFormData(prev => ({ ...prev, sharedWith: [...prev.sharedWith, grader._id] }));
+                                      setShareSearch('');
+                                      setShareHighlightIndex(0);
+                                      setTimeout(() => shareInputRef.current?.focus(), 0);
+                                    }}
+                                    onMouseEnter={() => setShareHighlightIndex(index)}
+                                    className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                                      shareHighlightIndex === index
+                                        ? 'bg-green-100 dark:bg-green-900/30'
+                                        : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                                    }`}
+                                  >
+                                    {grader.name}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                                  {shareSearch ? 'No graders found' : qaGraders.length === 0 ? 'No graders available' : 'All graders selected'}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {!isOwner && (
+                            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                              You can add graders but cannot remove those added by the owner.
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Scorecard Section */}
@@ -728,7 +1010,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                 <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
                   <div className="flex items-center justify-between">
                     <div>
-                      {selectedMacro && !isCreating && (
+                      {selectedMacro && !isCreating && isOwner && (
                         <button
                           onClick={handleDelete}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
@@ -743,7 +1025,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         onClick={() => {
                           if (isCreating) {
                             setIsCreating(false);
-                            setFormData({ title: '', feedback: '', categories: [], scorecardData: {} });
+                            setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
                           } else {
                             setSelectedMacro(null);
                           }

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { X, Hash, Save, ChevronDown, Copy } from 'lucide-react';
+import { X, Hash, Save, ChevronDown, Copy, Globe, Users } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import ScorecardEditor from './ScorecardEditor';
 import { useMacros } from '../hooks/useMacros';
@@ -22,14 +22,25 @@ const SaveAsMacroModal = ({
   agentPosition = null,
   onSave
 }) => {
-  const { createMacro } = useMacros();
+  const { createMacro, fetchQAGraders } = useMacros();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     feedback: '',
     categories: [],
-    scorecardData: {}
+    scorecardData: {},
+    isPublic: false,
+    sharedWith: []
   });
+
+  // QA Graders for sharing
+  const [qaGraders, setQaGraders] = useState([]);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [shareSearch, setShareSearch] = useState('');
+  const [shareHighlightIndex, setShareHighlightIndex] = useState(0);
+  const shareDropdownRef = useRef(null);
+  const shareInputRef = useRef(null);
+  const shareListRef = useRef(null);
 
   // Category dropdown state
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -80,6 +91,13 @@ const SaveAsMacroModal = ({
     ? scorecardConfig.variants
     : [{ key: scorecardConfig?.defaultVariant || 'use_this_one', label: selectedScorecardPosition }];
 
+  // Fetch QA graders on open
+  useEffect(() => {
+    if (open) {
+      fetchQAGraders().then(graders => setQaGraders(graders || []));
+    }
+  }, [open, fetchQAGraders]);
+
   // Reset form when opened with new data
   useEffect(() => {
     if (open) {
@@ -89,10 +107,14 @@ const SaveAsMacroModal = ({
         title: '',
         feedback: initialFeedback || '',
         categories: initialCategories || [],
-        scorecardData: convertInitialScorecardData(initialScorecardData) || {}
+        scorecardData: convertInitialScorecardData(initialScorecardData) || {},
+        isPublic: false,
+        sharedWith: []
       });
       setCategorySearch('');
       setShowCategoryDropdown(false);
+      setShareSearch('');
+      setShowShareDropdown(false);
     }
   }, [open, initialFeedback, initialCategories, initialScorecardData, agentPosition]);
 
@@ -190,6 +212,90 @@ const SaveAsMacroModal = ({
     }
   };
 
+  // Share dropdown - filter graders
+  const filteredGraders = qaGraders.filter(grader =>
+    grader.name.toLowerCase().includes(shareSearch.toLowerCase()) &&
+    !formData.sharedWith.includes(grader._id)
+  );
+
+  // Reset share highlight when search changes
+  useEffect(() => {
+    setShareHighlightIndex(0);
+  }, [shareSearch]);
+
+  // Scroll share highlighted item into view
+  useEffect(() => {
+    if (showShareDropdown && shareListRef.current) {
+      const highlighted = shareListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlighted) {
+        highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [shareHighlightIndex, showShareDropdown]);
+
+  // Close share dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (shareDropdownRef.current && !shareDropdownRef.current.contains(event.target)) {
+        setShowShareDropdown(false);
+        setShareSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleShareKeyDown = (e) => {
+    if (!showShareDropdown) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowShareDropdown(true);
+      }
+      return;
+    }
+
+    const totalItems = filteredGraders.length;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setShareHighlightIndex(prev => (prev + 1) % Math.max(totalItems, 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setShareHighlightIndex(prev => (prev - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredGraders[shareHighlightIndex]) {
+          const selected = filteredGraders[shareHighlightIndex];
+          setFormData(prev => ({ ...prev, sharedWith: [...prev.sharedWith, selected._id] }));
+          setShareSearch('');
+          setShareHighlightIndex(0);
+          setTimeout(() => shareInputRef.current?.focus(), 0);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowShareDropdown(false);
+        setShareSearch('');
+        break;
+      case 'Backspace':
+        if (shareSearch === '' && formData.sharedWith.length > 0) {
+          setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.slice(0, -1) }));
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Helper to get grader name by ID
+  const getGraderName = (graderId) => {
+    const grader = qaGraders.find(g => g._id === graderId);
+    return grader?.name || 'Unknown';
+  };
+
   // Get values for a specific position and variant
   const getValuesForVariant = (position, variantKey) => {
     return formData.scorecardData[position]?.[variantKey] || {};
@@ -282,7 +388,9 @@ const SaveAsMacroModal = ({
         title: formData.title,
         feedback: formData.feedback,
         categories: formData.categories,
-        scorecardData: formData.scorecardData
+        scorecardData: formData.scorecardData,
+        isPublic: formData.isPublic,
+        sharedWith: formData.sharedWith
       });
       if (result.success) {
         toast.success('Macro saved successfully');
@@ -446,6 +554,110 @@ const SaveAsMacroModal = ({
               <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
                 Categories will be applied when this macro is used.
               </p>
+            </motion.div>
+
+            {/* Visibility Section - Public & Share */}
+            <motion.div variants={staggerItem} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50 dark:bg-neutral-800/50">
+              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-2 block">
+                Visibility (optional)
+              </Label>
+
+              {/* Public Checkbox */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, isPublic: !prev.isPublic }))}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors ${
+                    formData.isPublic
+                      ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
+                      : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                  }`}
+                >
+                  <Globe className="w-4 h-4" />
+                  <span className="text-sm">Public</span>
+                </button>
+                <span className="text-xs text-gray-500 dark:text-neutral-400">
+                  {formData.isPublic ? 'Visible to all QA graders' : 'Only you can see this macro'}
+                </span>
+              </div>
+
+              {/* Share with Dropdown */}
+              <div ref={shareDropdownRef} className="relative">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Users className="w-3.5 h-3.5 text-gray-500 dark:text-neutral-400" />
+                  <span className="text-xs text-gray-600 dark:text-neutral-400">Share with</span>
+                </div>
+                <div
+                  className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showShareDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                  onClick={() => shareInputRef.current?.focus()}
+                >
+                  {formData.sharedWith.map(userId => (
+                    <span
+                      key={userId}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full"
+                    >
+                      {getGraderName(userId)}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.filter(id => id !== userId) }));
+                        }}
+                        className="hover:text-green-900 dark:hover:text-green-300"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    ref={shareInputRef}
+                    type="text"
+                    value={shareSearch}
+                    onChange={(e) => {
+                      setShareSearch(e.target.value);
+                      setShowShareDropdown(true);
+                    }}
+                    onFocus={() => setShowShareDropdown(true)}
+                    onKeyDown={handleShareKeyDown}
+                    placeholder={formData.sharedWith.length === 0 ? "Search QA graders..." : ""}
+                    className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                  />
+                </div>
+                {showShareDropdown && (
+                  <div
+                    ref={shareListRef}
+                    className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-32 overflow-y-auto"
+                  >
+                    {filteredGraders.length > 0 ? (
+                      filteredGraders.map((grader, index) => (
+                        <button
+                          key={grader._id}
+                          type="button"
+                          data-highlighted={shareHighlightIndex === index}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, sharedWith: [...prev.sharedWith, grader._id] }));
+                            setShareSearch('');
+                            setShareHighlightIndex(0);
+                            setTimeout(() => shareInputRef.current?.focus(), 0);
+                          }}
+                          onMouseEnter={() => setShareHighlightIndex(index)}
+                          className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                            shareHighlightIndex === index
+                              ? 'bg-green-100 dark:bg-green-900/30'
+                              : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                          }`}
+                        >
+                          {grader.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                        {shareSearch ? 'No graders found' : qaGraders.length === 0 ? 'No graders available' : 'All graders selected'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </motion.div>
 
             {/* Scorecard Section */}
