@@ -13,6 +13,7 @@ import SimilarFeedbacksPanel from '../../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
 import ChooseMacroModal from '../../components/ChooseMacroModal';
 import { hasScorecard, getScorecardCategories } from '../../data/scorecardConfig';
+import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/scorecardCalculations';
 import { useMacros } from '../../hooks/useMacros';
 import { Button } from './components';
 
@@ -63,6 +64,19 @@ const TicketDialog = ({
   const selectedAgent = agents.find(a => a._id === formData.agent);
   const agentPosition = selectedAgent?.position || null;
   const agentHasScorecard = agentPosition && hasScorecard(agentPosition);
+
+  // Auto-calculate quality score when scorecard values change
+  useEffect(() => {
+    if (agentPosition && supportsAutoQualityScore(agentPosition, formData.scorecardVariant)) {
+      const calculatedScore = calculateQualityScore(agentPosition, formData.scorecardValues, formData.scorecardVariant);
+      if (calculatedScore !== null) {
+        setFormData(prev => ({
+          ...prev,
+          qualityScorePercent: calculatedScore
+        }));
+      }
+    }
+  }, [formData.scorecardValues, formData.scorecardVariant, agentPosition]);
 
   const defaultCategories = [
     'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
@@ -546,7 +560,15 @@ const TicketDialog = ({
                       {formData.feedback && formData.feedback.trim() && (
                         <button
                           type="button"
-                          onClick={() => setSaveAsMacroDialog({ open: true, feedback: formData.feedback })}
+                          onClick={() => setSaveAsMacroDialog({
+                          open: true,
+                          feedback: formData.feedback,
+                          categories: formData.categories || [],
+                          scorecardData: agentPosition && formData.scorecardValues && Object.keys(formData.scorecardValues).length > 0
+                            ? { [agentPosition]: { values: formData.scorecardValues, variant: formData.scorecardVariant || null } }
+                            : {},
+                          agentPosition
+                        })}
                           className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
                         >
                           <Save className="w-3 h-3" />
@@ -562,7 +584,40 @@ const TicketDialog = ({
                     rows={5}
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
                     enableMacros={true}
-                    onMacroSelect={(macro) => {
+                    agentPosition={agentPosition}
+                    currentScorecardVariant={formData.scorecardVariant}
+                    onMacroApply={(macro, options = {}) => {
+                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+
+                      // Build updates object
+                      const updates = {};
+
+                      // Apply categories if requested
+                      if (applyCategories && macro.categories && macro.categories.length > 0) {
+                        updates.categories = macro.categories;
+                      }
+
+                      // Apply scorecard if requested and matches agent position
+                      // New structure: scorecardData[position][variant] = { key: value }
+                      if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
+                        const positionData = macro.scorecardData[agentPosition];
+                        // Use the variant from options (selected by user) or default to first available
+                        const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+                        const values = positionData[targetVariant];
+                        if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+                          updates.scorecardValues = values;
+                          if (targetVariant) {
+                            updates.scorecardVariant = targetVariant;
+                          }
+                        }
+                      }
+
+                      // Apply updates if any
+                      if (Object.keys(updates).length > 0) {
+                        setFormData(prev => ({ ...prev, ...updates }));
+                      }
+
+                      // Record usage
                       if (ticketDialog.data?._id) {
                         recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
                       }
@@ -650,13 +705,40 @@ const TicketDialog = ({
       <ChooseMacroModal
         open={showChooseMacroModal}
         onOpenChange={setShowChooseMacroModal}
-        onSelectMacro={(macro) => {
+        agentPosition={agentPosition}
+        currentScorecardVariant={formData.scorecardVariant}
+        onSelectMacro={(macro, options = {}) => {
+          const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+
+          // Always apply feedback
           const currentFeedback = formData.feedback || '';
           const separator = currentFeedback.trim() ? '\n\n' : '';
-          setFormData(prev => ({
-            ...prev,
+          const updates = {
             feedback: currentFeedback + separator + macro.feedback
-          }));
+          };
+
+          // Apply categories if requested
+          if (applyCategories && macro.categories && macro.categories.length > 0) {
+            updates.categories = macro.categories;
+          }
+
+          // Apply scorecard if requested and matches agent position
+          // New structure: scorecardData[position][variant] = { key: value }
+          if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
+            const positionData = macro.scorecardData[agentPosition];
+            // Use the variant from options (selected by user) or default to first available
+            const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+            const values = positionData[targetVariant];
+            if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+              updates.scorecardValues = values;
+              if (targetVariant) {
+                updates.scorecardVariant = targetVariant;
+              }
+            }
+          }
+
+          setFormData(prev => ({ ...prev, ...updates }));
+
           if (ticketDialog.data?._id) {
             recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
           }

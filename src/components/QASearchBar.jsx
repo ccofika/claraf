@@ -7,9 +7,6 @@ import {
 import { Badge } from './ui/badge';
 import { DatePicker } from './ui/date-picker';
 import {
-  dropdownVariants,
-  staggerContainer,
-  staggerItem,
   duration,
   easing
 } from '../utils/animations';
@@ -316,31 +313,30 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       <AnimatePresence>
       {showAdvancedFilters && (
         <motion.div
-          initial={{ opacity: 0, y: -10, height: 0 }}
-          animate={{ opacity: 1, y: 0, height: 'auto' }}
-          exit={{ opacity: 0, y: -10, height: 0 }}
-          transition={{ duration: duration.normal, ease: easing.smooth }}
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
           className="mt-2 p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg overflow-hidden"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Advanced Filters</h3>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={clearAllFilters}
               className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
             >
               Clear all
-            </motion.button>
+            </button>
           </div>
 
           <motion.div
-            initial="initial"
-            animate="animate"
-            variants={staggerContainer}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
           >
             {/* Categories - Multi-select */}
-            <motion.div variants={staggerItem} className="relative" ref={categoryDropdownRef}>
+            <div className="relative" ref={categoryDropdownRef}>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <Tag className="w-3 h-3 inline mr-1" />
                 Categories
@@ -454,10 +450,10 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                   )}
                 </motion.div>
               )}
-            </motion.div>
+            </div>
 
             {/* Agent - Searchable Dropdown */}
-            <motion.div variants={staggerItem} className="relative" ref={agentDropdownRef}>
+            <div className="relative" ref={agentDropdownRef}>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <Users className="w-3 h-3 inline mr-1" />
                 Agent
@@ -533,10 +529,10 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 )}
                 </AnimatePresence>
               </div>
-            </motion.div>
+            </div>
 
             {/* Status */}
-            <motion.div variants={staggerItem}>
+            <div>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <FileText className="w-3 h-3 inline mr-1" />
                 Status
@@ -550,11 +546,11 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 <option value="Selected">Selected</option>
                 <option value="Graded">Graded</option>
               </select>
-            </motion.div>
+            </div>
 
             {/* Grader */}
             {graders.length > 0 && (
-              <motion.div variants={staggerItem}>
+              <div>
                 <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   <UserCheck className="w-3 h-3 inline mr-1" />
                   Grader
@@ -571,11 +567,11 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                     </option>
                   ))}
                 </select>
-              </motion.div>
+              </div>
             )}
 
             {/* Score Range */}
-            <motion.div variants={staggerItem}>
+            <div>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <Target className="w-3 h-3 inline mr-1" />
                 Min Score
@@ -589,9 +585,9 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 placeholder="0"
                 className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
               />
-            </motion.div>
+            </div>
 
-            <motion.div variants={staggerItem}>
+            <div>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <Target className="w-3 h-3 inline mr-1" />
                 Max Score
@@ -605,10 +601,10 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                 placeholder="100"
                 className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
               />
-            </motion.div>
+            </div>
 
             {/* Date Range - Full width row */}
-            <motion.div variants={staggerItem} className="col-span-full">
+            <div className="col-span-full">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
@@ -637,7 +633,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                   />
                 </div>
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         </motion.div>
       )}

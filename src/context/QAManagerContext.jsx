@@ -104,7 +104,7 @@ export const QAManagerProvider = ({ children }) => {
   // Macro dialog state
   const [manageMacrosDialog, setManageMacrosDialog] = useState({ open: false });
   const [chooseMacroDialog, setChooseMacroDialog] = useState({ open: false, onSelect: null });
-  const [saveAsMacroDialog, setSaveAsMacroDialog] = useState({ open: false, feedback: '' });
+  const [saveAsMacroDialog, setSaveAsMacroDialog] = useState({ open: false, feedback: '', categories: [], scorecardData: {}, agentPosition: null });
 
   // Send Macro Ticket state
   const [sendMacroDialog, setSendMacroDialog] = useState({ open: false });

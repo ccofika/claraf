@@ -287,7 +287,7 @@ const QADashboard = () => {
               </li>
             </ol>
             <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-3">
-              Ekstenzija je tada dodata u tvoj browser i možeš da koristiš Grade funkciju koja će sama oceniti tvoje tikete na Maestru. :)
+              Ekstenzija je tada dodata u tvoj browser i možeš da koristiš Grade funkciju koja će sama oceniti tvoje tikete na Maestru. (samo refreshuj stranicu nakon dodavanja ekstenzije)  :)
             </p>
           </div>
 

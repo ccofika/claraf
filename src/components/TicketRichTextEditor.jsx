@@ -3,6 +3,7 @@ import { uploadTicketImage, generateImageId } from '../utils/imageUpload';
 import { toast } from 'sonner';
 import { X, ZoomIn } from 'lucide-react';
 import MacroTriggerDropdown from './MacroTriggerDropdown';
+import MacroInsertConfirmModal from './MacroInsertConfirmModal';
 
 // Image Lightbox Component for fullscreen view
 const ImageLightbox = ({ src, alt, onClose }) => {
@@ -43,7 +44,9 @@ const TicketRichTextEditor = ({
   rows = 3,
   disabled = false,
   enableMacros = false,
-  onMacroSelect = null
+  agentPosition = null,
+  currentScorecardVariant = null,
+  onMacroApply = null
 }) => {
   const editorRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -52,6 +55,11 @@ const TicketRichTextEditor = ({
     active: false,
     text: '',
     position: null
+  });
+  const [macroConfirmModal, setMacroConfirmModal] = useState({
+    open: false,
+    macro: null,
+    triggerText: ''
   });
 
   // Undo/Redo history with debouncing
@@ -273,20 +281,30 @@ const TicketRichTextEditor = ({
     }
   }, [enableMacros, getTextBeforeCursor, macroTrigger.active]);
 
-  // Handle macro selection - update DOM directly since useEffect won't run while focused
-  const handleMacroSelection = useCallback((macro) => {
+  // Check if macro has extra data (categories or scorecard)
+  // New structure: scorecardData[position][variant] = { key: value }
+  const macroHasExtraData = useCallback((macro) => {
+    const hasCategories = macro.categories && macro.categories.length > 0;
+    const scorecardDataForPosition = agentPosition && macro.scorecardData?.[agentPosition];
+    const hasScorecardValues = scorecardDataForPosition && (
+      // Check if any variant has values
+      Object.keys(scorecardDataForPosition).some(variantKey => {
+        const values = scorecardDataForPosition[variantKey];
+        return values && typeof values === 'object' && Object.keys(values).length > 0;
+      })
+    );
+    return hasCategories || hasScorecardValues;
+  }, [agentPosition]);
+
+  // Insert macro feedback into editor (shared logic)
+  const insertMacroFeedback = useCallback((macro, triggerText) => {
     if (!editorRef.current) return;
 
     // Get current HTML content
     let currentHtml = editorRef.current.innerHTML;
 
     // Find and remove the #text trigger from the HTML
-    const textBeforeCursor = getTextBeforeCursor();
-    const match = textBeforeCursor.match(/#(\w*)$/);
-
-    if (match) {
-      // Find the trigger text in the HTML and remove it
-      const triggerText = match[0]; // e.g., "#test" or "#"
+    if (triggerText) {
       const lastIndex = currentHtml.lastIndexOf(triggerText);
       if (lastIndex !== -1) {
         currentHtml = currentHtml.substring(0, lastIndex) + currentHtml.substring(lastIndex + triggerText.length);
@@ -302,14 +320,62 @@ const TicketRichTextEditor = ({
     // Also update parent state via onChange
     onChange?.(newHtml);
 
+    // Move cursor to end
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [onChange]);
+
+  // Handle macro selection - update DOM directly since useEffect won't run while focused
+  const handleMacroSelection = useCallback((macro) => {
+    if (!editorRef.current) return;
+
+    // Find the trigger text
+    const textBeforeCursor = getTextBeforeCursor();
+    const match = textBeforeCursor.match(/#(\w*)$/);
+    const triggerText = match ? match[0] : '';
+
     // Close trigger dropdown
     setMacroTrigger({ active: false, text: '', position: null });
 
-    // Notify parent if callback provided
-    if (onMacroSelect) {
-      onMacroSelect(macro);
+    // Check if macro has extra data
+    if (macroHasExtraData(macro)) {
+      // Show confirmation modal
+      setMacroConfirmModal({
+        open: true,
+        macro,
+        triggerText
+      });
+    } else {
+      // No extra data - insert directly
+      insertMacroFeedback(macro, triggerText);
+
+      // Notify parent with default options
+      if (onMacroApply) {
+        onMacroApply(macro, { applyCategories: false, applyScorecard: false });
+      }
     }
-  }, [getTextBeforeCursor, onChange, onMacroSelect]);
+  }, [getTextBeforeCursor, macroHasExtraData, insertMacroFeedback, onMacroApply]);
+
+  // Handle confirmation from modal
+  const handleMacroConfirm = useCallback((options) => {
+    const { macro, triggerText } = macroConfirmModal;
+    if (!macro) return;
+
+    // Insert the feedback
+    insertMacroFeedback(macro, triggerText);
+
+    // Notify parent with chosen options
+    if (onMacroApply) {
+      onMacroApply(macro, options);
+    }
+
+    // Close modal
+    setMacroConfirmModal({ open: false, macro: null, triggerText: '' });
+  }, [macroConfirmModal, insertMacroFeedback, onMacroApply]);
 
   // Close macro trigger
   const closeMacroTrigger = useCallback(() => {
@@ -811,6 +877,20 @@ const TicketRichTextEditor = ({
           onClose={() => setLightboxImage(null)}
         />
       )}
+
+      {/* Macro Insert Confirmation Modal */}
+      <MacroInsertConfirmModal
+        open={macroConfirmModal.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMacroConfirmModal({ open: false, macro: null, triggerText: '' });
+          }
+        }}
+        macro={macroConfirmModal.macro}
+        agentPosition={agentPosition}
+        currentScorecardVariant={currentScorecardVariant}
+        onConfirm={handleMacroConfirm}
+      />
 
       <style>{`
         .ticket-rich-editor {

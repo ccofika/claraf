@@ -172,6 +172,7 @@ const ScorecardEditor = ({
   onVariantChange,
   values = {},
   onChange,
+  hideVariantSelector = false,
   disabled = false,
   className = ''
 }) => {
@@ -208,12 +209,13 @@ const ScorecardEditor = ({
   }
 
   // If variant is required but not selected, show only variant selector
-  const showValues = !needsVariant || variant;
+  // When hideVariantSelector is true, always show values (variant is passed directly)
+  const showValues = hideVariantSelector || !needsVariant || variant;
 
   return (
     <div className={`${className}`}>
-      {/* Variant selector (only for Senior) */}
-      {config.variants && (
+      {/* Variant selector (only for Senior, hidden when showing separate editors) */}
+      {config.variants && !hideVariantSelector && (
         <VariantSelector
           variants={config.variants}
           selectedVariant={variant}

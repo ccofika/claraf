@@ -7,7 +7,7 @@ import {
   AlertCircle, Loader2, X, TrendingUp, Clock, CheckCircle,
   User, ArrowRight, ArrowLeftRight, Plane, Calendar,
   BarChart3, AlertTriangle, History, Settings, Copy,
-  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check
+  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check, Pencil
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
@@ -87,6 +87,8 @@ const QAActiveOverview = () => {
   const [vacationDialog, setVacationDialog] = useState({ open: false, grader: null });
   const [agentHistoryDialog, setAgentHistoryDialog] = useState({ open: false, agent: null });
   const [excelImportDialog, setExcelImportDialog] = useState({ open: false, data: null, loading: false });
+  const [editAgentDialog, setEditAgentDialog] = useState({ open: false, agent: null });
+  const [editAgentForm, setEditAgentForm] = useState({ name: '', maestroName: '', position: '', team: '' });
   const [selectedGrader, setSelectedGrader] = useState('');
   const [selectedAgent2, setSelectedAgent2] = useState(null);
   const [selectedGrader2, setSelectedGrader2] = useState('');
@@ -199,6 +201,53 @@ const QAActiveOverview = () => {
       toast.error('Failed to load agent history');
     } finally {
       setAgentHistoryLoading(false);
+    }
+  };
+
+  // Open edit agent dialog
+  const openEditAgentDialog = (agent) => {
+    setEditAgentForm({
+      name: agent.agentName || agent.name || '',
+      maestroName: agent.maestroName || '',
+      position: agent.agentPosition || agent.position || '',
+      team: agent.agentTeam || agent.team || ''
+    });
+    setEditAgentDialog({ open: true, agent });
+  };
+
+  // Save edited agent
+  const handleSaveAgent = async () => {
+    const agent = editAgentDialog.agent;
+    const agentId = agent.agentId || agent._id;
+
+    if (!agentId) {
+      toast.error('Agent ID not found');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await axios.put(
+        `${API_URL}/api/qa/agents/${agentId}`,
+        {
+          name: editAgentForm.name,
+          maestroName: editAgentForm.maestroName,
+          position: editAgentForm.position,
+          team: editAgentForm.team
+        },
+        getAuthHeaders()
+      );
+      toast.success('Agent updated successfully');
+      setEditAgentDialog({ open: false, agent: null });
+      fetchData(true); // Refresh data
+      if (activeSubTab === 'week-setup') {
+        fetchWeekSetup();
+      }
+    } catch (err) {
+      console.error('Error updating agent:', err);
+      toast.error(err.response?.data?.message || 'Failed to update agent');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1046,6 +1095,13 @@ const QAActiveOverview = () => {
                                 >
                                   <History className="w-3.5 h-3.5" />
                                 </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEditAgentDialog(agent); }}
+                                  className="p-1 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded"
+                                  title="Edit agent"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
                               </div>
 
                               <div className="flex items-center gap-4 text-xs">
@@ -1185,6 +1241,13 @@ const QAActiveOverview = () => {
                             title="Swap"
                           >
                             <ArrowLeftRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => openEditAgentDialog(agent)}
+                            className="p-1 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         <span className="text-xs text-neutral-400">{agent.tickets?.length || 0}</span>
@@ -1643,12 +1706,21 @@ const QAActiveOverview = () => {
                               <span className="text-sm font-medium text-neutral-900 dark:text-white truncate block">{agent.name}</span>
                               {agent.team && <span className="text-xs text-neutral-500">{agent.team}</span>}
                             </div>
-                            <button
-                              onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id)}
-                              className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button
+                                onClick={() => openEditAgentDialog(agent)}
+                                className="p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
+                                title="Edit agent"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id)}
+                                className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         ))}
 
@@ -1665,12 +1737,21 @@ const QAActiveOverview = () => {
                               <span className="text-sm font-medium text-green-700 dark:text-green-400 truncate block">{agent.name}</span>
                               <span className="text-xs text-green-600 dark:text-green-500">New assignment</span>
                             </div>
-                            <button
-                              onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id, true)}
-                              className="p-1.5 text-green-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEditAgentDialog(agent)}
+                                className="p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
+                                title="Edit agent"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id, true)}
+                                className="p-1.5 text-green-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         ))}
 
@@ -2024,6 +2105,87 @@ const QAActiveOverview = () => {
           </div>
           <DialogFooter>
             <button onClick={() => setAgentHistoryDialog({ open: false, agent: null })} className="px-4 py-2 text-sm bg-neutral-100 dark:bg-neutral-800 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700">Close</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Agent Dialog */}
+      <Dialog open={editAgentDialog.open} onOpenChange={(open) => !open && setEditAgentDialog({ open: false, agent: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-amber-500" />
+              Edit Agent
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Name</label>
+              <input
+                type="text"
+                value={editAgentForm.name}
+                onChange={(e) => setEditAgentForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Full name (first and last)"
+                className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* MaestroQA Name */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">MaestroQA Name</label>
+              <input
+                type="text"
+                value={editAgentForm.maestroName}
+                onChange={(e) => setEditAgentForm(prev => ({ ...prev, maestroName: e.target.value }))}
+                placeholder="Name as it appears in MaestroQA"
+                className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Position */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Position</label>
+              <select
+                value={editAgentForm.position}
+                onChange={(e) => setEditAgentForm(prev => ({ ...prev, position: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              >
+                <option value="">Select position</option>
+                <option value="Notes">Notes</option>
+                <option value="Junior Scorecard">Junior Scorecard</option>
+                <option value="Medior Scorecard">Medior Scorecard</option>
+                <option value="Senior Scorecard">Senior Scorecard</option>
+              </select>
+            </div>
+
+            {/* Team */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Team</label>
+              <input
+                type="text"
+                value={editAgentForm.team}
+                onChange={(e) => setEditAgentForm(prev => ({ ...prev, team: e.target.value }))}
+                placeholder="BG 1, KG 1..."
+                className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => setEditAgentDialog({ open: false, agent: null })}
+              className="px-4 py-2 text-sm bg-neutral-100 dark:bg-neutral-800 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveAgent}
+              disabled={actionLoading || !editAgentForm.name.trim()}
+              className="px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

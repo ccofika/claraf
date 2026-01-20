@@ -2,17 +2,41 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
-import { X, Search, FileText, Hash, Check } from 'lucide-react';
+import { X, Search, FileText, Hash, Check, Tag, ListChecks, MessageSquare, ChevronDown } from 'lucide-react';
 import { TicketContentDisplay } from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
 import { staggerContainer, staggerItem, fadeInUp, fadeInRight, duration, easing } from '../utils/animations';
+import { getScorecardConfig, requiresVariantSelection } from '../data/scorecardConfig';
 
-const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
+const ChooseMacroModal = ({
+  open,
+  onOpenChange,
+  onSelectMacro,
+  agentPosition = null,
+  currentScorecardVariant = null // Current variant selected in the ticket
+}) => {
   const { macros, loading, fetchMacros, searchMacros } = useMacros();
   const [selectedMacro, setSelectedMacro] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Get scorecard config for the position
+  const scorecardConfig = agentPosition ? getScorecardConfig(agentPosition) : null;
+  const needsVariantSelection = agentPosition && requiresVariantSelection(agentPosition);
+  const availableVariants = scorecardConfig?.variants || [];
+
+  // Check if macro has extra data (defined early for use in useEffect)
+  // New structure: scorecardData[position][variant] = { key: value }
+  const scorecardDataForPosition = agentPosition && selectedMacro?.scorecardData?.[agentPosition];
+  const hasScorecardValues = scorecardDataForPosition && (
+    // Check if any variant has values
+    Object.keys(scorecardDataForPosition).some(variantKey => {
+      const values = scorecardDataForPosition[variantKey];
+      return values && typeof values === 'object' && Object.keys(values).length > 0;
+    })
+  );
 
   // Fetch macros on open
   useEffect(() => {
@@ -21,8 +45,27 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
       setSelectedMacro(null);
       setSearchTerm('');
       setSearchResults([]);
+      setSelectedVariant(null);
     }
   }, [open, fetchMacros]);
+
+  // Update selected variant when macro or currentScorecardVariant changes
+  useEffect(() => {
+    if (selectedMacro && hasScorecardValues) {
+      // If ticket already has a variant selected, use that
+      if (currentScorecardVariant) {
+        setSelectedVariant(currentScorecardVariant);
+      } else if (selectedMacro.scorecardData?.[agentPosition]?.variant) {
+        // Otherwise use the variant from the macro
+        setSelectedVariant(selectedMacro.scorecardData[agentPosition].variant);
+      } else if (availableVariants.length > 0) {
+        // Default to first variant if none selected
+        setSelectedVariant(availableVariants[0].key);
+      } else {
+        setSelectedVariant(null);
+      }
+    }
+  }, [selectedMacro, currentScorecardVariant, agentPosition, availableVariants, hasScorecardValues]);
 
   // Debounced search
   useEffect(() => {
@@ -44,25 +87,58 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
   // Get display list
   const displayMacros = searchTerm.trim() ? searchResults : macros;
 
-  // Handle select
-  const handleSelect = () => {
+  // Check if macro has categories
+  const hasCategories = selectedMacro?.categories && selectedMacro.categories.length > 0;
+  const hasExtraData = hasCategories || hasScorecardValues;
+
+  // Handle select - feedback only
+  const handleSelectFeedbackOnly = () => {
     if (selectedMacro && onSelectMacro) {
-      onSelectMacro(selectedMacro);
+      onSelectMacro(selectedMacro, { applyCategories: false, applyScorecard: false });
       onOpenChange(false);
     }
   };
 
-  // Handle double click to select immediately
+  // Handle select - all data
+  const handleSelectAll = () => {
+    if (selectedMacro && onSelectMacro) {
+      onSelectMacro(selectedMacro, {
+        applyCategories: true,
+        applyScorecard: true,
+        scorecardVariant: selectedVariant // Pass the selected variant
+      });
+      onOpenChange(false);
+    }
+  };
+
+  // Handle double click to select immediately (feedback + all data if exists)
   const handleDoubleClick = (macro) => {
     if (onSelectMacro) {
-      onSelectMacro(macro);
+      const macroHasCategories = macro.categories && macro.categories.length > 0;
+      const macroHasScorecard = agentPosition && macro.scorecardData?.[agentPosition] &&
+        Object.keys(macro.scorecardData[agentPosition].values || {}).length > 0;
+
+      // Determine variant for double-click
+      let variant = null;
+      if (macroHasScorecard && needsVariantSelection) {
+        variant = currentScorecardVariant ||
+          macro.scorecardData?.[agentPosition]?.variant ||
+          (availableVariants.length > 0 ? availableVariants[0].key : null);
+      }
+
+      // If macro has extra data, apply all. Otherwise just feedback.
+      onSelectMacro(macro, {
+        applyCategories: macroHasCategories,
+        applyScorecard: macroHasScorecard,
+        scorecardVariant: variant
+      });
       onOpenChange(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-[70vw] !h-[50vh] !max-h-[50vh] p-0 gap-0 flex flex-col overflow-hidden">
+      <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-[70vw] !h-[60vh] !max-h-[60vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
         <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
           <div className="flex items-center justify-between">
@@ -109,22 +185,44 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
                 </div>
               ) : (
                 <motion.div variants={staggerContainer} initial="initial" animate="animate">
-                  {displayMacros.map((macro) => (
-                    <motion.button
-                      key={macro._id}
-                      onClick={() => setSelectedMacro(macro)}
-                      onDoubleClick={() => handleDoubleClick(macro)}
-                      className={`w-full text-left px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
-                        selectedMacro?._id === macro._id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500' : ''
-                      }`}
-                      variants={staggerItem}
-                      whileHover={{ x: 4, transition: { duration: duration.fast } }}
-                    >
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {macro.title}
-                      </p>
-                    </motion.button>
-                  ))}
+                  {displayMacros.map((macro) => {
+                    const macroHasCategories = macro.categories && macro.categories.length > 0;
+                    const macroHasScorecard = agentPosition && macro.scorecardData?.[agentPosition] &&
+                      Object.keys(macro.scorecardData[agentPosition].values || {}).length > 0;
+
+                    return (
+                      <motion.button
+                        key={macro._id}
+                        onClick={() => setSelectedMacro(macro)}
+                        onDoubleClick={() => handleDoubleClick(macro)}
+                        className={`w-full text-left px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                          selectedMacro?._id === macro._id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500' : ''
+                        }`}
+                        variants={staggerItem}
+                        whileHover={{ x: 4, transition: { duration: duration.fast } }}
+                      >
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {macro.title}
+                        </p>
+                        {(macroHasCategories || macroHasScorecard) && (
+                          <div className="flex items-center gap-2 mt-1">
+                            {macroHasCategories && (
+                              <span className="text-xs text-blue-500 flex items-center gap-0.5">
+                                <Tag className="w-3 h-3" />
+                                {macro.categories.length}
+                              </span>
+                            )}
+                            {macroHasScorecard && (
+                              <span className="text-xs text-purple-500 flex items-center gap-0.5">
+                                <ListChecks className="w-3 h-3" />
+                                SC
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
                 </motion.div>
               )}
             </div>
@@ -143,14 +241,14 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
             ) : (
               <>
                 <motion.div
-                  className="flex-1 overflow-y-auto p-4"
+                  className="flex-1 overflow-y-auto p-4 space-y-4"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: duration.normal, ease: easing.smooth }}
                   key={selectedMacro._id}
                 >
                   {/* Title */}
-                  <div className="mb-4">
+                  <div>
                     <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
                       Title
                     </p>
@@ -161,8 +259,9 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
 
                   {/* Feedback Preview */}
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
-                      Content
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      Feedback Content
                     </p>
                     <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-200 dark:border-neutral-800 p-3">
                       <TicketContentDisplay
@@ -171,24 +270,131 @@ const ChooseMacroModal = ({ open, onOpenChange, onSelectMacro }) => {
                       />
                     </div>
                   </div>
+
+                  {/* Categories Preview */}
+                  {hasCategories && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        Categories ({selectedMacro.categories.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedMacro.categories.map(cat => (
+                          <span
+                            key={cat}
+                            className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scorecard Preview */}
+                  {hasScorecardValues && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                        <ListChecks className="w-3 h-3" />
+                        Scorecard Values for {agentPosition}
+                      </p>
+
+                      {/* Variant Selection for positions that require it */}
+                      {needsVariantSelection && availableVariants.length > 0 && (
+                        <div className="mb-2">
+                          <label className="text-xs text-gray-500 dark:text-neutral-400 mb-1 block">
+                            {currentScorecardVariant ? 'Scorecard type (from ticket):' : 'Select scorecard type:'}
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={selectedVariant || ''}
+                              onChange={(e) => setSelectedVariant(e.target.value)}
+                              disabled={!!currentScorecardVariant} // Disable if ticket already has variant
+                              className="w-full appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {availableVariants.map(v => (
+                                <option key={v.key} value={v.key}>{v.label}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                          </div>
+                          {currentScorecardVariant && (
+                            <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">
+                              Using variant already selected in ticket
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 p-3">
+                        <p className="text-sm text-purple-700 dark:text-purple-300">
+                          {(() => {
+                            // Count values for the selected variant
+                            const variantValues = selectedVariant && scorecardDataForPosition[selectedVariant];
+                            if (variantValues && typeof variantValues === 'object') {
+                              return `${Object.keys(variantValues).length} scorecard fields will be applied`;
+                            }
+                            // Fallback: count all values across all variants
+                            let total = 0;
+                            Object.keys(scorecardDataForPosition).forEach(vk => {
+                              const vals = scorecardDataForPosition[vk];
+                              if (vals && typeof vals === 'object') {
+                                total += Object.keys(vals).length;
+                              }
+                            });
+                            return `${total} scorecard fields available`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
 
                 {/* Footer */}
                 <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => onOpenChange(false)}
-                      className="px-3 py-1.5 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSelect}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-black dark:bg-white text-white dark:text-black font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Insert Macro
-                    </button>
+                  <div className="flex items-center justify-between">
+                    {/* Info text */}
+                    {hasExtraData && (
+                      <p className="text-xs text-gray-500 dark:text-neutral-400">
+                        This macro includes categories/scorecard data
+                      </p>
+                    )}
+                    {!hasExtraData && <div />}
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onOpenChange(false)}
+                        className="px-3 py-1.5 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
+                      >
+                        Cancel
+                      </button>
+
+                      {hasExtraData ? (
+                        <>
+                          <button
+                            onClick={handleSelectFeedbackOnly}
+                            className="px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-300 border border-gray-300 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
+                          >
+                            Feedback Only
+                          </button>
+                          <button
+                            onClick={handleSelectAll}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Insert All
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={handleSelectFeedbackOnly}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-black dark:bg-white text-white dark:text-black font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Insert Macro
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </>

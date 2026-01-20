@@ -576,7 +576,10 @@ const QAManagerLayoutInner = () => {
         open={saveAsMacroDialog.open}
         onOpenChange={(open) => setSaveAsMacroDialog({ ...saveAsMacroDialog, open })}
         initialFeedback={saveAsMacroDialog.feedback}
-        onSave={() => setSaveAsMacroDialog({ open: false, feedback: '' })}
+        initialCategories={saveAsMacroDialog.categories}
+        initialScorecardData={saveAsMacroDialog.scorecardData}
+        agentPosition={saveAsMacroDialog.agentPosition}
+        onSave={() => setSaveAsMacroDialog({ open: false, feedback: '', categories: [], scorecardData: {}, agentPosition: null })}
       />
 
       {/* Send Ticket Modal */}
