@@ -8,12 +8,14 @@ import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Cop
 import TicketRichTextEditor from './TicketRichTextEditor';
 import ScorecardEditor from './ScorecardEditor';
 import { useMacros } from '../hooks/useMacros';
+import { useAuth } from '../context/AuthContext';
 import { staggerContainer, staggerItem, fadeInUp, fadeInLeft, duration, easing } from '../utils/animations';
 import { getScorecardCategories, hasScorecard, getScorecardConfig, requiresVariantSelection } from '../data/scorecardConfig';
 
 const SCORECARD_POSITIONS = ['Junior Scorecard', 'Medior Scorecard', 'Senior Scorecard'];
 
 const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
+  const { user } = useAuth();
   const {
     macros,
     loading,
@@ -837,18 +839,20 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                             className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showShareDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
                             onClick={() => shareInputRef.current?.focus()}
                           >
-                            {formData.sharedWith.map(userId => (
+                            {formData.sharedWith
+                              .filter(id => String(id) !== String(user?._id)) // Don't show current user in the list
+                              .map(sharedUserId => (
                               <span
-                                key={userId}
+                                key={sharedUserId}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full"
                               >
-                                {getGraderName(userId)}
+                                {getGraderName(sharedUserId)}
                                 {isOwner && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.filter(id => id !== userId) }));
+                                      setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.filter(id => id !== sharedUserId) }));
                                     }}
                                     className="hover:text-green-900 dark:hover:text-green-300"
                                   >
