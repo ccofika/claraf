@@ -801,7 +801,18 @@ const ViewTicketDialog = ({
                 <Button
                   size="sm"
                   variant="glass"
-                  onClick={() => setSaveAsMacroDialog({ open: true, feedback: ticket.feedback })}
+                  onClick={() => {
+                    const agentPosition = ticket.agent?.position || null;
+                    setSaveAsMacroDialog({
+                      open: true,
+                      feedback: ticket.feedback,
+                      categories: ticket.categories || [],
+                      scorecardData: agentPosition && ticket.scorecardValues && Object.keys(ticket.scorecardValues).length > 0
+                        ? { [agentPosition]: { values: ticket.scorecardValues, variant: ticket.scorecardVariant || null } }
+                        : {},
+                      agentPosition
+                    });
+                  }}
                 >
                   <Hash className="w-4 h-4 mr-1.5" />
                   Save as Macro

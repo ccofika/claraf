@@ -208,7 +208,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   // Share dropdown - filter graders
   const filteredGraders = qaGraders.filter(grader =>
     grader.name.toLowerCase().includes(shareSearch.toLowerCase()) &&
-    !formData.sharedWith.includes(grader._id)
+    !(formData.sharedWith || []).includes(grader._id)
   );
 
   // Reset share highlight when search changes
@@ -274,7 +274,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         setShareSearch('');
         break;
       case 'Backspace':
-        if (shareSearch === '' && formData.sharedWith.length > 0) {
+        if (shareSearch === '' && (formData.sharedWith || []).length > 0) {
           setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.slice(0, -1) }));
         }
         break;
@@ -470,7 +470,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     if (result.success) {
       toast.success('Macro deleted successfully');
       setSelectedMacro(null);
-      setFormData({ title: '', feedback: '', categories: [], scorecardData: {} });
+      setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
     } else {
       toast.error(result.error);
     }
@@ -839,7 +839,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                             className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showShareDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
                             onClick={() => shareInputRef.current?.focus()}
                           >
-                            {formData.sharedWith
+                            {(formData.sharedWith || [])
                               .filter(id => String(id) !== String(user?._id)) // Don't show current user in the list
                               .map(sharedUserId => (
                               <span
@@ -852,7 +852,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setFormData(prev => ({ ...prev, sharedWith: prev.sharedWith.filter(id => id !== sharedUserId) }));
+                                      setFormData(prev => ({ ...prev, sharedWith: (prev.sharedWith || []).filter(id => id !== sharedUserId) }));
                                     }}
                                     className="hover:text-green-900 dark:hover:text-green-300"
                                   >
@@ -871,7 +871,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                               }}
                               onFocus={() => setShowShareDropdown(true)}
                               onKeyDown={handleShareKeyDown}
-                              placeholder={formData.sharedWith.length === 0 ? "Search QA graders..." : ""}
+                              placeholder={(formData.sharedWith || []).length === 0 ? "Search QA graders..." : ""}
                               className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
                             />
                           </div>
