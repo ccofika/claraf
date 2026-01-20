@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
-  AlertTriangle, Sparkles, Users, ExternalLink
+  AlertTriangle, Sparkles, Users, ExternalLink, Search
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -54,12 +54,105 @@ const TicketDialog = ({
   const [showChooseMacroModal, setShowChooseMacroModal] = useState(false);
   const { recordUsage } = useMacros();
 
+  // Agent searchable dropdown state
+  const [agentSearchQuery, setAgentSearchQuery] = useState('');
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+  const [agentHighlightIndex, setAgentHighlightIndex] = useState(0);
+  const agentDropdownRef = useRef(null);
+  const agentInputRef = useRef(null);
+  const agentListRef = useRef(null);
+
   // Sync formData with ticketFormDataRef when dialog opens or ticket changes
   useEffect(() => {
     if (ticketDialog.open) {
       setFormDataLocal({ ...ticketFormDataRef.current });
     }
   }, [ticketDialog.open, ticketDialog.data?._id, ticketFormDataRef]);
+
+  // Sync agent search query with selected agent
+  useEffect(() => {
+    if (formData.agent) {
+      const selectedAgentObj = agents.find(a => a._id === formData.agent);
+      if (selectedAgentObj) {
+        setAgentSearchQuery(selectedAgentObj.name);
+      }
+    } else {
+      setAgentSearchQuery('');
+    }
+  }, [formData.agent, agents]);
+
+  // Filtered agents based on search
+  const filteredAgents = agents.filter(agent =>
+    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
+  );
+
+  // Reset agent highlight index when search changes
+  useEffect(() => {
+    if (showAgentDropdown) {
+      setAgentHighlightIndex(0);
+    }
+  }, [agentSearchQuery]);
+
+  // Scroll agent highlighted item into view
+  useEffect(() => {
+    if (showAgentDropdown && agentListRef.current) {
+      const highlightedElement = agentListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [agentHighlightIndex, showAgentDropdown]);
+
+  // Close agent dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target)) {
+        setShowAgentDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Keyboard handler for agent dropdown
+  const handleAgentKeyDown = (e) => {
+    if (!showAgentDropdown) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowAgentDropdown(true);
+        setAgentHighlightIndex(0);
+      }
+      return;
+    }
+
+    const totalItems = filteredAgents.length;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setAgentHighlightIndex(prev => (prev + 1) % Math.max(totalItems, 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setAgentHighlightIndex(prev => (prev - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredAgents[agentHighlightIndex]) {
+          const selectedAgentItem = filteredAgents[agentHighlightIndex];
+          setFormData({ ...formData, agent: selectedAgentItem._id });
+          setAgentSearchQuery(selectedAgentItem.name);
+          setShowAgentDropdown(false);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowAgentDropdown(false);
+        break;
+      default:
+        break;
+    }
+  };
 
   const selectedAgent = agents.find(a => a._id === formData.agent);
   const agentPosition = selectedAgent?.position || null;
@@ -352,19 +445,64 @@ const TicketDialog = ({
             <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
                 <div className="grid grid-cols-3 gap-4">
-                  <div>
+                  <div className="relative" ref={agentDropdownRef}>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
-                    <select
-                      value={formData.agent}
-                      onChange={(e) => setFormData({ ...formData, agent: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Select Agent</option>
-                      {agents.map(agent => (
-                        <option key={agent._id} value={agent._id}>{agent.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-neutral-500 pointer-events-none" />
+                      <input
+                        ref={agentInputRef}
+                        type="text"
+                        value={agentSearchQuery}
+                        onChange={(e) => {
+                          setAgentSearchQuery(e.target.value);
+                          setShowAgentDropdown(true);
+                          // Clear agent selection if search changes
+                          if (e.target.value !== agents.find(a => a._id === formData.agent)?.name) {
+                            // Keep the visual search but don't clear formData.agent until selection
+                          }
+                        }}
+                        onFocus={() => setShowAgentDropdown(true)}
+                        onKeyDown={handleAgentKeyDown}
+                        placeholder="Search agents..."
+                        required={!formData.agent}
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                      />
+                      {showAgentDropdown && (
+                        <div
+                          ref={agentListRef}
+                          className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {filteredAgents.length > 0 ? (
+                            filteredAgents.map((agent, index) => (
+                              <button
+                                key={agent._id}
+                                type="button"
+                                data-highlighted={agentHighlightIndex === index}
+                                onClick={() => {
+                                  setFormData({ ...formData, agent: agent._id });
+                                  setAgentSearchQuery(agent.name);
+                                  setShowAgentDropdown(false);
+                                }}
+                                onMouseEnter={() => setAgentHighlightIndex(index)}
+                                className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                                  agentHighlightIndex === index
+                                    ? 'bg-blue-100 dark:bg-blue-900/30'
+                                    : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                                }`}
+                              >
+                                {agent.name}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                              No agents found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Hidden input for form validation */}
+                    <input type="hidden" value={formData.agent} required />
                   </div>
                   <div>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>

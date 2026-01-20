@@ -132,6 +132,51 @@ export const useMacros = () => {
     }
   }, []);
 
+  // Get QA graders with macro counts (admin only)
+  const fetchQAGradersWithCounts = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/macros/graders-with-counts`, getAuthHeaders());
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching QA graders with counts:', err);
+      return [];
+    }
+  }, []);
+
+  // Fetch macros by specific creator (admin only)
+  const fetchMacrosByCreator = useCallback(async (creatorId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/macros?creatorId=${creatorId}`,
+        getAuthHeaders()
+      );
+      setMacros(response.data);
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching macros by creator:', err);
+      setError(err.response?.data?.message || 'Failed to fetch macros');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Search macros by specific creator (admin only)
+  const searchMacrosByCreator = useCallback(async (term, creatorId) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/macros/search?q=${encodeURIComponent(term)}&creatorId=${creatorId}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error searching macros by creator:', err);
+      return [];
+    }
+  }, []);
+
   return {
     macros,
     loading,
@@ -144,7 +189,11 @@ export const useMacros = () => {
     deleteMacro,
     recordUsage,
     getMacroTickets,
-    fetchQAGraders
+    fetchQAGraders,
+    // Admin functions
+    fetchQAGradersWithCounts,
+    fetchMacrosByCreator,
+    searchMacrosByCreator
   };
 };
 

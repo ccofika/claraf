@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Copy, Globe, Users } from 'lucide-react';
+import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Copy, Globe, Users, UserCircle } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import ScorecardEditor from './ScorecardEditor';
 import { useMacros } from '../hooks/useMacros';
@@ -13,6 +13,9 @@ import { staggerContainer, staggerItem, fadeInUp, fadeInLeft, duration, easing }
 import { getScorecardCategories, hasScorecard, getScorecardConfig, requiresVariantSelection } from '../data/scorecardConfig';
 
 const SCORECARD_POSITIONS = ['Junior Scorecard', 'Medior Scorecard', 'Senior Scorecard'];
+
+// Admin emails that can view all macros
+const MACRO_ADMIN_EMAILS = ['filipkozomara@mebit.io', 'nevena@mebit.io'];
 
 const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const { user } = useAuth();
@@ -24,13 +27,24 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     updateMacro,
     deleteMacro,
     getMacroTickets,
-    fetchQAGraders
+    fetchQAGraders,
+    fetchQAGradersWithCounts,
+    fetchMacrosByCreator
   } = useMacros();
+
+  // Check if current user is admin
+  const isAdmin = MACRO_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
 
   const [selectedMacro, setSelectedMacro] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Admin state for viewing other users' macros
+  const [adminGraders, setAdminGraders] = useState([]);
+  const [selectedCreator, setSelectedCreator] = useState(null);
+  const [showCreatorDropdown, setShowCreatorDropdown] = useState(false);
+  const creatorDropdownRef = useRef(null);
 
   // Form state for editing/creating
   const [formData, setFormData] = useState({
@@ -107,8 +121,38 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
       setSelectedScorecardPosition('Junior Scorecard');
       setShareSearch('');
       setShowShareDropdown(false);
+      // Reset admin state
+      setSelectedCreator(null);
+      setShowCreatorDropdown(false);
+      // Fetch admin graders if user is admin
+      if (isAdmin) {
+        fetchQAGradersWithCounts().then(graders => setAdminGraders(graders || []));
+      }
     }
-  }, [open, fetchMacros, fetchQAGraders]);
+  }, [open, fetchMacros, fetchQAGraders, isAdmin, fetchQAGradersWithCounts]);
+
+  // Fetch macros when creator selection changes (admin only)
+  useEffect(() => {
+    if (isAdmin && selectedCreator) {
+      fetchMacrosByCreator(selectedCreator._id);
+      setSelectedMacro(null);
+      setIsCreating(false);
+    } else if (isAdmin && selectedCreator === null && open) {
+      // When clearing selection, fetch user's own macros
+      fetchMacros();
+    }
+  }, [selectedCreator, isAdmin, fetchMacrosByCreator, fetchMacros, open]);
+
+  // Close creator dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (creatorDropdownRef.current && !creatorDropdownRef.current.contains(event.target)) {
+        setShowCreatorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Update form when macro is selected
   useEffect(() => {
@@ -290,6 +334,9 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   };
 
   // Check if current user is the owner of the selected macro
+  // Can edit if creating, owner, or admin with canAdminEdit flag
+  const canEdit = isCreating || (selectedMacro && (selectedMacro.isOwner || selectedMacro.canAdminEdit));
+  // For display purposes, isOwner means actual owner (not admin)
   const isOwner = isCreating || (selectedMacro && selectedMacro.isOwner);
 
   // Get scorecard config for selected position
@@ -408,8 +455,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
 
   // Handle save
   const handleSave = async () => {
-    // Only validate content if owner
-    if (isOwner) {
+    // Validate content if can edit (owner or admin)
+    if (canEdit) {
       if (!formData.title.trim()) {
         toast.error('Title is required');
         return;
@@ -427,8 +474,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         sharedWith: formData.sharedWith
       };
 
-      // Only include content if owner
-      if (isOwner) {
+      // Include content if can edit (owner or admin)
+      if (canEdit) {
         dataToSave.title = formData.title;
         dataToSave.feedback = formData.feedback;
         dataToSave.categories = formData.categories;
@@ -511,6 +558,68 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT SIDEBAR - Macro List (25%) */}
           <div className="w-1/4 flex flex-col border-r border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+            {/* Admin Creator Dropdown */}
+            {isAdmin && (
+              <div className="p-3 border-b border-gray-200 dark:border-neutral-800" ref={creatorDropdownRef}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatorDropdown(!showCreatorDropdown)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className={selectedCreator ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-neutral-400'}>
+                        {selectedCreator ? selectedCreator.name : 'My Macros'}
+                      </span>
+                      {selectedCreator && (
+                        <span className="text-xs text-gray-400">({selectedCreator.macroCount})</span>
+                      )}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCreatorDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showCreatorDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCreator(null);
+                          setShowCreatorDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                          !selectedCreator ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <UserCircle className="w-4 h-4" />
+                          My Macros
+                        </span>
+                      </button>
+                      <div className="border-t border-gray-200 dark:border-neutral-700 my-1" />
+                      {adminGraders.map(grader => (
+                        <button
+                          key={grader._id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCreator(grader);
+                            setShowCreatorDropdown(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                            selectedCreator?._id === grader._id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center justify-between">
+                            <span>{grader.name}</span>
+                            <span className="text-xs text-gray-400">({grader.macroCount})</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Search */}
             <div className="p-3 border-b border-gray-200 dark:border-neutral-800">
               <div className="relative">
@@ -636,16 +745,16 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                       {/* Title */}
                       <div>
                         <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                          Title {isOwner && <span className="text-red-500">*</span>}
+                          Title {canEdit && <span className="text-red-500">*</span>}
                         </Label>
                         <Input
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                           placeholder="e.g., ontario-ip-issue"
                           className="bg-white dark:bg-neutral-800"
-                          disabled={!isOwner}
+                          disabled={!canEdit}
                         />
-                        {isOwner && (
+                        {canEdit && (
                           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
                             Use a descriptive name. Type # followed by part of the title to quickly insert this macro.
                           </p>
@@ -655,7 +764,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                       {/* Feedback Content */}
                       <div>
                         <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                          Feedback Content {isOwner && <span className="text-red-500">*</span>}
+                          Feedback Content {canEdit && <span className="text-red-500">*</span>}
                         </Label>
                         <TicketRichTextEditor
                           value={formData.feedback}
@@ -663,7 +772,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                           placeholder="Enter the feedback template content..."
                           rows={10}
                           className="min-h-[200px]"
-                          disabled={!isOwner}
+                          disabled={!canEdit}
                         />
                       </div>
 
@@ -726,8 +835,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                           Categories (optional)
                         </Label>
                         <div
-                          className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 ${isOwner ? 'cursor-text' : 'cursor-not-allowed opacity-75'} min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showCategoryDropdown && isOwner ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
-                          onClick={() => isOwner && categoryInputRef.current?.focus()}
+                          className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 ${canEdit ? 'cursor-text' : 'cursor-not-allowed opacity-75'} min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showCategoryDropdown && canEdit ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                          onClick={() => canEdit && categoryInputRef.current?.focus()}
                         >
                           {formData.categories.map(cat => (
                             <span
@@ -735,7 +844,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                               className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
                             >
                               {cat}
-                              {isOwner && (
+                              {canEdit && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -749,7 +858,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                               )}
                             </span>
                           ))}
-                          {isOwner && (
+                          {canEdit && (
                             <input
                               ref={categoryInputRef}
                               type="text"
@@ -765,7 +874,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                             />
                           )}
                         </div>
-                        {showCategoryDropdown && isOwner && (
+                        {showCategoryDropdown && canEdit && (
                           <div
                             ref={categoryListRef}
                             className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
@@ -847,7 +956,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full"
                               >
                                 {getGraderName(sharedUserId)}
-                                {isOwner && (
+                                {canEdit && (
                                   <button
                                     type="button"
                                     onClick={(e) => {

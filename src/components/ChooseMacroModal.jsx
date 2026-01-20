@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
-import { X, Search, FileText, Hash, Check, Tag, ListChecks, MessageSquare, ChevronDown, Globe, Users } from 'lucide-react';
+import { X, Search, FileText, Hash, Check, Tag, ListChecks, MessageSquare, ChevronDown, Globe, Users, UserCircle } from 'lucide-react';
 import { TicketContentDisplay } from './TicketRichTextEditor';
 import { useMacros } from '../hooks/useMacros';
+import { useAuth } from '../context/AuthContext';
 import { staggerContainer, staggerItem, fadeInUp, fadeInRight, duration, easing } from '../utils/animations';
 import { getScorecardConfig, requiresVariantSelection } from '../data/scorecardConfig';
+
+// Admin emails that can view all macros
+const MACRO_ADMIN_EMAILS = ['filipkozomara@mebit.io', 'nevena@mebit.io'];
 
 const ChooseMacroModal = ({
   open,
@@ -15,12 +19,30 @@ const ChooseMacroModal = ({
   agentPosition = null,
   currentScorecardVariant = null // Current variant selected in the ticket
 }) => {
-  const { macros, loading, fetchMacros, searchMacros } = useMacros();
+  const { user } = useAuth();
+  const {
+    macros,
+    loading,
+    fetchMacros,
+    searchMacros,
+    fetchQAGradersWithCounts,
+    fetchMacrosByCreator,
+    searchMacrosByCreator
+  } = useMacros();
   const [selectedMacro, setSelectedMacro] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Check if current user is admin
+  const isAdmin = MACRO_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+
+  // Admin state for viewing other users' macros
+  const [adminGraders, setAdminGraders] = useState([]);
+  const [selectedCreator, setSelectedCreator] = useState(null);
+  const [showCreatorDropdown, setShowCreatorDropdown] = useState(false);
+  const creatorDropdownRef = useRef(null);
 
   // Get scorecard config for the position
   const scorecardConfig = agentPosition ? getScorecardConfig(agentPosition) : null;
@@ -46,8 +68,38 @@ const ChooseMacroModal = ({
       setSearchTerm('');
       setSearchResults([]);
       setSelectedVariant(null);
+      // Reset admin state
+      setSelectedCreator(null);
+      setShowCreatorDropdown(false);
+      // Fetch admin graders if user is admin
+      if (isAdmin) {
+        fetchQAGradersWithCounts().then(graders => setAdminGraders(graders || []));
+      }
     }
-  }, [open, fetchMacros]);
+  }, [open, fetchMacros, isAdmin, fetchQAGradersWithCounts]);
+
+  // Fetch macros when creator selection changes (admin only)
+  useEffect(() => {
+    if (isAdmin && selectedCreator) {
+      fetchMacrosByCreator(selectedCreator._id);
+      setSelectedMacro(null);
+      setSearchResults([]);
+      setSearchTerm('');
+    } else if (isAdmin && selectedCreator === null && open) {
+      fetchMacros();
+    }
+  }, [selectedCreator, isAdmin, fetchMacrosByCreator, fetchMacros, open]);
+
+  // Close creator dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (creatorDropdownRef.current && !creatorDropdownRef.current.contains(event.target)) {
+        setShowCreatorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Update selected variant when macro or currentScorecardVariant changes
   useEffect(() => {
@@ -76,13 +128,16 @@ const ChooseMacroModal = ({
 
     const timer = setTimeout(async () => {
       setIsSearching(true);
-      const results = await searchMacros(searchTerm);
+      // Use creator-filtered search if admin has selected a creator
+      const results = isAdmin && selectedCreator
+        ? await searchMacrosByCreator(searchTerm, selectedCreator._id)
+        : await searchMacros(searchTerm);
       setSearchResults(results);
       setIsSearching(false);
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, searchMacros]);
+  }, [searchTerm, searchMacros, searchMacrosByCreator, isAdmin, selectedCreator]);
 
   // Get display list
   const displayMacros = searchTerm.trim() ? searchResults : macros;
@@ -159,6 +214,68 @@ const ChooseMacroModal = ({
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT SIDEBAR - Macro List (30%) */}
           <div className="w-[30%] flex flex-col border-r border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+            {/* Admin Creator Dropdown */}
+            {isAdmin && (
+              <div className="p-3 border-b border-gray-200 dark:border-neutral-800" ref={creatorDropdownRef}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatorDropdown(!showCreatorDropdown)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className={selectedCreator ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-neutral-400'}>
+                        {selectedCreator ? selectedCreator.name : 'My Macros'}
+                      </span>
+                      {selectedCreator && (
+                        <span className="text-xs text-gray-400">({selectedCreator.macroCount})</span>
+                      )}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCreatorDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showCreatorDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCreator(null);
+                          setShowCreatorDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                          !selectedCreator ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <UserCircle className="w-4 h-4" />
+                          My Macros
+                        </span>
+                      </button>
+                      <div className="border-t border-gray-200 dark:border-neutral-700 my-1" />
+                      {adminGraders.map(grader => (
+                        <button
+                          key={grader._id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCreator(grader);
+                            setShowCreatorDropdown(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors ${
+                            selectedCreator?._id === grader._id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center justify-between">
+                            <span>{grader.name}</span>
+                            <span className="text-xs text-gray-400">({grader.macroCount})</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Search */}
             <div className="p-3 border-b border-gray-200 dark:border-neutral-800">
               <div className="relative">

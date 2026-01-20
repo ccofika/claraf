@@ -700,7 +700,7 @@ const QAManagerLayoutInner = () => {
       <TicketDialog
         ticketDialog={ticketDialog}
         setTicketDialog={setTicketDialog}
-        agents={agents}
+        agents={ticketDialog.source === 'archive' ? allExistingAgents : agents}
         tickets={tickets}
         ticketFormDataRef={ticketFormDataRef}
         originalFormDataRef={originalFormDataRef}

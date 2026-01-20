@@ -19,11 +19,17 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [agentHighlightIndex, setAgentHighlightIndex] = useState(-1); // -1 means "All agents" option
 
+  // Category search state
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categoryHighlightIndex, setCategoryHighlightIndex] = useState(0);
+
   const searchInputRef = useRef(null);
   const agentDropdownRef = useRef(null);
   const agentInputRef = useRef(null);
   const agentListRef = useRef(null);
   const categoryDropdownRef = useRef(null);
+  const categoryInputRef = useRef(null);
+  const categoryListRef = useRef(null);
 
   // Sync with currentFilters from parent
   useEffect(() => {
@@ -46,6 +52,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       }
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
         setShowCategoryDropdown(false);
+        setCategorySearch('');
       }
     };
 
@@ -85,6 +92,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       searchMode: 'text'
     });
     setAgentSearchQuery('');
+    setCategorySearch('');
   };
 
   const getActiveFilterCount = () => {
@@ -120,6 +128,95 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const filteredAgents = agents.filter(agent =>
     agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
   );
+
+  // All categories list
+  const allCategories = [
+    'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
+    'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
+    'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
+    'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
+    'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
+    'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
+    'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
+    'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
+    'Games issues', 'Games | Providers | Rules', 'Games | Live games',
+    'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
+    'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
+    'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
+    'Reload', 'Responsible gambling', 'Roles', 'Rollover',
+    'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
+    'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
+    'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
+  ];
+
+  // Filtered categories based on search (excluding already selected)
+  const filteredCategories = allCategories.filter(cat =>
+    cat.toLowerCase().includes(categorySearch.toLowerCase()) &&
+    !(currentFilters.categories || []).includes(cat)
+  );
+
+  // Reset category highlight index when search changes
+  useEffect(() => {
+    setCategoryHighlightIndex(0);
+  }, [categorySearch]);
+
+  // Scroll category highlighted item into view
+  useEffect(() => {
+    if (showCategoryDropdown && categoryListRef.current) {
+      const highlighted = categoryListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlighted) {
+        highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [categoryHighlightIndex, showCategoryDropdown]);
+
+  // Keyboard handler for category dropdown
+  const handleCategoryKeyDown = (e) => {
+    if (!showCategoryDropdown) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowCategoryDropdown(true);
+      }
+      return;
+    }
+
+    const totalItems = filteredCategories.length;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setCategoryHighlightIndex(prev => (prev + 1) % Math.max(totalItems, 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setCategoryHighlightIndex(prev => (prev - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredCategories[categoryHighlightIndex]) {
+          const selected = filteredCategories[categoryHighlightIndex];
+          handleFilterChange('categories', [...(currentFilters.categories || []), selected]);
+          setCategorySearch('');
+          setCategoryHighlightIndex(0);
+          setTimeout(() => categoryInputRef.current?.focus(), 0);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowCategoryDropdown(false);
+        setCategorySearch('');
+        break;
+      case 'Backspace':
+        if (categorySearch === '' && (currentFilters.categories || []).length > 0) {
+          const newCategories = [...(currentFilters.categories || [])];
+          newCategories.pop();
+          handleFilterChange('categories', newCategories);
+        }
+        break;
+      default:
+        break;
+    }
+  };
 
   // Reset highlight index when search query changes
   useEffect(() => {
@@ -335,121 +432,88 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
             transition={{ duration: 0.15 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
           >
-            {/* Categories - Multi-select */}
+            {/* Categories - Tag-based searchable dropdown */}
             <div className="relative" ref={categoryDropdownRef}>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 <Tag className="w-3 h-3 inline mr-1" />
                 Categories
               </label>
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white text-left flex items-center justify-between"
+              <div
+                className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-xs rounded-lg bg-white dark:bg-neutral-950 cursor-text min-h-[32px] border border-neutral-200 dark:border-neutral-700 ${showCategoryDropdown ? 'ring-2 ring-neutral-900 dark:ring-neutral-300' : ''}`}
+                onClick={() => categoryInputRef.current?.focus()}
               >
-                <span className={(!currentFilters.categories || currentFilters.categories.length === 0) ? 'text-neutral-500 dark:text-neutral-500' : ''}>
-                  {(!currentFilters.categories || currentFilters.categories.length === 0)
-                    ? 'All categories'
-                    : currentFilters.categories.length === 1
-                      ? currentFilters.categories[0]
-                      : `${currentFilters.categories.length} selected`}
-                </span>
-                <motion.span animate={{ rotate: showCategoryDropdown ? 180 : 0 }} transition={{ duration: duration.fast }}>
-                  <ChevronDown className="w-3 h-3" />
-                </motion.span>
-              </motion.button>
+                {(currentFilters.categories || []).map(cat => (
+                  <span
+                    key={cat}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded"
+                  >
+                    {cat.length > 12 ? cat.substring(0, 12) + '...' : cat}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFilterChange('categories', (currentFilters.categories || []).filter(c => c !== cat));
+                      }}
+                      className="hover:text-blue-900 dark:hover:text-blue-300"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  ref={categoryInputRef}
+                  type="text"
+                  value={categorySearch}
+                  onChange={(e) => {
+                    setCategorySearch(e.target.value);
+                    setShowCategoryDropdown(true);
+                  }}
+                  onFocus={() => setShowCategoryDropdown(true)}
+                  onKeyDown={handleCategoryKeyDown}
+                  placeholder={(currentFilters.categories || []).length === 0 ? "Search categories..." : ""}
+                  className="flex-1 min-w-[80px] bg-transparent outline-none text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 text-xs"
+                />
+              </div>
               <AnimatePresence>
               {showCategoryDropdown && (
                 <motion.div
+                  ref={categoryListRef}
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
                   transition={{ duration: duration.fast }}
                   className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                 >
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={() => {
-                      handleFilterChange('categories', []);
-                      setShowCategoryDropdown(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-                  >
-                    Clear all
-                  </motion.button>
-                  {[
-                    'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
-                    'Available bonuses', 'Balance issues', 'Bet | Bet archive', 'Birthday bonus',
-                    'Break in play', 'Bonus crediting', 'Bonus drops', 'Casino',
-                    'Coin mixing | AML', 'Compliance (KYC, Terms of service, Privacy)',
-                    'Crypto - General', 'Crypto deposits', 'Crypto withdrawals', 'Data deletion',
-                    'Deposit bonus', 'Exclusion | General', 'Exclusion | Self exclusion',
-                    'Exclusion | Casino exclusion', 'Fiat General', 'Fiat - CAD', 'Fiat - BRL',
-                    'Fiat - JPY', 'Fiat - INR', 'Fiat - PEN/ARS/CLP', 'Forum', 'Funds recovery',
-                    'Games issues', 'Games | Providers | Rules', 'Games | Live games',
-                    'Hacked accounts', 'In-game chat | Third party chat', 'Monthly bonus',
-                    'No luck tickets | RTP', 'Phishing | Scam attempt', 'Phone removal',
-                    'Pre/Post monthly bonus', 'Promotions', 'Provably fair', 'Race', 'Rakeback',
-                    'Reload', 'Responsible gambling', 'Roles', 'Rollover',
-                    'Security (2FA, Password, Email codes)', 'Sportsbook', 'Stake basics',
-                    'Stake chat', 'Stake original', 'Tech issues | Jira cases | Bugs',
-                    'Tip recovery', 'VIP host', 'VIP program', 'Welcome bonus', 'Weekly bonus', 'Other'
-                  ].map(cat => (
-                    <label
-                      key={cat}
-                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(currentFilters.categories || []).includes(cat)}
-                        onChange={(e) => {
-                          const current = currentFilters.categories || [];
-                          if (e.target.checked) {
-                            handleFilterChange('categories', [...current, cat]);
-                          } else {
-                            handleFilterChange('categories', current.filter(c => c !== cat));
-                          }
-                        }}
-                        className="w-3 h-3 rounded border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-neutral-900 dark:text-white truncate">{cat}</span>
-                    </label>
-                  ))}
-                </motion.div>
-              )}
-              </AnimatePresence>
-              {currentFilters.categories && currentFilters.categories.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-wrap gap-1 mt-1"
-                >
-                  {currentFilters.categories.slice(0, 3).map(cat => (
-                    <motion.span
-                      key={cat}
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded"
-                    >
-                      {cat.length > 15 ? cat.substring(0, 15) + '...' : cat}
-                      <motion.button
-                        whileTap={{ scale: 0.8 }}
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((cat, index) => (
+                      <button
+                        key={cat}
                         type="button"
-                        onClick={() => handleFilterChange('categories', currentFilters.categories.filter(c => c !== cat))}
-                        className="hover:text-blue-900 dark:hover:text-blue-300"
+                        data-highlighted={categoryHighlightIndex === index}
+                        onClick={() => {
+                          handleFilterChange('categories', [...(currentFilters.categories || []), cat]);
+                          setCategorySearch('');
+                          setCategoryHighlightIndex(0);
+                          setTimeout(() => categoryInputRef.current?.focus(), 0);
+                        }}
+                        onMouseEnter={() => setCategoryHighlightIndex(index)}
+                        className={`w-full px-3 py-2 text-left text-xs text-neutral-900 dark:text-white transition-colors ${
+                          categoryHighlightIndex === index
+                            ? 'bg-blue-100 dark:bg-blue-900/30'
+                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                        }`}
                       >
-                        <X className="w-2.5 h-2.5" />
-                      </motion.button>
-                    </motion.span>
-                  ))}
-                  {currentFilters.categories.length > 3 && (
-                    <span className="text-[10px] text-neutral-500 dark:text-neutral-500">
-                      +{currentFilters.categories.length - 3} more
-                    </span>
+                        {cat}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-500">
+                      {categorySearch ? 'No categories found' : 'All categories selected'}
+                    </div>
                   )}
                 </motion.div>
               )}
+              </AnimatePresence>
             </div>
 
             {/* Agent - Searchable Dropdown */}
