@@ -409,7 +409,7 @@ const QAAgents = () => {
                         <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-all duration-200">
                           <GlassActions>
                             <GlassActionButton
-                              onClick={() => handleStartGrading(agent._id)}
+                              onClick={() => handleStartGrading(agent._id, 'agents')}
                               title="Start Grading (Extension)"
                               variant="success"
                               isFirst

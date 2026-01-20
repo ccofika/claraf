@@ -667,8 +667,15 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // EXPORT FUNCTIONS
   // ============================================
-  const handleExportMaestro = useCallback(async (agentId) => {
+  const handleExportMaestro = useCallback(async (agentId, source = 'dashboard') => {
     try {
+      // Track the grade button click
+      axios.post(
+        `${API_URL}/api/qa/grade-clicks`,
+        { agentId, source },
+        getAuthHeaders()
+      ).catch(err => console.error('Failed to track grade click:', err));
+
       const response = await axios.post(
         `${API_URL}/api/qa/export/maestro/${agentId}`,
         {},
@@ -859,7 +866,7 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // GRADING FUNCTIONS
   // ============================================
-  const handleStartGrading = useCallback(async (agentId) => {
+  const handleStartGrading = useCallback(async (agentId, source = 'dashboard') => {
     try {
       clearValidationErrors();
 
@@ -930,6 +937,17 @@ export const QAManagerProvider = ({ children }) => {
         type: 'CLARA_START_GRADING',
         data: taskData
       }, '*');
+
+      // Record the grade button click for tracking
+      try {
+        await axios.post(
+          `${API_URL}/api/qa/grade-clicks`,
+          { agentId: agent._id, source },
+          getAuthHeaders()
+        );
+      } catch (trackingErr) {
+        console.error('Failed to record grade click:', trackingErr);
+      }
 
       const mode = hasExistingAssignment ? 'adding to existing' : 'creating new';
       toast.success(`Starting grading for ${agent.name} (${selectedTicketsList.length} tickets, ${mode} assignment)`);

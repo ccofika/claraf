@@ -7,7 +7,7 @@ import {
   AlertCircle, Loader2, X, TrendingUp, Clock, CheckCircle,
   User, ArrowRight, ArrowLeftRight, Plane, Calendar,
   BarChart3, AlertTriangle, History, Settings, Copy,
-  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check, Pencil
+  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check, Pencil, Play
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
@@ -64,6 +64,9 @@ const QAActiveOverview = () => {
   const [staleTickets, setStaleTickets] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
+  // Grade clicks state
+  const [gradeClicksData, setGradeClicksData] = useState(null);
+
   // Week setup state
   const [weekSetup, setWeekSetup] = useState(null);
   const [weekSetupLoading, setWeekSetupLoading] = useState(false);
@@ -113,12 +116,13 @@ const QAActiveOverview = () => {
         setLoading(true);
       }
 
-      const response = await axios.get(
-        `${API_URL}/api/qa/active-overview`,
-        getAuthHeaders()
-      );
+      const [response, gradeClicksRes] = await Promise.all([
+        axios.get(`${API_URL}/api/qa/active-overview`, getAuthHeaders()),
+        axios.get(`${API_URL}/api/qa/grade-clicks/weekly`, getAuthHeaders()).catch(() => ({ data: null }))
+      ]);
 
       setData(response.data);
+      setGradeClicksData(gradeClicksRes.data);
 
       // Auto-expand all graders on first load
       if (!showRefreshing && response.data.graders) {
@@ -871,6 +875,53 @@ const QAActiveOverview = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Grade Button Usage This Week */}
+      {data.graders && data.graders.length > 0 && gradeClicksData && (
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+            <Play className="w-4 h-4 text-blue-500" />
+            Grade Button Usage This Week
+            <span className="text-xs font-normal text-neutral-500 ml-2">
+              ({gradeClicksData.weekStart} - {gradeClicksData.weekEnd})
+            </span>
+          </h3>
+          <div className="space-y-3">
+            {(() => {
+              const counts = gradeClicksData.counts || {};
+              const maxClicks = Math.max(...Object.values(counts), 1);
+
+              return data.graders.map((graderData, index) => {
+                const graderId = graderData.grader?._id;
+                const clickCount = counts[graderId] || 0;
+                const percentage = (clickCount / maxClicks) * 100;
+
+                return (
+                  <div key={graderId || `grader-${index}`} className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                        {graderData.grader?.name?.split(' ')[0] || 'Unknown'}
+                      </p>
+                    </div>
+                    <div className="flex-1 h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                        {clickCount} click{clickCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 text-xs text-neutral-500">
+            Total: {Object.values(gradeClicksData.counts || {}).reduce((sum, c) => sum + c, 0)} grade button clicks this week
           </div>
         </div>
       )}
