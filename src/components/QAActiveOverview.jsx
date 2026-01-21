@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
+import { TicketContentDisplay } from './TicketRichTextEditor';
 
 // Sub-tab components
 const SubTabs = ({ activeTab, onTabChange }) => {
@@ -1951,13 +1952,17 @@ const QAActiveOverview = () => {
               {viewTicketDialog.ticket.notes && (
                 <div>
                   <label className="text-xs text-neutral-500 uppercase">Notes</label>
-                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg text-sm prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: viewTicketDialog.ticket.notes }} />
+                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                    <TicketContentDisplay content={viewTicketDialog.ticket.notes} className="text-sm" />
+                  </div>
                 </div>
               )}
               {viewTicketDialog.ticket.feedback && (
                 <div>
                   <label className="text-xs text-neutral-500 uppercase">Feedback</label>
-                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg text-sm">{viewTicketDialog.ticket.feedback}</div>
+                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                    <TicketContentDisplay content={viewTicketDialog.ticket.feedback} className="text-sm" />
+                  </div>
                 </div>
               )}
             </div>

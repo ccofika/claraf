@@ -1,28 +1,37 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { uploadTicketImage, generateImageId } from '../utils/imageUpload';
 import { toast } from 'sonner';
 import { X, ZoomIn } from 'lucide-react';
 import MacroTriggerDropdown from './MacroTriggerDropdown';
 import MacroInsertConfirmModal from './MacroInsertConfirmModal';
 
-// Image Lightbox Component for fullscreen view
+// Image Lightbox Component for fullscreen view - uses Portal to render over everything
 const ImageLightbox = ({ src, alt, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // Prevent body scroll when lightbox is open
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [onClose]);
 
-  return (
+  // Use portal to render at document body level, outside of any modal containers
+  return createPortal(
     <div
-      className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/90 flex items-center justify-center p-4"
+      style={{ zIndex: 99999 }}
       onClick={onClose}
     >
       <button
         onClick={onClose}
         className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+        style={{ zIndex: 100000 }}
       >
         <X className="w-6 h-6" />
       </button>
@@ -32,7 +41,8 @@ const ImageLightbox = ({ src, alt, onClose }) => {
         className="max-w-full max-h-full object-contain rounded-lg"
         onClick={(e) => e.stopPropagation()}
       />
-    </div>
+    </div>,
+    document.body
   );
 };
 
