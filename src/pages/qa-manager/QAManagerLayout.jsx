@@ -5,7 +5,7 @@ import {
   BarChart3, FileText, UsersRound, TrendingUp, Target, Bug,
   Keyboard, RefreshCw, Search, AlertTriangle, Loader2, X, Check,
   RotateCcw, ClipboardList, Edit, Hash, ChevronLeft, ChevronRight,
-  MessageSquare, Users, Sparkles, ExternalLink
+  MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
@@ -55,6 +55,12 @@ const QAManagerLayoutInner = () => {
     setAssignmentsDialog,
     assignments,
     assignmentsLoading,
+    gradingAssignmentModal,
+    setGradingAssignmentModal,
+    handleConfirmGradingWithExistingAssignment,
+    handleDeleteAssignmentFromModal,
+    handleCreateAssignmentAndStartGrading,
+    handleCloseGradingAssignmentModal,
     allExistingAgents,
     tickets,
     agents,
@@ -74,6 +80,7 @@ const QAManagerLayoutInner = () => {
     handleAcceptMacroTicket,
     handleDeclineMacroTicket,
     handleResetAssignment,
+    handleCreateManualAssignment,
     openTicketDialog,
     fetchDashboardStats,
     fetchAgents,
@@ -92,6 +99,45 @@ const QAManagerLayoutInner = () => {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const searchInputRef = useRef(null);
+
+  // Local state for create assignment form in Assignments dialog
+  const [showCreateAssignmentForm, setShowCreateAssignmentForm] = useState(false);
+  const [newAssignmentName, setNewAssignmentName] = useState('');
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+
+  // Generate default assignment name for new assignments
+  const generateDefaultAssignmentName = (agentName) => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const monday = new Date(now);
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    monday.setDate(now.getDate() - daysToMonday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const formatDate = (date) => `${date.getMonth() + 1}/${date.getDate()}`;
+    return `${agentName} ${formatDate(monday)}-${formatDate(sunday)}`;
+  };
+
+  // Handle create assignment submission
+  const handleSubmitCreateAssignment = async () => {
+    if (!newAssignmentName.trim()) return;
+    setCreatingAssignment(true);
+    const success = await handleCreateManualAssignment(assignmentsDialog.agentId, newAssignmentName);
+    setCreatingAssignment(false);
+    if (success) {
+      setShowCreateAssignmentForm(false);
+      setNewAssignmentName('');
+    }
+  };
+
+  // Reset create form when dialog closes
+  const handleAssignmentsDialogClose = (open) => {
+    setAssignmentsDialog({ ...assignmentsDialog, open });
+    if (!open) {
+      setShowCreateAssignmentForm(false);
+      setNewAssignmentName('');
+    }
+  };
 
   // Get active tab from URL
   const getActiveTab = () => {
@@ -475,26 +521,108 @@ const QAManagerLayoutInner = () => {
       {/* Global Dialogs */}
 
       {/* Assignments Dialog */}
-      <Dialog open={assignmentsDialog.open} onOpenChange={(open) => setAssignmentsDialog({ ...assignmentsDialog, open })}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <Dialog open={assignmentsDialog.open} onOpenChange={handleAssignmentsDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-neutral-900">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-purple-500" />
-              Assignments - {assignmentsDialog.agentName}
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-purple-500" />
+                Assignments - {assignmentsDialog.agentName}
+              </div>
+              {!showCreateAssignmentForm && !assignmentsLoading && (
+                <Button
+                  onClick={() => {
+                    setNewAssignmentName(generateDefaultAssignmentName(assignmentsDialog.agentName));
+                    setShowCreateAssignmentForm(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Assignment
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Create Assignment Form */}
+          {showCreateAssignmentForm && (
+            <div className="p-4 border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 rounded-lg mb-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-purple-500" />
+                Create New Assignment
+              </h4>
+              <p className="text-xs text-gray-600 dark:text-neutral-400 mb-3">
+                Do you want to create an assignment where the extension will write grades on Maestro?
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-neutral-300 mb-1">
+                    Assignment Name
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-neutral-500 mb-2">
+                    Must match the assignment name on MaestroQA exactly
+                  </p>
+                  <input
+                    type="text"
+                    value={newAssignmentName}
+                    onChange={(e) => setNewAssignmentName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg
+                             bg-white dark:bg-neutral-800 text-gray-900 dark:text-white
+                             focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="e.g., Agent Name 1/20-1/26"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitCreateAssignment()}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowCreateAssignmentForm(false);
+                      setNewAssignmentName('');
+                    }}
+                    className="text-gray-600 dark:text-neutral-400 text-sm"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmitCreateAssignment}
+                    disabled={!newAssignmentName.trim() || creatingAssignment}
+                    className="bg-purple-600 hover:bg-purple-700 text-white text-sm flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {creatingAssignment ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    Create Assignment
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto">
             {assignmentsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
               </div>
-            ) : assignments.length === 0 ? (
+            ) : assignments.length === 0 && !showCreateAssignmentForm ? (
               <div className="text-center py-12 text-gray-500 dark:text-neutral-400">
                 <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p>No assignments found for this agent</p>
-                <p className="text-xs mt-1">Assignments will appear here after the bot creates them</p>
+                <p className="text-xs mt-1 mb-4">Do you want to create an assignment where the extension will write grades on Maestro?</p>
+                <Button
+                  onClick={() => {
+                    setNewAssignmentName(generateDefaultAssignmentName(assignmentsDialog.agentName));
+                    setShowCreateAssignmentForm(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-sm flex items-center gap-2 mx-auto"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Assignment
+                </Button>
               </div>
-            ) : (
+            ) : assignments.length === 0 && showCreateAssignmentForm ? null : (
               <div className="space-y-3">
                 {assignments.map((assignment) => (
                   <div
@@ -548,6 +676,65 @@ const QAManagerLayoutInner = () => {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Grading Assignment Modal - Only shown when existing assignment found */}
+      <Dialog open={gradingAssignmentModal.open} onOpenChange={(open) => !open && handleCloseGradingAssignmentModal()}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <ClipboardList className="w-5 h-5 text-purple-500" />
+              Existing Assignment Found
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-neutral-400">
+                An assignment already exists for <strong className="text-gray-900 dark:text-white">{gradingAssignmentModal.agentName}</strong>.
+                Do you want to add grades to this assignment?
+              </p>
+
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm font-medium text-purple-900 dark:text-purple-300">Assignment Name:</span>
+                </div>
+                <p className="text-sm font-semibold text-purple-800 dark:text-purple-200 ml-6">
+                  {gradingAssignmentModal.existingAssignment?.assignmentName}
+                </p>
+                <div className="mt-2 ml-6 text-xs text-purple-600 dark:text-purple-400">
+                  {gradingAssignmentModal.existingAssignment?.gradedTicketIds?.length || 0} / {gradingAssignmentModal.existingAssignment?.ticketIds?.length || 0} tickets graded
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={handleCloseGradingAssignmentModal}
+              className="text-gray-600 dark:text-neutral-400"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAssignmentFromModal}
+              className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              No, delete assignment
+            </Button>
+            <Button
+              onClick={handleConfirmGradingWithExistingAssignment}
+              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+            >
+              <Play className="w-4 h-4" />
+              Yes, use this assignment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

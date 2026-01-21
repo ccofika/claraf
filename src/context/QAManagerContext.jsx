@@ -119,6 +119,17 @@ export const QAManagerProvider = ({ children }) => {
   const [assignments, setAssignments] = useState([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
 
+  // Grading assignment modal state (shown when starting grading from dashboard)
+  const [gradingAssignmentModal, setGradingAssignmentModal] = useState({
+    open: false,
+    hasExistingAssignment: false,
+    existingAssignment: null,
+    agentId: null,
+    agentName: null,
+    pendingTaskData: null,
+    newAssignmentName: ''
+  });
+
   // ============================================
   // VALIDATION STATE
   // ============================================
@@ -884,8 +895,7 @@ export const QAManagerProvider = ({ children }) => {
       const selectedTicketsList = validation.tickets;
 
       let hasExistingAssignment = false;
-      let existingAssignmentName = null;
-      let gradedTicketIds = [];
+      let existingAssignment = null;
 
       try {
         const assignmentRes = await axios.get(
@@ -894,8 +904,7 @@ export const QAManagerProvider = ({ children }) => {
         );
         if (assignmentRes.data.assignment) {
           hasExistingAssignment = true;
-          existingAssignmentName = assignmentRes.data.assignment.assignmentName;
-          gradedTicketIds = assignmentRes.data.assignment.gradedTicketIds || [];
+          existingAssignment = assignmentRes.data.assignment;
         }
       } catch (err) {
         console.log('No existing assignment found, will create new one');
@@ -909,6 +918,7 @@ export const QAManagerProvider = ({ children }) => {
 
       const userEmail = user?.email || '';
 
+      // Prepare task data (without assignment name for now - will be added based on modal choice)
       const taskData = {
         agentId: agent._id,
         agentName: agent.name,
@@ -920,8 +930,8 @@ export const QAManagerProvider = ({ children }) => {
         fileName: `${agent.name.replace(/\s+/g, '_')}_tickets.csv`,
         qaEmail: userEmail,
         hasExistingAssignment: hasExistingAssignment,
-        existingAssignmentName: existingAssignmentName,
-        gradedTicketIds: gradedTicketIds,
+        existingAssignmentName: existingAssignment?.assignmentName || null,
+        gradedTicketIds: existingAssignment?.gradedTicketIds || [],
         tickets: selectedTicketsList.map(t => ({
           _id: t._id,
           ticketId: t.ticketId,
@@ -930,9 +940,25 @@ export const QAManagerProvider = ({ children }) => {
           categories: t.categories,
           feedback: t.feedback,
           notes: t.notes
-        }))
+        })),
+        source
       };
 
+      // If assignment exists, show modal to confirm or delete
+      if (hasExistingAssignment) {
+        setGradingAssignmentModal({
+          open: true,
+          hasExistingAssignment: true,
+          existingAssignment,
+          agentId: agent._id,
+          agentName: agent.name,
+          pendingTaskData: taskData,
+          newAssignmentName: ''
+        });
+        return;
+      }
+
+      // No assignment exists - proceed directly with grading
       window.postMessage({
         type: 'CLARA_START_GRADING',
         data: taskData
@@ -949,8 +975,7 @@ export const QAManagerProvider = ({ children }) => {
         console.error('Failed to record grade click:', trackingErr);
       }
 
-      const mode = hasExistingAssignment ? 'adding to existing' : 'creating new';
-      toast.success(`Starting grading for ${agent.name} (${selectedTicketsList.length} tickets, ${mode} assignment)`);
+      toast.success(`Starting grading for ${agent.name} (${selectedTicketsList.length} tickets, creating new assignment)`);
 
       const event = new CustomEvent('clara-start-grading', { detail: taskData });
       document.dispatchEvent(event);
@@ -960,6 +985,130 @@ export const QAManagerProvider = ({ children }) => {
       toast.error(err.response?.data?.message || 'Failed to start grading');
     }
   }, [agents, API_URL, getAuthHeaders, user, validateGradingPrerequisites, clearValidationErrors]);
+
+  // Confirm using existing assignment and start grading
+  const handleConfirmGradingWithExistingAssignment = useCallback(async () => {
+    const { pendingTaskData, existingAssignment } = gradingAssignmentModal;
+    if (!pendingTaskData) return;
+
+    // Update taskData to use existing assignment
+    const taskData = {
+      ...pendingTaskData,
+      hasExistingAssignment: true,
+      existingAssignmentName: existingAssignment.assignmentName,
+      gradedTicketIds: existingAssignment.gradedTicketIds || []
+    };
+
+    // Close modal
+    setGradingAssignmentModal(prev => ({ ...prev, open: false }));
+
+    // Send to extension
+    window.postMessage({
+      type: 'CLARA_START_GRADING',
+      data: taskData
+    }, '*');
+
+    // Record the grade button click for tracking
+    try {
+      await axios.post(
+        `${API_URL}/api/qa/grade-clicks`,
+        { agentId: taskData.agentId, source: taskData.source },
+        getAuthHeaders()
+      );
+    } catch (trackingErr) {
+      console.error('Failed to record grade click:', trackingErr);
+    }
+
+    toast.success(`Starting grading for ${taskData.agentName} (${taskData.ticketCount} tickets, adding to existing assignment)`);
+
+    const event = new CustomEvent('clara-start-grading', { detail: taskData });
+    document.dispatchEvent(event);
+  }, [gradingAssignmentModal, API_URL, getAuthHeaders]);
+
+  // Delete existing assignment and close modal (user can click Grade again to start fresh)
+  const handleDeleteAssignmentFromModal = useCallback(async () => {
+    const { existingAssignment } = gradingAssignmentModal;
+    if (!existingAssignment) return;
+
+    try {
+      await axios.delete(
+        `${API_URL}/api/qa/assignments/${existingAssignment._id}`,
+        getAuthHeaders()
+      );
+
+      toast.success(`Assignment "${existingAssignment.assignmentName}" deleted. Click Grade again to start fresh.`);
+
+      // Close modal - user can click Grade again
+      setGradingAssignmentModal({
+        open: false,
+        hasExistingAssignment: false,
+        existingAssignment: null,
+        agentId: null,
+        agentName: null,
+        pendingTaskData: null,
+        newAssignmentName: ''
+      });
+    } catch (err) {
+      console.error('Error deleting assignment:', err);
+      toast.error('Failed to delete assignment');
+    }
+  }, [gradingAssignmentModal, API_URL, getAuthHeaders]);
+
+  // Create new assignment with custom name and start grading
+  const handleCreateAssignmentAndStartGrading = useCallback(async () => {
+    const { pendingTaskData, newAssignmentName } = gradingAssignmentModal;
+    if (!pendingTaskData || !newAssignmentName.trim()) {
+      toast.error('Please enter an assignment name');
+      return;
+    }
+
+    // Update taskData with the new assignment name
+    const taskData = {
+      ...pendingTaskData,
+      hasExistingAssignment: false,
+      existingAssignmentName: null,
+      gradedTicketIds: [],
+      customAssignmentName: newAssignmentName.trim()
+    };
+
+    // Close modal
+    setGradingAssignmentModal(prev => ({ ...prev, open: false }));
+
+    // Send to extension
+    window.postMessage({
+      type: 'CLARA_START_GRADING',
+      data: taskData
+    }, '*');
+
+    // Record the grade button click for tracking
+    try {
+      await axios.post(
+        `${API_URL}/api/qa/grade-clicks`,
+        { agentId: taskData.agentId, source: taskData.source },
+        getAuthHeaders()
+      );
+    } catch (trackingErr) {
+      console.error('Failed to record grade click:', trackingErr);
+    }
+
+    toast.success(`Starting grading for ${taskData.agentName} (${taskData.ticketCount} tickets, creating new assignment)`);
+
+    const event = new CustomEvent('clara-start-grading', { detail: taskData });
+    document.dispatchEvent(event);
+  }, [gradingAssignmentModal, API_URL, getAuthHeaders]);
+
+  // Close modal without action
+  const handleCloseGradingAssignmentModal = useCallback(() => {
+    setGradingAssignmentModal({
+      open: false,
+      hasExistingAssignment: false,
+      existingAssignment: null,
+      agentId: null,
+      agentName: null,
+      pendingTaskData: null,
+      newAssignmentName: ''
+    });
+  }, []);
 
   // ============================================
   // NAVIGATION FUNCTIONS
@@ -1108,6 +1257,43 @@ export const QAManagerProvider = ({ children }) => {
       toast.error('Failed to reset assignment');
     }
   }, [API_URL, getAuthHeaders]);
+
+  // Create a new assignment manually from the Assignments dialog
+  const handleCreateManualAssignment = useCallback(async (agentId, assignmentName) => {
+    if (!assignmentName?.trim()) {
+      toast.error('Please enter an assignment name');
+      return false;
+    }
+
+    const agent = agents.find(a => a._id === agentId);
+    if (!agent) {
+      toast.error('Agent not found');
+      return false;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/qa/assignments`,
+        {
+          agentId,
+          assignmentName: assignmentName.trim(),
+          ticketIds: [],
+          rubricName: agent.position,
+          qaEmail: user?.email || ''
+        },
+        getAuthHeaders()
+      );
+
+      // Add to local state
+      setAssignments(prev => [response.data.assignment, ...prev]);
+      toast.success(`Assignment "${assignmentName}" created successfully`);
+      return true;
+    } catch (err) {
+      console.error('Error creating assignment:', err);
+      toast.error(err.response?.data?.message || 'Failed to create assignment');
+      return false;
+    }
+  }, [agents, API_URL, getAuthHeaders, user]);
 
   // ============================================
   // UTILITY FUNCTIONS
@@ -1340,6 +1526,12 @@ export const QAManagerProvider = ({ children }) => {
     setAssignmentsDialog,
     assignments,
     assignmentsLoading,
+    gradingAssignmentModal,
+    setGradingAssignmentModal,
+    handleConfirmGradingWithExistingAssignment,
+    handleDeleteAssignmentFromModal,
+    handleCreateAssignmentAndStartGrading,
+    handleCloseGradingAssignmentModal,
 
     // Validation
     validationErrors,
@@ -1430,6 +1622,7 @@ export const QAManagerProvider = ({ children }) => {
     // Assignments
     handleViewAssignments,
     handleResetAssignment,
+    handleCreateManualAssignment,
 
     // Navigation helper
     getActiveTabFromPath,
