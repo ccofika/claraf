@@ -13,6 +13,8 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Sun,
   Moon,
   RefreshCw,
@@ -21,7 +23,11 @@ import {
   TrendingUp,
   Users,
   Clock,
-  Sparkles
+  Sparkles,
+  ListFilter,
+  X,
+  User,
+  ArrowUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -60,6 +66,7 @@ const QASummaries = () => {
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [editDialog, setEditDialog] = useState({ open: false, summary: null, content: '' });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, summaryId: null });
+  const [allSummariesDialog, setAllSummariesDialog] = useState({ open: false, summaries: [], loading: false, shiftFilter: 'all', graderFilter: 'all', graders: [], page: 1, hasMore: true, expandedIds: new Set() });
 
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -93,6 +100,119 @@ const QASummaries = () => {
       console.error('Failed to fetch summary dates:', error);
     }
   }, [API_URL, calendarMonth, calendarYear, getAuthHeaders]);
+
+  const fetchSummaryGraders = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/summaries/graders`, getAuthHeaders());
+      return response.data.graders || [];
+    } catch (error) {
+      console.error('Failed to fetch graders:', error);
+      return [];
+    }
+  }, [API_URL, getAuthHeaders]);
+
+  const fetchAllSummaries = useCallback(async (reset = false, overrideFilters = {}) => {
+    try {
+      setAllSummariesDialog(prev => ({ ...prev, loading: true }));
+      const page = reset ? 1 : allSummariesDialog.page;
+      const shift = overrideFilters.shift !== undefined ? overrideFilters.shift : allSummariesDialog.shiftFilter;
+      const graderId = overrideFilters.graderId !== undefined ? overrideFilters.graderId : allSummariesDialog.graderFilter;
+
+      let url = `${API_URL}/api/qa/summaries/all?page=${page}&limit=30`;
+      if (shift && shift !== 'all') url += `&shift=${shift}`;
+      if (graderId && graderId !== 'all') url += `&graderId=${graderId}`;
+
+      const response = await axios.get(url, getAuthHeaders());
+      const newSummaries = response.data.summaries || [];
+      const hasMore = page < response.data.pagination.pages;
+
+      setAllSummariesDialog(prev => ({
+        ...prev,
+        summaries: reset ? newSummaries : [...prev.summaries, ...newSummaries],
+        loading: false,
+        page: reset ? 1 : page,
+        hasMore,
+        expandedIds: reset ? new Set() : (prev.expandedIds || new Set())
+      }));
+    } catch (error) {
+      console.error('Failed to fetch all summaries:', error);
+      toast.error('Failed to load all summaries');
+      setAllSummariesDialog(prev => ({ ...prev, loading: false }));
+    }
+  }, [API_URL, getAuthHeaders, allSummariesDialog.page, allSummariesDialog.shiftFilter, allSummariesDialog.graderFilter]);
+
+  const handleOpenAllSummaries = async () => {
+    setAllSummariesDialog({ open: true, summaries: [], loading: true, shiftFilter: 'all', graderFilter: 'all', graders: [], page: 1, hasMore: true, expandedIds: new Set() });
+    // Fetch graders and summaries
+    const graders = await fetchSummaryGraders();
+    setAllSummariesDialog(prev => ({ ...prev, graders }));
+    fetchAllSummaries(true);
+  };
+
+  const handleAllSummariesShiftChange = (shift) => {
+    setAllSummariesDialog(prev => ({ ...prev, shiftFilter: shift, page: 1, hasMore: true, expandedIds: new Set() }));
+    fetchAllSummaries(true, { shift });
+  };
+
+  const handleAllSummariesGraderChange = (graderId) => {
+    setAllSummariesDialog(prev => ({ ...prev, graderFilter: graderId, page: 1, hasMore: true, expandedIds: new Set() }));
+    fetchAllSummaries(true, { graderId });
+  };
+
+  const handleLoadMoreSummaries = async () => {
+    if (allSummariesDialog.loading || !allSummariesDialog.hasMore) return;
+    const nextPage = allSummariesDialog.page + 1;
+    setAllSummariesDialog(prev => ({ ...prev, page: nextPage }));
+    try {
+      setAllSummariesDialog(prev => ({ ...prev, loading: true }));
+      const shift = allSummariesDialog.shiftFilter;
+      const graderId = allSummariesDialog.graderFilter;
+
+      let url = `${API_URL}/api/qa/summaries/all?page=${nextPage}&limit=30`;
+      if (shift && shift !== 'all') url += `&shift=${shift}`;
+      if (graderId && graderId !== 'all') url += `&graderId=${graderId}`;
+
+      const response = await axios.get(url, getAuthHeaders());
+      const newSummaries = response.data.summaries || [];
+      const hasMore = nextPage < response.data.pagination.pages;
+      setAllSummariesDialog(prev => ({
+        ...prev,
+        summaries: [...prev.summaries, ...newSummaries],
+        loading: false,
+        hasMore,
+        expandedIds: prev.expandedIds || new Set()
+      }));
+    } catch (error) {
+      console.error('Failed to load more summaries:', error);
+      setAllSummariesDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const toggleSummaryExpand = (summaryId) => {
+    setAllSummariesDialog(prev => {
+      const newExpanded = new Set(prev.expandedIds || []);
+      if (newExpanded.has(summaryId)) {
+        newExpanded.delete(summaryId);
+      } else {
+        newExpanded.add(summaryId);
+      }
+      return { ...prev, expandedIds: newExpanded };
+    });
+  };
+
+  const expandAllSummaries = () => {
+    setAllSummariesDialog(prev => ({
+      ...prev,
+      expandedIds: new Set(prev.summaries.map(s => s._id))
+    }));
+  };
+
+  const collapseAllSummaries = () => {
+    setAllSummariesDialog(prev => ({
+      ...prev,
+      expandedIds: new Set()
+    }));
+  };
 
   useEffect(() => {
     fetchSummaries();
@@ -449,6 +569,9 @@ const QASummaries = () => {
           <motion.button whileTap={{ scale: 0.95 }} onClick={() => { fetchSummaries(); fetchSummaryDates(); }} className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors">
             <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Refresh</span>
           </motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleOpenAllSummaries} className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors">
+            <ListFilter className="h-3.5 w-3.5 sm:h-4 sm:w-4" /><span className="hidden sm:inline">All Summaries</span>
+          </motion.button>
           <motion.button whileTap={{ scale: 0.95 }} onClick={handleCreateSummary} disabled={generating || !isDateSelectable(selectedDate)} className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-neutral-300 disabled:to-neutral-400 dark:disabled:from-neutral-700 dark:disabled:to-neutral-600 disabled:text-neutral-500 dark:disabled:text-neutral-400 rounded-lg transition-all shadow-lg shadow-blue-500/25 disabled:shadow-none">
             {generating ? <><Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /><span>Generating...</span></> : <><Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" /><span>Create Summary</span></>}
           </motion.button>
@@ -562,6 +685,298 @@ const QASummaries = () => {
             <button onClick={() => setDeleteDialog({ open: false, summaryId: null })} className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">Cancel</button>
             <motion.button whileTap={{ scale: 0.95 }} onClick={handleDeleteSummary} className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Delete</motion.button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* All Summaries Dialog - With Sidebar Navigation */}
+      <Dialog open={allSummariesDialog.open} onOpenChange={(open) => !open && setAllSummariesDialog(prev => ({ ...prev, open: false, expandedIds: new Set() }))}>
+        <DialogContent className="max-w-5xl w-full max-h-[90vh] bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/30">
+                  <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-neutral-900 dark:text-white">All Summaries</DialogTitle>
+                  <DialogDescription className="text-neutral-500 text-xs mt-0.5">Click on a summary to expand • Use sidebar to navigate</DialogDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mr-8">
+                {/* Expand/Collapse All */}
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={expandAllSummaries}
+                  className="px-3 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  Expand All
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={collapseAllSummaries}
+                  className="px-3 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  Collapse All
+                </motion.button>
+              </div>
+            </div>
+            {/* Filters Row */}
+            <div className="flex items-center gap-4 mt-3 flex-wrap">
+              {/* Shift Filter Tabs */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-500 font-medium">Shift:</span>
+                {['all', 'Morning', 'Afternoon'].map((filter) => (
+                  <motion.button
+                    key={filter}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleAllSummariesShiftChange(filter)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      allSummariesDialog.shiftFilter === filter
+                        ? filter === 'all'
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          : filter === 'Morning'
+                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    {filter === 'Morning' && <Sun className="h-3.5 w-3.5" />}
+                    {filter === 'Afternoon' && <Moon className="h-3.5 w-3.5" />}
+                    {filter === 'all' ? 'All' : filter}
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Grader Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-500 font-medium">Grader:</span>
+                <select
+                  value={allSummariesDialog.graderFilter}
+                  onChange={(e) => handleAllSummariesGraderChange(e.target.value)}
+                  className="px-3 py-1.5 text-sm bg-neutral-100 dark:bg-neutral-800 border-0 rounded-lg text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="all">All Graders</option>
+                  {allSummariesDialog.graders.map((grader) => (
+                    <option key={grader._id} value={grader._id}>
+                      {grader.name || grader.email} ({grader.summaryCount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content with Sidebar */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Sidebar Navigation */}
+            {allSummariesDialog.summaries.length > 0 && (
+              <div className="w-48 flex-shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 overflow-y-auto">
+                <div className="p-3">
+                  <h4 className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-2 px-2">Navigate by Date</h4>
+                  <div className="space-y-1">
+                    {(() => {
+                      const grouped = {};
+                      allSummariesDialog.summaries.forEach(summary => {
+                        const dateKey = new Date(summary.date).toISOString().split('T')[0];
+                        const displayDate = new Date(summary.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                        if (!grouped[dateKey]) grouped[dateKey] = { display: displayDate, count: 0, morning: 0, afternoon: 0 };
+                        grouped[dateKey].count++;
+                        if (summary.shift === 'Morning') grouped[dateKey].morning++;
+                        else grouped[dateKey].afternoon++;
+                      });
+
+                      return Object.entries(grouped).map(([dateKey, data]) => (
+                        <button
+                          key={dateKey}
+                          onClick={() => {
+                            const element = document.getElementById(`date-${dateKey}`);
+                            if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }}
+                          className="w-full text-left px-2 py-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors group"
+                        >
+                          <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+                            {data.display}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            {data.morning > 0 && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                                <Sun className="h-2.5 w-2.5" />{data.morning}
+                              </span>
+                            )}
+                            {data.afternoon > 0 && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-orange-600 dark:text-orange-400">
+                                <Moon className="h-2.5 w-2.5" />{data.afternoon}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto" id="all-summaries-content">
+              {allSummariesDialog.loading && allSummariesDialog.summaries.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : allSummariesDialog.summaries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-16 h-16 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
+                    <FileText className="h-8 w-8 text-neutral-400" />
+                  </div>
+                  <p className="text-neutral-500">No summaries found</p>
+                </div>
+              ) : (
+                <div>
+                  {/* Group by date */}
+                  {(() => {
+                    const grouped = {};
+                    allSummariesDialog.summaries.forEach(summary => {
+                      const dateKey = new Date(summary.date).toISOString().split('T')[0];
+                      const displayDate = new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                      if (!grouped[dateKey]) grouped[dateKey] = { display: displayDate, summaries: [] };
+                      grouped[dateKey].summaries.push(summary);
+                    });
+
+                    return Object.entries(grouped).map(([dateKey, data]) => (
+                      <div key={dateKey} id={`date-${dateKey}`} className="border-b border-neutral-200 dark:border-neutral-800 last:border-b-0">
+                        {/* Date Header */}
+                        <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-5 py-3 border-b border-neutral-200 dark:border-neutral-700">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="font-semibold text-neutral-900 dark:text-white">{data.display}</span>
+                            <Badge variant="secondary" className="text-[10px] ml-auto bg-white dark:bg-neutral-800">
+                              {data.summaries.length} {data.summaries.length === 1 ? 'summary' : 'summaries'}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Summaries for this date */}
+                        <div className="divide-y divide-neutral-100 dark:divide-neutral-800/50">
+                          {data.summaries.map((summary) => {
+                            const isExpanded = allSummariesDialog.expandedIds?.has(summary._id) || false;
+                            const ticketCount = (summary.metadata?.ticketCount?.selected || 0) + (summary.metadata?.ticketCount?.graded || 0) + (summary.metadata?.ticketCount?.both || 0);
+                            const userName = summary.userId?.name || summary.userId?.email || 'Unknown';
+                            const contentPreview = summary.content.split('\n')[0].substring(0, 80);
+
+                            return (
+                              <div key={summary._id} className="bg-white dark:bg-neutral-900">
+                                {/* Clickable Header */}
+                                <button
+                                  onClick={() => toggleSummaryExpand(summary._id)}
+                                  className="w-full text-left px-5 py-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {/* Expand Icon */}
+                                    <div className={`flex-shrink-0 p-1 rounded transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                      <ChevronDown className="h-4 w-4 text-neutral-400" />
+                                    </div>
+                                    {/* Shift Icon */}
+                                    <div className={`flex-shrink-0 p-1.5 rounded-lg ${summary.shift === 'Morning' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                                      {summary.shift === 'Morning' ? <Sun className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />}
+                                    </div>
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-neutral-900 dark:text-white text-sm">{userName}</span>
+                                        <Badge variant="secondary" className={`text-[10px] ${summary.shift === 'Morning' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'}`}>
+                                          {summary.shift}
+                                        </Badge>
+                                        <span className="text-xs text-neutral-400">•</span>
+                                        <span className="text-xs text-neutral-500">{summary.metadata?.agentsSummarized?.length || 0} agents</span>
+                                        <span className="text-xs text-neutral-400">•</span>
+                                        <span className="text-xs text-neutral-500">{ticketCount} tickets</span>
+                                      </div>
+                                      {!isExpanded && (
+                                        <p className="text-xs text-neutral-500 mt-1 truncate">{contentPreview}...</p>
+                                      )}
+                                    </div>
+                                    {/* Copy Button */}
+                                    <motion.button
+                                      whileTap={{ scale: 0.9 }}
+                                      onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(summary.content); }}
+                                      className="flex-shrink-0 p-2 text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                                      title="Copy summary"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </motion.button>
+                                  </div>
+                                </button>
+
+                                {/* Expanded Content */}
+                                <AnimatePresence>
+                                  {isExpanded && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.2 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="px-5 pb-5 pt-0">
+                                        {/* Full Summary Content */}
+                                        <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 ml-9 border border-neutral-200 dark:border-neutral-700">
+                                          <pre className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap font-sans leading-relaxed">
+                                            {summary.content}
+                                          </pre>
+                                        </div>
+
+                                        {/* Agents Summarized */}
+                                        {summary.metadata?.agentsSummarized?.length > 0 && (
+                                          <div className="mt-3 ml-9">
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {summary.metadata.agentsSummarized.map((agent, idx) => (
+                                                <Badge key={idx} variant="secondary" className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-0">
+                                                  {agent.agentName}
+                                                </Badge>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Timestamp */}
+                                        <div className="mt-3 ml-9 flex items-center gap-1.5 text-xs text-neutral-400">
+                                          <Clock className="h-3 w-3" />
+                                          <span>Created {new Date(summary.createdAt).toLocaleString()}</span>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+
+                  {/* Load More Button */}
+                  {allSummariesDialog.hasMore && (
+                    <div className="flex justify-center py-6 border-t border-neutral-200 dark:border-neutral-800">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleLoadMoreSummaries}
+                        disabled={allSummariesDialog.loading}
+                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {allSummariesDialog.loading ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /><span>Loading...</span></>
+                        ) : (
+                          <><ChevronDown className="h-4 w-4" /><span>Load More Summaries</span></>
+                        )}
+                      </motion.button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </motion.div>

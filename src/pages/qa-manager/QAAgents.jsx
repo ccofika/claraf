@@ -1,14 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Users, Edit, Trash2, Eye, Download, Play, ChevronDown, ChevronRight,
-  Loader2, CheckCircle, AlertTriangle, ArrowUpDown
+  Loader2, CheckCircle, AlertTriangle, ArrowUpDown, History
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useQAManager } from '../../context/QAManagerContext';
 import { Button, LoadingSkeleton, EmptyState, GlassActions, GlassActionButton, GlassActionDivider } from './components';
+import AgentHistoryPanel from '../../components/AgentHistoryPanel';
 
 const QAAgents = () => {
   const {
@@ -47,6 +48,9 @@ const QAAgents = () => {
     handleCancelExtension,
     handleClearExtensionLogs,
   } = useQAManager();
+
+  // History panel state
+  const [historyPanel, setHistoryPanel] = useState({ open: false, agentId: null, agentName: '' });
 
   // Fetch agents on mount
   useEffect(() => {
@@ -418,11 +422,18 @@ const QAAgents = () => {
                             </GlassActionButton>
                             <GlassActionDivider />
                             <GlassActionButton
-                              onClick={() => handleViewAgentTickets(agent._id)}
-                              title="View Tickets"
+                              onClick={() => setHistoryPanel({ open: true, agentId: agent._id, agentName: agent.name })}
+                              title="Performance History"
                               variant="primary"
                             >
-                              <Eye className="w-3.5 h-3.5 text-gray-600 dark:text-neutral-300 group-hover/primary:text-blue-500 dark:group-hover/primary:text-blue-400 transition-colors" />
+                              <History className="w-3.5 h-3.5 text-gray-600 dark:text-neutral-300 group-hover/primary:text-blue-500 dark:group-hover/primary:text-blue-400 transition-colors" />
+                            </GlassActionButton>
+                            <GlassActionDivider />
+                            <GlassActionButton
+                              onClick={() => handleViewAgentTickets(agent._id)}
+                              title="View Tickets"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-gray-600 dark:text-neutral-300" />
                             </GlassActionButton>
                             <GlassActionDivider />
                             <GlassActionButton
@@ -574,6 +585,14 @@ const QAAgents = () => {
       <AddExistingAgentDialogContent />
       <SimilarAgentDialogContent />
       <DeleteDialogContent />
+
+      {/* Agent History Panel */}
+      <AgentHistoryPanel
+        agentId={historyPanel.agentId}
+        agentName={historyPanel.agentName}
+        isOpen={historyPanel.open}
+        onClose={() => setHistoryPanel({ open: false, agentId: null, agentName: '' })}
+      />
     </div>
   );
 };
