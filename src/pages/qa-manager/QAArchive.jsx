@@ -4,6 +4,7 @@ import { Archive, RotateCcw, Trash2, ExternalLink, Sparkles } from 'lucide-react
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, StatusBadge, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
 import QASearchBar from '../../components/QASearchBar';
+import TicketHoverPreview from '../../components/TicketHoverPreview';
 
 const QAArchive = () => {
   const { ticketId } = useParams();
@@ -131,22 +132,22 @@ const QAArchive = () => {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-neutral-800" ref={ticketListRef}>
               {sortedTickets.map((ticket, index) => (
-                <tr
-                  key={ticket._id}
-                  data-ticket-index={index}
-                  className={`group transition-colors cursor-pointer ${
-                    focusedTicketIndex === index
-                      ? 'bg-blue-50 dark:bg-blue-900/20'
-                      : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
-                  }`}
-                  onClick={(e) => {
-                    if (e.target.closest('button')) {
-                      return;
-                    }
-                    setFocusedTicketIndex(index);
-                    handleViewTicket(ticket);
-                  }}
-                >
+                <TicketHoverPreview key={ticket._id} ticket={ticket}>
+                  <tr
+                    data-ticket-index={index}
+                    className={`group transition-colors cursor-pointer ${
+                      focusedTicketIndex === index
+                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
+                    }`}
+                    onClick={(e) => {
+                      if (e.target.closest('button')) {
+                        return;
+                      }
+                      setFocusedTicketIndex(index);
+                      handleViewTicket(ticket);
+                    }}
+                  >
                   {isAISearch && (
                     <td className="px-4 py-3">
                       <div
@@ -206,6 +207,7 @@ const QAArchive = () => {
                     </div>
                   </td>
                 </tr>
+              </TicketHoverPreview>
               ))}
             </tbody>
           </table>

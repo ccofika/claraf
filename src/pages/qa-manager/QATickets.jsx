@@ -7,6 +7,7 @@ import {
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, StatusBadge, Button, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
 import QASearchBar from '../../components/QASearchBar';
+import TicketHoverPreview from '../../components/TicketHoverPreview';
 
 const QATickets = () => {
   const { ticketId } = useParams();
@@ -308,27 +309,27 @@ const QATickets = () => {
                   const hasValidationError = validationErrors.validationMode && ticketValidationError;
 
                   return (
-                    <tr
-                      key={ticket._id}
-                      data-ticket-index={index}
-                      className={`group transition-colors cursor-pointer relative ${
-                        hasValidationError
-                          ? 'bg-red-50 dark:bg-red-900/20'
-                          : focusedTicketIndex === index
-                          ? 'bg-blue-50 dark:bg-blue-900/20'
-                          : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
-                      }`}
-                      style={hasValidationError ? {
-                        boxShadow: '0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 0 2px rgba(239, 68, 68, 0.6)'
-                      } : undefined}
-                      onClick={(e) => {
-                        if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) {
-                          return;
-                        }
-                        setFocusedTicketIndex(index);
-                        handleViewTicket(ticket);
-                      }}
-                    >
+                    <TicketHoverPreview key={ticket._id} ticket={ticket}>
+                      <tr
+                        data-ticket-index={index}
+                        className={`group transition-colors cursor-pointer relative ${
+                          hasValidationError
+                            ? 'bg-red-50 dark:bg-red-900/20'
+                            : focusedTicketIndex === index
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
+                        }`}
+                        style={hasValidationError ? {
+                          boxShadow: '0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 0 2px rgba(239, 68, 68, 0.6)'
+                        } : undefined}
+                        onClick={(e) => {
+                          if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) {
+                            return;
+                          }
+                          setFocusedTicketIndex(index);
+                          handleViewTicket(ticket);
+                        }}
+                      >
                       {/* Validation error tooltip */}
                       {hasValidationError && (
                         <div className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -403,6 +404,7 @@ const QATickets = () => {
                         </div>
                       </td>
                     </tr>
+                  </TicketHoverPreview>
                   );
                 })}
               </tbody>
