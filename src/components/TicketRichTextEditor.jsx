@@ -10,37 +10,64 @@ import MacroInsertConfirmModal from './MacroInsertConfirmModal';
 const ImageLightbox = ({ src, alt, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+      }
     };
-    document.addEventListener('keydown', handleKeyDown);
+    // Use capture phase to intercept before other handlers
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
     // Prevent body scroll when lightbox is open
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.body.style.overflow = '';
     };
   }, [onClose]);
 
+  const handleBackdropClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+
+  const handleButtonClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+
   // Use portal to render at document body level, outside of any modal containers
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/90 flex items-center justify-center p-4"
-      style={{ zIndex: 99999 }}
-      onClick={onClose}
+      className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+      style={{ zIndex: 999999, pointerEvents: 'auto' }}
+      onClick={handleBackdropClick}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <button
-        onClick={onClose}
-        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-        style={{ zIndex: 100000 }}
+        type="button"
+        onClick={handleButtonClick}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+        style={{ zIndex: 1000000, pointerEvents: 'auto' }}
       >
         <X className="w-6 h-6" />
       </button>
       <img
         src={src}
         alt={alt}
-        className="max-w-full max-h-full object-contain rounded-lg"
+        className="max-w-full max-h-full object-contain rounded-lg cursor-default"
+        style={{ pointerEvents: 'auto' }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        draggable={false}
       />
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm bg-black/50 px-4 py-2 rounded-full pointer-events-none select-none">
+        Click outside or press ESC to close
+      </div>
     </div>,
     document.body
   );
@@ -417,20 +444,26 @@ const TicketRichTextEditor = ({
     const items = clipboardData.items;
 
     let imageFiles = [];
-    let textContent = '';
-    let htmlContent = '';
+    let textContentPromise = null;
+    let htmlContentPromise = null;
 
-    // Collect all clipboard items
+    // Collect all clipboard items SYNCHRONOUSLY first (items become invalid after async)
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const file = items[i].getAsFile();
         if (file) imageFiles.push(file);
       } else if (items[i].type === 'text/plain') {
-        textContent = await new Promise(resolve => items[i].getAsString(resolve));
+        // Create promise but don't await yet
+        textContentPromise = new Promise(resolve => items[i].getAsString(resolve));
       } else if (items[i].type === 'text/html') {
-        htmlContent = await new Promise(resolve => items[i].getAsString(resolve));
+        // Create promise but don't await yet
+        htmlContentPromise = new Promise(resolve => items[i].getAsString(resolve));
       }
     }
+
+    // Now await all promises after the loop
+    const textContent = textContentPromise ? await textContentPromise : '';
+    const htmlContent = htmlContentPromise ? await htmlContentPromise : '';
 
     // Normalize text: remove excessive line breaks but keep single line breaks
     const normalizeText = (text) => {
@@ -445,18 +478,43 @@ const TicketRichTextEditor = ({
     };
 
     // Extract images from HTML content (for when images are embedded in copied content)
-    // Returns array of { type: 'file', file: File } or { type: 'url', url: string }
+    // Returns { images: array of { type: 'file', file: File } or { type: 'url', url: string }, textWithoutImages: string }
     const extractImagesFromHtml = async (html) => {
-      if (!html) return [];
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const images = doc.querySelectorAll('img');
+      if (!html) return { images: [], textWithoutImages: '' };
+
       const extractedImages = [];
 
-      for (const img of images) {
-        const src = img.src;
-        if (src && src.startsWith('data:image')) {
-          // Convert data URL to blob/file
+      // First try regex to find all img src attributes (more reliable than DOM parsing for clipboard HTML)
+      const imgSrcRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+      let match;
+      const foundSrcs = [];
+
+      while ((match = imgSrcRegex.exec(html)) !== null) {
+        const src = match[1];
+        if (src && !foundSrcs.includes(src)) {
+          foundSrcs.push(src);
+        }
+      }
+
+      // Also try data-full-url attribute (used by our editor for lightbox)
+      const dataUrlRegex = /data-full-url=["']([^"']+)["']/gi;
+      while ((match = dataUrlRegex.exec(html)) !== null) {
+        const src = match[1];
+        if (src && !foundSrcs.includes(src)) {
+          foundSrcs.push(src);
+        }
+      }
+
+      // Process found image URLs
+      for (const src of foundSrcs) {
+        // Check if it's a Cloudinary URL or other CDN - use directly without re-fetching
+        const isCdnUrl = src.includes('cloudinary.com') ||
+                         src.includes('cdn.') ||
+                         src.includes('amazonaws.com') ||
+                         src.includes('blob:');
+
+        if (src.startsWith('data:image')) {
+          // Convert data URL to blob/file for re-upload
           try {
             const response = await fetch(src);
             const blob = await response.blob();
@@ -464,33 +522,32 @@ const TicketRichTextEditor = ({
             extractedImages.push({ type: 'file', file });
           } catch (err) {
             console.error('Error converting data URL to file:', err);
-          }
-        } else if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
-          // External URLs - try to fetch and convert to file, fallback to direct URL
-          try {
-            const response = await fetch(src);
-            if (response.ok) {
-              const blob = await response.blob();
-              if (blob.type.startsWith('image/')) {
-                const file = new File([blob], 'pasted-image.png', { type: blob.type });
-                extractedImages.push({ type: 'file', file });
-              } else {
-                // Not an image blob, use URL directly
-                extractedImages.push({ type: 'url', url: src });
-              }
-            } else {
-              // Fetch failed, use URL directly
-              extractedImages.push({ type: 'url', url: src });
-            }
-          } catch (err) {
-            // CORS or other error - use URL directly as fallback
-            console.log('Could not fetch external image, using URL directly:', src);
+            // Fallback: use data URL directly
             extractedImages.push({ type: 'url', url: src });
           }
+        } else if (isCdnUrl || src.startsWith('http://') || src.startsWith('https://')) {
+          // CDN URLs or external URLs - use directly to avoid CORS issues
+          extractedImages.push({ type: 'url', url: src });
+        } else if (src && src.length > 0) {
+          // Relative URL or other format - use as-is
+          extractedImages.push({ type: 'url', url: src });
         }
       }
 
-      return extractedImages;
+      // Get text content without image alt text
+      // Remove img tags and their containers, then extract text
+      let cleanHtml = html
+        .replace(/<img[^>]*>/gi, '') // Remove img tags
+        .replace(/<span[^>]*class="[^"]*inline-image-container[^"]*"[^>]*>[\s\S]*?<\/span>/gi, '') // Remove image containers
+        .replace(/<span[^>]*class="[^"]*zoom-indicator[^"]*"[^>]*>[\s\S]*?<\/span>/gi, ''); // Remove zoom indicators
+
+      // Parse cleaned HTML to get text
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(cleanHtml, 'text/html');
+      let textWithoutImages = doc.body.textContent || '';
+      textWithoutImages = normalizeText(textWithoutImages);
+
+      return { images: extractedImages, textWithoutImages };
     };
 
     // If we have direct image files from clipboard (e.g., screenshots)
@@ -511,23 +568,94 @@ const TicketRichTextEditor = ({
 
     // Check for images embedded in HTML content
     if (htmlContent) {
-      const embeddedImages = await extractImagesFromHtml(htmlContent);
+      const { images: embeddedImages, textWithoutImages } = await extractImagesFromHtml(htmlContent);
 
       if (embeddedImages.length > 0) {
-        // We have images in HTML - insert text first, then images
-        if (textContent) {
-          const normalized = normalizeText(textContent);
-          insertPlainText(normalized);
+        // We have images in HTML - build complete content and insert at once
+        const fragment = document.createDocumentFragment();
+
+        // Add text content first (if any)
+        if (textWithoutImages) {
+          const lines = textWithoutImages.split('\n');
+          lines.forEach((line, index) => {
+            if (index > 0) {
+              fragment.appendChild(document.createElement('br'));
+            }
+            if (line) {
+              fragment.appendChild(document.createTextNode(line));
+            }
+          });
         }
 
+        // Add images after text
         for (const imgData of embeddedImages) {
+          const url = imgData.type === 'url' ? imgData.url : null;
+
           if (imgData.type === 'file') {
+            // For files, we need to upload first - handle separately
             await handleImagePaste(imgData.file);
-          } else if (imgData.type === 'url') {
-            // Insert external URL image directly
-            insertExternalImage(imgData.url);
+          } else if (url) {
+            // Create image container
+            const imgContainer = document.createElement('span');
+            imgContainer.className = 'inline-image-container';
+            imgContainer.style.cssText = 'display: inline-block; position: relative; margin: 4px 2px; vertical-align: middle;';
+
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'Pasted image';
+            img.className = 'ticket-inline-image';
+            img.style.cssText = `
+              max-width: 120px;
+              max-height: 80px;
+              width: auto;
+              height: auto;
+              border-radius: 4px;
+              cursor: pointer;
+              object-fit: cover;
+              border: 1px solid rgba(0,0,0,0.1);
+              transition: transform 0.2s, box-shadow 0.2s;
+            `;
+            img.setAttribute('data-full-url', url);
+            img.setAttribute('data-external', 'true');
+
+            // Zoom indicator
+            const zoomIndicator = document.createElement('span');
+            zoomIndicator.className = 'zoom-indicator';
+            zoomIndicator.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>`;
+            zoomIndicator.style.cssText = `
+              position: absolute;
+              bottom: 4px;
+              right: 4px;
+              background: rgba(0,0,0,0.6);
+              color: white;
+              padding: 2px;
+              border-radius: 4px;
+              opacity: 0;
+              transition: opacity 0.2s;
+              pointer-events: none;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            `;
+
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(zoomIndicator);
+            fragment.appendChild(imgContainer);
+            fragment.appendChild(document.createTextNode(' ')); // Space after image
           }
         }
+
+        // Insert entire fragment at once
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(fragment);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+
         onChange?.(editorRef.current.innerHTML);
         return;
       }
