@@ -177,6 +177,32 @@ export const useMacros = () => {
     }
   }, []);
 
+  // Fetch macro analytics
+  const fetchMacroAnalytics = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/qa/macros/analytics`, getAuthHeaders());
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching macro analytics:', err);
+      return null;
+    }
+  }, []);
+
+  // Fetch macro suggestions based on categories
+  const fetchMacroSuggestions = useCallback(async (categories) => {
+    try {
+      const categoryParam = Array.isArray(categories) ? categories.join(',') : categories;
+      const response = await axios.get(
+        `${API_URL}/api/qa/macros/suggestions?categories=${encodeURIComponent(categoryParam)}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching macro suggestions:', err);
+      return { suggestions: [], frequentlyUsed: [], teamFavorites: [] };
+    }
+  }, []);
+
   return {
     macros,
     loading,
@@ -193,7 +219,10 @@ export const useMacros = () => {
     // Admin functions
     fetchQAGradersWithCounts,
     fetchMacrosByCreator,
-    searchMacrosByCreator
+    searchMacrosByCreator,
+    // Analytics & Suggestions
+    fetchMacroAnalytics,
+    fetchMacroSuggestions
   };
 };
 

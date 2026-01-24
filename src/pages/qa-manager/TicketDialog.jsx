@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
-  AlertTriangle, Sparkles, Users, ExternalLink, Search
+  AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -11,6 +11,8 @@ import TicketRichTextEditor from '../../components/TicketRichTextEditor';
 import ScorecardEditor from '../../components/ScorecardEditor';
 import SimilarFeedbacksPanel from '../../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
+import MacroSuggestionsPanel from '../../components/MacroSuggestionsPanel';
+import ArchiveSearchPanel from '../../components/ArchiveSearchPanel';
 import ChooseMacroModal from '../../components/ChooseMacroModal';
 import { hasScorecard, getScorecardCategories } from '../../data/scorecardConfig';
 import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/scorecardCalculations';
@@ -784,36 +786,60 @@ const TicketDialog = ({
               />
 
               <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
-                <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+                <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('ai')}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'ai'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-3.5 h-3.5" />
                     AI Similar
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('related')}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'related'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Users className="w-4 h-4" />
+                    <Users className="w-3.5 h-3.5" />
                     Related
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('macros')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                      rightPanelMode === 'macros'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    Suggested
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('archive')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                      rightPanelMode === 'archive'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Archive
                   </button>
                 </div>
               </div>
 
               <div className="flex-1 overflow-hidden relative z-10">
-                {rightPanelMode === 'ai' ? (
+                {rightPanelMode === 'ai' && (
                   <SimilarFeedbacksPanel
                     notes={formData.notes}
                     ticketId={ticketDialog.data?._id}
@@ -827,11 +853,86 @@ const TicketDialog = ({
                       }));
                     }}
                   />
-                ) : (
+                )}
+                {rightPanelMode === 'related' && (
                   <RelatedTicketsPanel
                     agentId={formData.agent}
                     categories={formData.categories}
                     currentTicketId={ticketDialog.data?._id}
+                  />
+                )}
+                {rightPanelMode === 'macros' && (
+                  <MacroSuggestionsPanel
+                    categories={formData.categories || []}
+                    agentPosition={agentPosition}
+                    currentScorecardVariant={formData.scorecardVariant}
+                    onSelectMacro={(macro, options = {}) => {
+                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+
+                      // Always apply feedback
+                      const currentFeedback = formData.feedback || '';
+                      const separator = currentFeedback.trim() ? '\n\n' : '';
+                      const updates = {
+                        feedback: currentFeedback + separator + macro.feedback
+                      };
+
+                      // Apply categories if requested
+                      if (applyCategories && macro.categories && macro.categories.length > 0) {
+                        updates.categories = macro.categories;
+                      }
+
+                      // Apply scorecard if requested and matches agent position
+                      if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
+                        const positionData = macro.scorecardData[agentPosition];
+                        const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+                        const values = positionData[targetVariant];
+                        if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+                          updates.scorecardValues = values;
+                          if (targetVariant) {
+                            updates.scorecardVariant = targetVariant;
+                          }
+                        }
+                      }
+
+                      setFormData(prev => ({ ...prev, ...updates }));
+
+                      if (ticketDialog.data?._id) {
+                        recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
+                      }
+                    }}
+                  />
+                )}
+                {rightPanelMode === 'archive' && (
+                  <ArchiveSearchPanel
+                    agents={agents}
+                    currentCategories={formData.categories || []}
+                    onCopyToTicket={(data) => {
+                      const updates = {};
+
+                      // Copy feedback (append to existing)
+                      if (data.feedback) {
+                        const currentFeedback = formData.feedback || '';
+                        const separator = currentFeedback.trim() ? '\n\n' : '';
+                        updates.feedback = currentFeedback + separator + data.feedback;
+                      }
+
+                      // Copy categories (replace)
+                      if (data.categories && data.categories.length > 0) {
+                        updates.categories = data.categories;
+                      }
+
+                      // Copy scorecard (replace)
+                      if (data.scorecardValues && Object.keys(data.scorecardValues).length > 0) {
+                        updates.scorecardValues = data.scorecardValues;
+                        if (data.scorecardVariant) {
+                          updates.scorecardVariant = data.scorecardVariant;
+                        }
+                      }
+
+                      if (Object.keys(updates).length > 0) {
+                        setFormData(prev => ({ ...prev, ...updates }));
+                      }
+                    }}
                   />
                 )}
               </div>

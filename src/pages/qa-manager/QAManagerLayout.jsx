@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, FileText, UsersRound, TrendingUp, Target, Bug,
   Keyboard, RefreshCw, Search, AlertTriangle, Loader2, X, Check,
   RotateCcw, ClipboardList, Edit, Hash, ChevronLeft, ChevronRight,
-  MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play
+  MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
+  ChevronDown, Wand2, GraduationCap
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
@@ -98,7 +100,10 @@ const QAManagerLayoutInner = () => {
   // Local state for modals and UI
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [generateDropdownOpen, setGenerateDropdownOpen] = useState(false);
+  const [generateDropdownPosition, setGenerateDropdownPosition] = useState({ top: 0, left: 0 });
   const searchInputRef = useRef(null);
+  const generateButtonRef = useRef(null);
 
   // Local state for create assignment form in Assignments dialog
   const [showCreateAssignmentForm, setShowCreateAssignmentForm] = useState(false);
@@ -315,13 +320,20 @@ const QAManagerLayoutInner = () => {
                 }}
               >
               {(() => {
-                const tabs = [
+                const regularTabs = [
                   { value: 'dashboard', label: 'Dashboard' },
                   { value: 'agents', label: 'Agents' },
                   { value: 'tickets', label: 'Tickets' },
                   { value: 'archive', label: 'Archive' },
                   { value: 'analytics', label: 'Analytics', icon: BarChart3 },
-                  { value: 'summaries', label: 'Summaries', icon: FileText },
+                ];
+
+                const generateSubTabs = [
+                  { value: 'summaries', label: 'Summary', icon: FileText },
+                  { value: 'coaching', label: 'Coaching', icon: GraduationCap },
+                ];
+
+                const adminTabs = [
                   ...(isAdmin ? [
                     { value: 'all-agents', label: 'All Agents', icon: UsersRound },
                     { value: 'statistics', label: 'Statistics', icon: TrendingUp },
@@ -332,9 +344,197 @@ const QAManagerLayoutInner = () => {
                   ] : []),
                 ];
 
+                const isGenerateActive = activeTab === 'summaries' || activeTab === 'coaching';
+
                 return (
                   <>
-                    {tabs.map((tab) => (
+                    {regularTabs.map((tab) => (
+                      <button
+                        key={tab.value}
+                        onClick={() => handleTabChange(tab.value)}
+                        className={`relative z-10 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
+                          activeTab === tab.value
+                            ? 'text-gray-900 dark:text-white'
+                            : 'text-gray-500 dark:text-neutral-500 hover:text-gray-700 dark:hover:text-neutral-300'
+                        }`}
+                      >
+                        {tab.icon && <tab.icon className="w-4 h-4" />}
+                        {tab.label}
+                        {activeTab === tab.value && (
+                          <motion.div
+                            layoutId="activeTabIndicator"
+                            className="absolute inset-0 rounded-xl -z-10"
+                            transition={{
+                              type: 'spring',
+                              stiffness: 500,
+                              damping: 35,
+                            }}
+                          >
+                            {/* Animated gradient border - Light theme */}
+                            <div
+                              className="absolute inset-0 rounded-xl dark:hidden"
+                              style={{
+                                padding: '1px',
+                                background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.03) 40%, rgba(0,0,0,0.03) 60%, rgba(0,0,0,0.12) 100%)',
+                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                                animation: 'rotateGradient 4s ease-in-out infinite',
+                              }}
+                            />
+                            {/* Animated gradient border - Dark theme */}
+                            <div
+                              className="absolute inset-0 rounded-xl hidden dark:block"
+                              style={{
+                                padding: '1px',
+                                background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.2) 100%)',
+                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                                animation: 'rotateGradient 4s ease-in-out infinite',
+                              }}
+                            />
+                            {/* Inner glass background - Light theme */}
+                            <div
+                              className="absolute inset-[1px] rounded-[11px] dark:hidden"
+                              style={{
+                                background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(250,250,250,0.98) 50%, rgba(255,255,255,0.95) 100%)',
+                                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.1)',
+                              }}
+                            />
+                            {/* Inner glass background - Dark theme */}
+                            <div
+                              className="absolute inset-[1px] rounded-[11px] hidden dark:block"
+                              style={{
+                                background: 'linear-gradient(145deg, rgba(30,30,30,0.9) 0%, rgba(20,20,20,0.95) 50%, rgba(25,25,25,0.9) 100%)',
+                                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.4)',
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </button>
+                    ))}
+
+                    {/* Generate Dropdown */}
+                    <div
+                      ref={generateButtonRef}
+                      className="relative"
+                      onMouseEnter={() => {
+                        if (generateButtonRef.current) {
+                          const rect = generateButtonRef.current.getBoundingClientRect();
+                          setGenerateDropdownPosition({
+                            top: rect.bottom + 4,
+                            left: rect.left
+                          });
+                        }
+                        setGenerateDropdownOpen(true);
+                      }}
+                      onMouseLeave={() => setGenerateDropdownOpen(false)}
+                    >
+                      <button
+                        className={`relative z-10 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
+                          isGenerateActive
+                            ? 'text-gray-900 dark:text-white'
+                            : 'text-gray-500 dark:text-neutral-500 hover:text-gray-700 dark:hover:text-neutral-300'
+                        }`}
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        Generate
+                        <ChevronDown className={`w-3 h-3 transition-transform ${generateDropdownOpen ? 'rotate-180' : ''}`} />
+                        {isGenerateActive && (
+                          <motion.div
+                            layoutId="activeTabIndicator"
+                            className="absolute inset-0 rounded-xl -z-10"
+                            transition={{
+                              type: 'spring',
+                              stiffness: 500,
+                              damping: 35,
+                            }}
+                          >
+                            <div
+                              className="absolute inset-0 rounded-xl dark:hidden"
+                              style={{
+                                padding: '1px',
+                                background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.03) 40%, rgba(0,0,0,0.03) 60%, rgba(0,0,0,0.12) 100%)',
+                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                                animation: 'rotateGradient 4s ease-in-out infinite',
+                              }}
+                            />
+                            <div
+                              className="absolute inset-0 rounded-xl hidden dark:block"
+                              style={{
+                                padding: '1px',
+                                background: 'linear-gradient(var(--gradient-angle, 135deg), rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.2) 100%)',
+                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                                animation: 'rotateGradient 4s ease-in-out infinite',
+                              }}
+                            />
+                            <div
+                              className="absolute inset-[1px] rounded-[11px] dark:hidden"
+                              style={{
+                                background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(250,250,250,0.98) 50%, rgba(255,255,255,0.95) 100%)',
+                                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.1)',
+                              }}
+                            />
+                            <div
+                              className="absolute inset-[1px] rounded-[11px] hidden dark:block"
+                              style={{
+                                background: 'linear-gradient(145deg, rgba(30,30,30,0.9) 0%, rgba(20,20,20,0.95) 50%, rgba(25,25,25,0.9) 100%)',
+                                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.4)',
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </button>
+
+                      {/* Dropdown Menu - Rendered via Portal */}
+                      {generateDropdownOpen && createPortal(
+                        <div
+                          className="fixed z-[100]"
+                          style={{
+                            top: generateDropdownPosition.top - 10,
+                            left: generateDropdownPosition.left
+                          }}
+                          onMouseEnter={() => setGenerateDropdownOpen(true)}
+                          onMouseLeave={() => setGenerateDropdownOpen(false)}
+                        >
+                          {/* Invisible bridge area to prevent gap issues */}
+                          <div className="h-[10px]" />
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            transition={{ duration: 0.15 }}
+                            className="py-1 min-w-[140px] bg-white dark:bg-neutral-900 rounded-lg shadow-lg border border-gray-200 dark:border-neutral-700"
+                          >
+                            {generateSubTabs.map((subTab) => (
+                              <button
+                                key={subTab.value}
+                                onClick={() => {
+                                  handleTabChange(subTab.value);
+                                  setGenerateDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                                  activeTab === subTab.value
+                                    ? 'bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-white'
+                                    : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800'
+                                }`}
+                              >
+                                <subTab.icon className="w-4 h-4" />
+                                {subTab.label}
+                              </button>
+                            ))}
+                          </motion.div>
+                        </div>,
+                        document.body
+                      )}
+                    </div>
+
+                    {adminTabs.map((tab) => (
                       <button
                         key={tab.value}
                         onClick={() => handleTabChange(tab.value)}

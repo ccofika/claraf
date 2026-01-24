@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, Copy, Globe, Users, UserCircle } from 'lucide-react';
+import { X, Plus, Trash2, Search, FileText, ExternalLink, Hash, ChevronDown, ChevronUp, Copy, Globe, Users, UserCircle, BarChart3, TrendingUp, Award, Target, Lightbulb } from 'lucide-react';
 import TicketRichTextEditor from './TicketRichTextEditor';
 import ScorecardEditor from './ScorecardEditor';
 import { useMacros } from '../hooks/useMacros';
@@ -29,8 +29,14 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     getMacroTickets,
     fetchQAGraders,
     fetchQAGradersWithCounts,
-    fetchMacrosByCreator
+    fetchMacrosByCreator,
+    fetchMacroAnalytics
   } = useMacros();
+
+  // Analytics state
+  const [analyticsExpanded, setAnalyticsExpanded] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Check if current user is admin
   const isAdmin = MACRO_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
@@ -130,6 +136,17 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
       }
     }
   }, [open, fetchMacros, fetchQAGraders, isAdmin, fetchQAGradersWithCounts]);
+
+  // Fetch analytics when expanded
+  useEffect(() => {
+    if (analyticsExpanded && !analytics && !analyticsLoading) {
+      setAnalyticsLoading(true);
+      fetchMacroAnalytics().then(data => {
+        setAnalytics(data);
+        setAnalyticsLoading(false);
+      });
+    }
+  }, [analyticsExpanded, analytics, analyticsLoading, fetchMacroAnalytics]);
 
   // Fetch macros when creator selection changes (admin only)
   useEffect(() => {
@@ -558,6 +575,148 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT SIDEBAR - Macro List (25%) */}
           <div className="w-1/4 flex flex-col border-r border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+            {/* Analytics Panel - Collapsible */}
+            <div className="border-b border-gray-200 dark:border-neutral-800">
+              <button
+                onClick={() => setAnalyticsExpanded(!analyticsExpanded)}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-neutral-900 transition-colors"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-neutral-300">
+                  <BarChart3 className="w-4 h-4 text-purple-500" />
+                  Analytics
+                </span>
+                {analyticsExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {analyticsExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3 pb-3 space-y-3">
+                      {analyticsLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      ) : analytics ? (
+                        <>
+                          {/* Summary Stats */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="p-2 bg-white dark:bg-neutral-900 rounded-lg text-center">
+                              <p className="text-lg font-bold text-gray-900 dark:text-white">{analytics.summary?.totalMacros || 0}</p>
+                              <p className="text-[10px] text-gray-500 dark:text-neutral-400">Macros</p>
+                            </div>
+                            <div className="p-2 bg-white dark:bg-neutral-900 rounded-lg text-center">
+                              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{analytics.summary?.totalUsage || 0}</p>
+                              <p className="text-[10px] text-gray-500 dark:text-neutral-400">Total Uses</p>
+                            </div>
+                            <div className="p-2 bg-white dark:bg-neutral-900 rounded-lg text-center">
+                              <p className="text-lg font-bold text-green-600 dark:text-green-400">{analytics.summary?.avgUsagePerMacro || 0}</p>
+                              <p className="text-[10px] text-gray-500 dark:text-neutral-400">Avg/Macro</p>
+                            </div>
+                          </div>
+
+                          {/* Most Used This Week */}
+                          {analytics.mostUsedThisWeek?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-500 dark:text-neutral-400 uppercase mb-1.5 flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" />
+                                This Week
+                              </p>
+                              <div className="space-y-1">
+                                {analytics.mostUsedThisWeek.slice(0, 3).map((m, idx) => (
+                                  <div key={m._id} className="flex items-center justify-between text-xs p-1.5 bg-white dark:bg-neutral-900 rounded">
+                                    <span className="truncate text-gray-700 dark:text-neutral-300" title={m.title}>
+                                      {idx + 1}. {m.title}
+                                    </span>
+                                    <span className="text-purple-600 dark:text-purple-400 font-medium ml-2">{m.weeklyCount}x</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Top Graders */}
+                          {analytics.usageByGrader?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-500 dark:text-neutral-400 uppercase mb-1.5 flex items-center gap-1">
+                                <Award className="w-3 h-3" />
+                                Top Graders
+                              </p>
+                              <div className="space-y-1">
+                                {analytics.usageByGrader.slice(0, 3).map((g, idx) => (
+                                  <div key={g.graderId} className="flex items-center justify-between text-xs p-1.5 bg-white dark:bg-neutral-900 rounded">
+                                    <span className="truncate text-gray-700 dark:text-neutral-300">
+                                      {idx + 1}. {g.graderName}
+                                    </span>
+                                    <span className="text-green-600 dark:text-green-400 font-medium ml-2">{g.totalUsage} uses</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Effectiveness */}
+                          {analytics.effectiveness?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-500 dark:text-neutral-400 uppercase mb-1.5 flex items-center gap-1">
+                                <Target className="w-3 h-3" />
+                                Effectiveness
+                              </p>
+                              <div className="space-y-1">
+                                {analytics.effectiveness.slice(0, 3).map((m) => (
+                                  <div key={m.macroId} className="flex items-center justify-between text-xs p-1.5 bg-white dark:bg-neutral-900 rounded">
+                                    <span className="truncate text-gray-700 dark:text-neutral-300" title={m.title}>
+                                      {m.title}
+                                    </span>
+                                    <span className={`font-medium ml-2 ${m.avgScore >= 80 ? 'text-green-600 dark:text-green-400' : m.avgScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
+                                      {m.avgScore}%
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Opportunities */}
+                          {analytics.opportunities?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-500 dark:text-neutral-400 uppercase mb-1.5 flex items-center gap-1">
+                                <Lightbulb className="w-3 h-3" />
+                                Opportunities
+                              </p>
+                              <div className="space-y-1">
+                                {analytics.opportunities.slice(0, 2).map((o) => (
+                                  <div key={o.category} className="text-xs p-1.5 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded">
+                                    <span className="font-medium">{o.category}</span>
+                                    <span className="text-yellow-600 dark:text-yellow-500 ml-1">
+                                      ({o.ticketCount} tickets, {o.macroUsage} macro uses)
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 text-center py-2">
+                          No analytics data
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Admin Creator Dropdown */}
             {isAdmin && (
               <div className="p-3 border-b border-gray-200 dark:border-neutral-800" ref={creatorDropdownRef}>

@@ -44,7 +44,9 @@ import {
   QAAllAgents,
   StatisticsPage,
   QAActiveOverview,
-  QABugsPage
+  QABugsPage,
+  QACoaching,
+  QACoachingDetail
 } from './pages/qa-manager';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
@@ -168,6 +170,8 @@ function App() {
                           <Route path="archive/:ticketId/edit" element={<QAArchive />} />
                           <Route path="analytics" element={<QAAnalyticsDashboard />} />
                           <Route path="summaries" element={<QASummaries />} />
+                          <Route path="coaching" element={<QACoaching />} />
+                          <Route path="coaching/:id" element={<QACoachingDetail />} />
                           <Route path="all-agents" element={<QAAllAgents />} />
                           <Route path="statistics" element={<StatisticsPage />} />
                           <Route path="import-tickets" element={<QAImportTickets />} />

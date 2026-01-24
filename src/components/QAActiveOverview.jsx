@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -7,11 +9,14 @@ import {
   AlertCircle, Loader2, X, TrendingUp, Clock, CheckCircle,
   User, ArrowRight, ArrowLeftRight, Plane, Calendar,
   BarChart3, AlertTriangle, History, Settings, Copy,
-  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check, Pencil, Play
+  GripVertical, Plus, Minus, Save, RotateCcw, Upload, FileSpreadsheet, Check, Pencil, Play,
+  ExternalLink, Tag, MessageSquare
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { TicketContentDisplay } from './TicketRichTextEditor';
+import { getScorecardValues, SHORT_LABELS } from '../data/scorecardConfig';
 
 // Sub-tab components
 const SubTabs = ({ activeTab, onTabChange }) => {
@@ -97,6 +102,19 @@ const QAActiveOverview = () => {
   const [selectedAgent2, setSelectedAgent2] = useState(null);
   const [selectedGrader2, setSelectedGrader2] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  // ESC key handler for closing panels
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        if (viewTicketDialog.open) {
+          setViewTicketDialog({ open: false, ticket: null });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [viewTicketDialog.open]);
 
   // Auth headers
   const getAuthHeaders = useCallback(() => ({
@@ -1908,70 +1926,225 @@ const QAActiveOverview = () => {
       {activeSubTab === 'analytics' && renderAnalyticsTab()}
       {activeSubTab === 'week-setup' && renderWeekSetupTab()}
 
-      {/* View Ticket Dialog */}
-      <Dialog open={viewTicketDialog.open} onOpenChange={(open) => !open && setViewTicketDialog({ open: false, ticket: null })}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Ticket className="w-5 h-5" />
-              Ticket: {viewTicketDialog.ticket?.ticketId}
-            </DialogTitle>
-          </DialogHeader>
-          {viewTicketDialog.ticket && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Agent</label>
-                  <p className="font-medium text-neutral-900 dark:text-white">{viewTicketDialog.ticket.agent?.name || 'Unknown'}</p>
+      {/* View Ticket Side Panel */}
+      {viewTicketDialog.open && createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setViewTicketDialog({ open: false, ticket: null })}
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9998]"
+          />
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-neutral-900 shadow-2xl z-[9999] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-xl flex items-center justify-center">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                      {viewTicketDialog.ticket?.ticketId}
+                      {viewTicketDialog.ticket?.qualityScorePercent !== null && (
+                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${
+                          viewTicketDialog.ticket.qualityScorePercent >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                          viewTicketDialog.ticket.qualityScorePercent >= 80 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                          viewTicketDialog.ticket.qualityScorePercent >= 70 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                          'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                        }`}>
+                          {viewTicketDialog.ticket.qualityScorePercent}%
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      {viewTicketDialog.ticket?.agent?.name} • {viewTicketDialog.ticket?.agent?.position}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Grader</label>
-                  <p className="font-medium text-neutral-900 dark:text-white">{viewTicketDialog.ticket.createdBy?.name || 'Unknown'}</p>
-                </div>
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Date</label>
-                  <p className="text-neutral-900 dark:text-white">{formatDate(viewTicketDialog.ticket.dateEntered)}</p>
-                </div>
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Status</label>
-                  <div className="mt-1">{getStatusBadge(viewTicketDialog.ticket.status)}</div>
-                </div>
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Score</label>
-                  <p className={`font-semibold ${getScoreColor(viewTicketDialog.ticket.qualityScorePercent)}`}>
-                    {viewTicketDialog.ticket.qualityScorePercent !== null ? `${viewTicketDialog.ticket.qualityScorePercent}%` : 'Not graded'}
-                  </p>
+                <div className="flex items-center gap-2">
+                  {viewTicketDialog.ticket?.ticketId && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${viewTicketDialog.ticket.ticketId}`, '_blank')}
+                      className="p-2 text-neutral-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                      title="Open in Intercom"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setViewTicketDialog({ open: false, ticket: null })}
+                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-neutral-500" />
+                  </button>
                 </div>
               </div>
-              {viewTicketDialog.ticket.shortDescription && (
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Description</label>
-                  <p className="mt-1 text-neutral-900 dark:text-white">{viewTicketDialog.ticket.shortDescription}</p>
-                </div>
-              )}
-              {viewTicketDialog.ticket.notes && (
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Notes</label>
-                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <TicketContentDisplay content={viewTicketDialog.ticket.notes} className="text-sm" />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {viewTicketDialog.ticket && (
+                <div className="space-y-6">
+                  {/* Meta Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-neutral-500 uppercase">Grader</label>
+                      <p className="font-medium text-neutral-900 dark:text-white">{viewTicketDialog.ticket.createdBy?.name || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500 uppercase">Date</label>
+                      <p className="text-neutral-900 dark:text-white">{formatDate(viewTicketDialog.ticket.dateEntered)}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500 uppercase">Status</label>
+                      <div className="mt-1">{getStatusBadge(viewTicketDialog.ticket.status)}</div>
+                    </div>
                   </div>
-                </div>
-              )}
-              {viewTicketDialog.ticket.feedback && (
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase">Feedback</label>
-                  <div className="mt-1 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <TicketContentDisplay content={viewTicketDialog.ticket.feedback} className="text-sm" />
-                  </div>
+
+                  {/* Categories */}
+                  {viewTicketDialog.ticket.categories && viewTicketDialog.ticket.categories.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="w-4 h-4 text-neutral-400" />
+                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Categories</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {viewTicketDialog.ticket.categories.map(cat => (
+                          <Badge key={cat} variant="secondary" className="text-xs">
+                            {cat}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {viewTicketDialog.ticket.notes && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Eye className="w-4 h-4 text-neutral-400" />
+                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Notes</h3>
+                      </div>
+                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-neutral-200 dark:border-neutral-700">
+                        <TicketContentDisplay content={viewTicketDialog.ticket.notes} className="text-sm" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Feedback */}
+                  {viewTicketDialog.ticket.feedback && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-neutral-400" />
+                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Feedback</h3>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                        <TicketContentDisplay content={viewTicketDialog.ticket.feedback} className="text-sm" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scorecard */}
+                  {viewTicketDialog.ticket.scorecardValues && Object.keys(viewTicketDialog.ticket.scorecardValues).length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="w-4 h-4 text-neutral-400" />
+                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Scorecard</h3>
+                        {viewTicketDialog.ticket.scorecardVariant && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${
+                              viewTicketDialog.ticket.scorecardVariant === 'mentions'
+                                ? 'border-purple-400 text-purple-600 dark:text-purple-400'
+                                : 'border-blue-400 text-blue-600 dark:text-blue-400'
+                            }`}
+                          >
+                            {viewTicketDialog.ticket.scorecardVariant === 'mentions' ? 'Selected Mentions' : 'Use This One'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-neutral-200 dark:border-neutral-700">
+                        {/* Scorecard Position Header */}
+                        {viewTicketDialog.ticket.agent?.position && (
+                          <div className="mb-3 pb-3 border-b border-neutral-200 dark:border-neutral-700">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              {viewTicketDialog.ticket.agent.position}
+                            </span>
+                          </div>
+                        )}
+                        {/* Scorecard Values */}
+                        <div className="space-y-2.5">
+                          {(() => {
+                            const position = viewTicketDialog.ticket.agent?.position;
+                            const variant = viewTicketDialog.ticket.scorecardVariant;
+                            const configValues = position ? getScorecardValues(position, variant) : [];
+                            const configMap = {};
+                            configValues.forEach(v => { configMap[v.key] = v; });
+
+                            const getBgClass = (idx) => {
+                              if (idx === null || idx === undefined) return 'bg-neutral-100 dark:bg-neutral-700';
+                              switch (idx) {
+                                case 0: return 'bg-green-500';
+                                case 1: return 'bg-yellow-400';
+                                case 2: return 'bg-amber-500';
+                                case 3: return 'bg-red-500';
+                                case 4: return 'bg-neutral-400';
+                                default: return 'bg-neutral-100 dark:bg-neutral-700';
+                              }
+                            };
+
+                            const getTextClass = (idx) => {
+                              if (idx === null || idx === undefined) return 'text-neutral-500';
+                              if (idx === 1) return 'text-neutral-900';
+                              return 'text-white';
+                            };
+
+                            return Object.entries(viewTicketDialog.ticket.scorecardValues).map(([key, value]) => {
+                              const configItem = configMap[key];
+                              const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                              const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
+                                ? SHORT_LABELS[value]
+                                : '-';
+
+                              return (
+                                <div key={key} className="flex items-center justify-between">
+                                  <span className="text-sm text-neutral-600 dark:text-neutral-400">{label}</span>
+                                  <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${getBgClass(value)} ${getTextClass(value)}`}>
+                                    {displayLabel}
+                                  </span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-          <DialogFooter>
-            <button onClick={() => setViewTicketDialog({ open: false, ticket: null })} className="px-4 py-2 text-sm bg-neutral-100 dark:bg-neutral-800 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700">Close</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            {/* Footer */}
+            <div className="flex-shrink-0 border-t border-neutral-200 dark:border-neutral-800 px-6 py-3 bg-neutral-50 dark:bg-neutral-800/50">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-neutral-200 dark:bg-neutral-700 rounded text-[10px]">ESC</kbd> to close
+              </p>
+            </div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Reassign Tickets Dialog */}
       <Dialog open={reassignDialog.open} onOpenChange={(open) => !open && setReassignDialog({ open: false, ticketIds: [], single: false })}>
