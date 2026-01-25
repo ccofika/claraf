@@ -58,6 +58,7 @@ const GlassActionButton = ({ onClick, title, children, className = '', isFirst, 
     danger: 'hover:bg-red-500/10 group/delete',
     success: 'hover:bg-green-500/10 group/success',
     primary: 'hover:bg-blue-500/10 group/primary',
+    warning: 'hover:bg-amber-500/10 group/warning',
   };
 
   return (

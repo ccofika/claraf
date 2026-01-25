@@ -23,6 +23,11 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const [categorySearch, setCategorySearch] = useState('');
   const [categoryHighlightIndex, setCategoryHighlightIndex] = useState(0);
 
+  // Grader search state
+  const [graderSearchQuery, setGraderSearchQuery] = useState('');
+  const [showGraderDropdown, setShowGraderDropdown] = useState(false);
+  const [graderHighlightIndex, setGraderHighlightIndex] = useState(0);
+
   const searchInputRef = useRef(null);
   const agentDropdownRef = useRef(null);
   const agentInputRef = useRef(null);
@@ -30,6 +35,9 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   const categoryDropdownRef = useRef(null);
   const categoryInputRef = useRef(null);
   const categoryListRef = useRef(null);
+  const graderDropdownRef = useRef(null);
+  const graderInputRef = useRef(null);
+  const graderListRef = useRef(null);
 
   // Sync with currentFilters from parent
   useEffect(() => {
@@ -44,6 +52,18 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
     }
   }, [currentFilters.agent, agents]);
 
+  // Sync grader search query with currentFilters
+  useEffect(() => {
+    if (currentFilters.grader) {
+      const selectedGrader = graders.find(g => g._id === currentFilters.grader);
+      if (selectedGrader) {
+        setGraderSearchQuery(selectedGrader.name || selectedGrader.email);
+      }
+    } else {
+      setGraderSearchQuery('');
+    }
+  }, [currentFilters.grader, graders]);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -53,6 +73,9 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
         setShowCategoryDropdown(false);
         setCategorySearch('');
+      }
+      if (graderDropdownRef.current && !graderDropdownRef.current.contains(event.target)) {
+        setShowGraderDropdown(false);
       }
     };
 
@@ -93,6 +116,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
     });
     setAgentSearchQuery('');
     setCategorySearch('');
+    setGraderSearchQuery('');
   };
 
   const getActiveFilterCount = () => {
@@ -129,6 +153,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
     agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
   );
 
+  // Filtered graders based on search
+  const filteredGraders = graders.filter(grader => {
+    const name = grader.name || grader.email || '';
+    return name.toLowerCase().includes(graderSearchQuery.toLowerCase());
+  });
+
   // All categories list
   const allCategories = [
     'Account closure', 'ACP usage', 'Account recovery', 'Affiliate program',
@@ -163,9 +193,19 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
   // Scroll category highlighted item into view
   useEffect(() => {
     if (showCategoryDropdown && categoryListRef.current) {
-      const highlighted = categoryListRef.current.querySelector('[data-highlighted="true"]');
-      if (highlighted) {
-        highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const highlightedElement = categoryListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlightedElement) {
+        const container = categoryListRef.current;
+        const elementTop = highlightedElement.offsetTop;
+        const elementBottom = elementTop + highlightedElement.offsetHeight;
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+
+        if (elementTop < containerTop) {
+          container.scrollTop = elementTop;
+        } else if (elementBottom > containerBottom) {
+          container.scrollTop = elementBottom - container.clientHeight;
+        }
       }
     }
   }, [categoryHighlightIndex, showCategoryDropdown]);
@@ -232,12 +272,22 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
     }
   }, [showAgentDropdown]);
 
-  // Scroll highlighted item into view
+  // Scroll highlighted item into view (agent)
   useEffect(() => {
     if (showAgentDropdown && agentListRef.current) {
       const highlightedElement = agentListRef.current.querySelector('[data-highlighted="true"]');
       if (highlightedElement) {
-        highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const container = agentListRef.current;
+        const elementTop = highlightedElement.offsetTop;
+        const elementBottom = elementTop + highlightedElement.offsetHeight;
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+
+        if (elementTop < containerTop) {
+          container.scrollTop = elementTop;
+        } else if (elementBottom > containerBottom) {
+          container.scrollTop = elementBottom - container.clientHeight;
+        }
       }
     }
   }, [agentHighlightIndex, showAgentDropdown]);
@@ -284,6 +334,86 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       case 'Escape':
         e.preventDefault();
         setShowAgentDropdown(false);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Reset grader highlight index when search query changes
+  useEffect(() => {
+    if (showGraderDropdown) {
+      setGraderHighlightIndex(0);
+    }
+  }, [graderSearchQuery]);
+
+  // Set initial highlight when grader dropdown opens
+  useEffect(() => {
+    if (showGraderDropdown) {
+      setGraderHighlightIndex(0);
+    }
+  }, [showGraderDropdown]);
+
+  // Scroll grader highlighted item into view
+  useEffect(() => {
+    if (showGraderDropdown && graderListRef.current) {
+      const highlightedElement = graderListRef.current.querySelector('[data-highlighted="true"]');
+      if (highlightedElement) {
+        const container = graderListRef.current;
+        const elementTop = highlightedElement.offsetTop;
+        const elementBottom = elementTop + highlightedElement.offsetHeight;
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+
+        if (elementTop < containerTop) {
+          container.scrollTop = elementTop;
+        } else if (elementBottom > containerBottom) {
+          container.scrollTop = elementBottom - container.clientHeight;
+        }
+      }
+    }
+  }, [graderHighlightIndex, showGraderDropdown]);
+
+  // Keyboard handler for grader dropdown navigation
+  const handleGraderKeyDown = (e) => {
+    if (!showGraderDropdown) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setShowGraderDropdown(true);
+        setGraderHighlightIndex(0);
+      }
+      return;
+    }
+
+    const totalItems = filteredGraders.length + 1; // +1 for "All graders" option
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setGraderHighlightIndex(prev => (prev + 1) % totalItems);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setGraderHighlightIndex(prev => (prev - 1 + totalItems) % totalItems);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (graderHighlightIndex === 0) {
+          // "All graders" selected
+          handleFilterChange('grader', '');
+          setGraderSearchQuery('');
+        } else if (graderHighlightIndex > 0 && graderHighlightIndex <= filteredGraders.length) {
+          const selectedGrader = filteredGraders[graderHighlightIndex - 1];
+          if (selectedGrader) {
+            handleFilterChange('grader', selectedGrader._id);
+            setGraderSearchQuery(selectedGrader.name || selectedGrader.email);
+          }
+        }
+        setShowGraderDropdown(false);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowGraderDropdown(false);
         break;
       default:
         break;
@@ -414,7 +544,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="mt-2 p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg overflow-hidden"
+          className="mt-2 p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Advanced Filters</h3>
@@ -482,7 +612,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
                   transition={{ duration: duration.fast }}
-                  className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                  className="absolute z-[100] w-full mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                 >
                   {filteredCategories.length > 0 ? (
                     filteredCategories.map((cat, index) => (
@@ -544,7 +674,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
                     transition={{ duration: duration.fast }}
-                    className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50"
+                    className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto z-[100]"
                   >
                     <motion.button
                       whileTap={{ scale: 0.98 }}
@@ -612,25 +742,84 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
               </select>
             </div>
 
-            {/* Grader */}
+            {/* Grader - Searchable Dropdown */}
             {graders.length > 0 && (
-              <div>
+              <div className="relative" ref={graderDropdownRef}>
                 <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   <UserCheck className="w-3 h-3 inline mr-1" />
                   Grader
                 </label>
-                <select
-                  value={currentFilters.grader || ''}
-                  onChange={(e) => handleFilterChange('grader', e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
-                >
-                  <option value="">All graders</option>
-                  {graders.map(grader => (
-                    <option key={grader._id} value={grader._id}>
-                      {grader.name || grader.email}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    ref={graderInputRef}
+                    type="text"
+                    value={graderSearchQuery}
+                    onChange={(e) => {
+                      setGraderSearchQuery(e.target.value);
+                      setShowGraderDropdown(true);
+                    }}
+                    onFocus={() => setShowGraderDropdown(true)}
+                    onKeyDown={handleGraderKeyDown}
+                    placeholder="Search graders..."
+                    className="w-full px-2 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white"
+                  />
+                  <AnimatePresence>
+                  {showGraderDropdown && (
+                    <motion.div
+                      ref={graderListRef}
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: duration.fast }}
+                      className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-48 overflow-y-auto z-[100]"
+                    >
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        data-highlighted={graderHighlightIndex === 0}
+                        onClick={() => {
+                          handleFilterChange('grader', '');
+                          setGraderSearchQuery('');
+                          setShowGraderDropdown(false);
+                        }}
+                        onMouseEnter={() => setGraderHighlightIndex(0)}
+                        className={`w-full px-3 py-2 text-left text-xs text-neutral-900 dark:text-white transition-colors ${
+                          graderHighlightIndex === 0
+                            ? 'bg-neutral-200 dark:bg-neutral-700'
+                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        All graders
+                      </motion.button>
+                      {filteredGraders.length > 0 ? (
+                        filteredGraders.map((grader, index) => (
+                          <motion.button
+                            key={grader._id}
+                            whileTap={{ scale: 0.98 }}
+                            data-highlighted={graderHighlightIndex === index + 1}
+                            onClick={() => {
+                              handleFilterChange('grader', grader._id);
+                              setGraderSearchQuery(grader.name || grader.email);
+                              setShowGraderDropdown(false);
+                            }}
+                            onMouseEnter={() => setGraderHighlightIndex(index + 1)}
+                            className={`w-full px-3 py-2 text-left text-xs text-neutral-900 dark:text-white transition-colors ${
+                              graderHighlightIndex === index + 1
+                                ? 'bg-neutral-200 dark:bg-neutral-700'
+                                : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                            }`}
+                          >
+                            {grader.name || grader.email}
+                          </motion.button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-500">
+                          No graders found
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
 

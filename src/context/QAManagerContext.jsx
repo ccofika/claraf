@@ -7,6 +7,12 @@ import { getScorecardValues } from '../data/scorecardConfig';
 
 const QAManagerContext = createContext();
 
+// QA Admin emails - these users have elevated permissions for archive management
+const QA_ADMIN_EMAILS = [
+  'filipkozomara@mebit.io',
+  'nevena@mebit.io'
+];
+
 export const useQAManager = () => {
   const context = useContext(QAManagerContext);
   if (!context) {
@@ -20,6 +26,9 @@ export const QAManagerProvider = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const API_URL = process.env.REACT_APP_API_URL;
+
+  // Check if current user is a QA admin (Filip or Nevena)
+  const isQAAdmin = QA_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
 
   // ============================================
   // HELPER: Get active tab from URL path
@@ -173,9 +182,16 @@ export const QAManagerProvider = ({ children }) => {
   // SELECTION STATE
   // ============================================
   const [selectedTickets, setSelectedTickets] = useState([]);
+  const [selectedArchivedTickets, setSelectedArchivedTickets] = useState([]);
   const [archivingAll, setArchivingAll] = useState(false);
   const [focusedTicketIndex, setFocusedTicketIndex] = useState(-1);
   const ticketListRef = useRef(null);
+
+  // ============================================
+  // UNDO ARCHIVE STATE
+  // ============================================
+  const [lastArchivedTicketIds, setLastArchivedTicketIds] = useState([]);
+  const undoToastIdRef = useRef(null);
 
   // ============================================
   // AGENT EXPANSION STATE
@@ -530,16 +546,67 @@ export const QAManagerProvider = ({ children }) => {
     }
   }, [API_URL, getAuthHeaders]);
 
+  // Undo archive handler
+  const handleUndoArchive = useCallback(async (ticketIds) => {
+    try {
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-restore`, { ticketIds }, getAuthHeaders());
+      // Dismiss the undo toast
+      if (undoToastIdRef.current) {
+        toast.dismiss(undoToastIdRef.current);
+        undoToastIdRef.current = null;
+      }
+      setLastArchivedTicketIds([]);
+      // Refresh tickets to show restored ones
+      fetchTickets();
+      toast.success(`${ticketIds.length} ticket(s) restored`);
+    } catch (err) {
+      console.error('Error undoing archive:', err);
+      toast.error('Failed to undo archive');
+    }
+  }, [API_URL, getAuthHeaders, fetchTickets]);
+
+  // Show undo toast with persistent duration
+  const showUndoToast = useCallback((count, ticketIds) => {
+    // Dismiss previous undo toast if exists
+    if (undoToastIdRef.current) {
+      toast.dismiss(undoToastIdRef.current);
+    }
+
+    setLastArchivedTicketIds(ticketIds);
+
+    undoToastIdRef.current = toast.success(
+      <div className="flex items-center justify-between w-full min-w-[280px]">
+        <span className="flex-1 text-center font-medium">
+          {count} ticket(s) archived
+        </span>
+        <button
+          onClick={() => handleUndoArchive(ticketIds)}
+          className="ml-4 px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 shadow-sm"
+        >
+          Undo
+        </button>
+      </div>,
+      {
+        duration: 15000, // 15 seconds
+        dismissible: true,
+        onDismiss: () => {
+          undoToastIdRef.current = null;
+          setLastArchivedTicketIds([]);
+        }
+      }
+    );
+  }, [handleUndoArchive]);
+
   const handleArchiveTicket = useCallback(async (id) => {
     try {
       await axios.post(`${API_URL}/api/qa/tickets/${id}/archive`, {}, getAuthHeaders());
       setTickets(prev => prev.filter(t => t._id !== id));
-      toast.success('Ticket archived successfully');
+      showUndoToast(1, [id]);
     } catch (err) {
       console.error('Error archiving ticket:', err);
       toast.error('Failed to archive ticket');
     }
-  }, [API_URL, getAuthHeaders]);
+  }, [API_URL, getAuthHeaders, showUndoToast]);
 
   const handleBulkArchive = useCallback(async () => {
     if (selectedTickets.length === 0) {
@@ -547,15 +614,16 @@ export const QAManagerProvider = ({ children }) => {
       return;
     }
     try {
-      await axios.post(`${API_URL}/api/qa/tickets/bulk-archive`, { ticketIds: selectedTickets }, getAuthHeaders());
-      setTickets(prev => prev.filter(t => !selectedTickets.includes(t._id)));
+      const ticketIds = [...selectedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-archive`, { ticketIds }, getAuthHeaders());
+      setTickets(prev => prev.filter(t => !ticketIds.includes(t._id)));
       setSelectedTickets([]);
-      toast.success(`${selectedTickets.length} ticket(s) archived successfully`);
+      showUndoToast(ticketIds.length, ticketIds);
     } catch (err) {
       console.error('Error bulk archiving:', err);
       toast.error('Failed to archive tickets');
     }
-  }, [API_URL, getAuthHeaders, selectedTickets]);
+  }, [API_URL, getAuthHeaders, selectedTickets, showUndoToast]);
 
   const handleArchiveAll = useCallback(async () => {
     if (tickets.length === 0) {
@@ -563,24 +631,41 @@ export const QAManagerProvider = ({ children }) => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to archive all ${tickets.length} tickets? This will move them to the Archive tab.`)) {
+    if (!window.confirm(`Are you sure you want to archive ALL tickets matching your current filters? This will archive tickets across all pages.`)) {
       return;
     }
 
     try {
       setArchivingAll(true);
-      const allTicketIds = tickets.map(t => t._id);
-      await axios.post(`${API_URL}/api/qa/tickets/bulk-archive`, { ticketIds: allTicketIds }, getAuthHeaders());
-      setTickets([]);
-      setSelectedTickets([]);
-      toast.success(`All ${allTicketIds.length} tickets archived successfully`);
+      // Use the new endpoint that archives all filtered tickets
+      const response = await axios.post(`${API_URL}/api/qa/tickets/archive-all-filtered`, {
+        agent: ticketsFilters.agent || undefined,
+        status: ticketsFilters.status || undefined,
+        dateFrom: ticketsFilters.dateFrom || undefined,
+        dateTo: ticketsFilters.dateTo || undefined,
+        scoreMin: ticketsFilters.scoreMin || undefined,
+        scoreMax: ticketsFilters.scoreMax || undefined,
+        categories: ticketsFilters.categories?.length > 0 ? ticketsFilters.categories : undefined,
+        grader: ticketsFilters.grader || undefined
+      }, getAuthHeaders());
+
+      const archivedIds = response.data.archivedTicketIds || [];
+      const count = response.data.count || 0;
+
+      if (count > 0) {
+        setTickets([]);
+        setSelectedTickets([]);
+        showUndoToast(count, archivedIds);
+      } else {
+        toast.info('No tickets to archive');
+      }
     } catch (err) {
       console.error('Error archiving all tickets:', err);
       toast.error('Failed to archive tickets');
     } finally {
       setArchivingAll(false);
     }
-  }, [API_URL, getAuthHeaders, tickets]);
+  }, [API_URL, getAuthHeaders, tickets.length, ticketsFilters, showUndoToast]);
 
   const handleRestoreTicket = useCallback(async (id) => {
     try {
@@ -592,6 +677,111 @@ export const QAManagerProvider = ({ children }) => {
       toast.error('Failed to restore ticket');
     }
   }, [API_URL, getAuthHeaders]);
+
+  // Bulk restore archived tickets (for Archive page)
+  const handleBulkRestore = useCallback(async () => {
+    if (selectedArchivedTickets.length === 0) {
+      toast.error('No tickets selected');
+      return;
+    }
+    try {
+      const ticketIds = [...selectedArchivedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-restore`, { ticketIds }, getAuthHeaders());
+      setTickets(prev => prev.filter(t => !ticketIds.includes(t._id)));
+      setSelectedArchivedTickets([]);
+      toast.success(`${ticketIds.length} ticket(s) restored successfully`);
+    } catch (err) {
+      console.error('Error bulk restoring:', err);
+      toast.error('Failed to restore tickets');
+    }
+  }, [API_URL, getAuthHeaders, selectedArchivedTickets]);
+
+  // Bulk change status for archived tickets
+  const handleBulkStatusChange = useCallback(async (newStatus) => {
+    if (selectedArchivedTickets.length === 0) {
+      toast.error('No tickets selected');
+      return;
+    }
+    try {
+      const ticketIds = [...selectedArchivedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-status`, { ticketIds, status: newStatus }, getAuthHeaders());
+      // Update local state
+      setTickets(prev => prev.map(t =>
+        ticketIds.includes(t._id) ? { ...t, status: newStatus } : t
+      ));
+      setSelectedArchivedTickets([]);
+      toast.success(`${ticketIds.length} ticket(s) status changed to ${newStatus}`);
+    } catch (err) {
+      console.error('Error bulk changing status:', err);
+      toast.error('Failed to change ticket status');
+    }
+  }, [API_URL, getAuthHeaders, selectedArchivedTickets]);
+
+  // Bulk delete archived tickets
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedArchivedTickets.length === 0) {
+      toast.error('No tickets selected');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedArchivedTickets.length} ticket(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const ticketIds = [...selectedArchivedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-delete`, { ticketIds }, getAuthHeaders());
+      setTickets(prev => prev.filter(t => !ticketIds.includes(t._id)));
+      setSelectedArchivedTickets([]);
+      toast.success(`${ticketIds.length} ticket(s) deleted permanently`);
+    } catch (err) {
+      console.error('Error bulk deleting:', err);
+      toast.error('Failed to delete tickets');
+    }
+  }, [API_URL, getAuthHeaders, selectedArchivedTickets]);
+
+  // Bulk change status for regular tickets (Tickets page)
+  const handleBulkStatusChangeTickets = useCallback(async (newStatus) => {
+    if (selectedTickets.length === 0) {
+      toast.error('No tickets selected');
+      return;
+    }
+    try {
+      const ticketIds = [...selectedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-status`, { ticketIds, status: newStatus }, getAuthHeaders());
+      setTickets(prev => prev.map(t =>
+        ticketIds.includes(t._id) ? { ...t, status: newStatus } : t
+      ));
+      setSelectedTickets([]);
+      toast.success(`${ticketIds.length} ticket(s) status changed to ${newStatus}`);
+    } catch (err) {
+      console.error('Error bulk changing status:', err);
+      toast.error('Failed to change ticket status');
+    }
+  }, [API_URL, getAuthHeaders, selectedTickets]);
+
+  // Bulk delete regular tickets (Tickets page)
+  const handleBulkDeleteTickets = useCallback(async () => {
+    if (selectedTickets.length === 0) {
+      toast.error('No tickets selected');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedTickets.length} ticket(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const ticketIds = [...selectedTickets];
+      await axios.post(`${API_URL}/api/qa/tickets/bulk-delete`, { ticketIds }, getAuthHeaders());
+      setTickets(prev => prev.filter(t => !ticketIds.includes(t._id)));
+      setSelectedTickets([]);
+      toast.success(`${ticketIds.length} ticket(s) deleted permanently`);
+    } catch (err) {
+      console.error('Error bulk deleting:', err);
+      toast.error('Failed to delete tickets');
+    }
+  }, [API_URL, getAuthHeaders, selectedTickets]);
 
   const handleGradeTicket = useCallback(async (id, qualityScorePercent) => {
     try {
@@ -1466,6 +1656,7 @@ export const QAManagerProvider = ({ children }) => {
     // Auth
     user,
     getAuthHeaders,
+    isQAAdmin,
 
     // Loading
     loading,
@@ -1553,6 +1744,8 @@ export const QAManagerProvider = ({ children }) => {
     // Selection & Sorting
     selectedTickets,
     setSelectedTickets,
+    selectedArchivedTickets,
+    setSelectedArchivedTickets,
     focusedTicketIndex,
     setFocusedTicketIndex,
     ticketListRef,
@@ -1589,9 +1782,15 @@ export const QAManagerProvider = ({ children }) => {
     handleDeleteTicket,
     handleArchiveTicket,
     handleBulkArchive,
+    handleBulkStatusChangeTickets,
+    handleBulkDeleteTickets,
     handleArchiveAll,
     archivingAll,
     handleRestoreTicket,
+    handleBulkRestore,
+    handleBulkStatusChange,
+    handleBulkDelete,
+    handleUndoArchive,
     handleGradeTicket,
     handleUpdateFeedback,
 

@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FileText, Archive, Plus, Send, Hash, Edit, Trash2, ExternalLink, Eye, Check, XCircle, Sparkles
+  FileText, Archive, Plus, Send, Hash, Edit, Trash2, ExternalLink, Eye, Check, XCircle, Sparkles, ChevronDown
 } from 'lucide-react';
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, StatusBadge, Button, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
@@ -14,6 +14,10 @@ const QATickets = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isEditMode = location.pathname.endsWith('/edit');
+
+  // Status dropdown state
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const {
     loading,
@@ -40,11 +44,24 @@ const QATickets = () => {
     setDeclineConfirmDialog,
     handleArchiveTicket,
     handleBulkArchive,
+    handleBulkStatusChangeTickets,
+    handleBulkDeleteTickets,
     handleArchiveAll,
     handleAcceptMacroTicket,
     handlePageChange,
     fetchTickets,
   } = useQAManager();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Reset pagination to page 1 when component mounts
   useEffect(() => {
@@ -137,13 +154,71 @@ const QATickets = () => {
       {selectedTickets.length > 0 && (
         <div className="bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-lg px-4 py-3 flex items-center justify-between">
           <span className="text-sm text-gray-700 dark:text-neutral-300">{selectedTickets.length} ticket(s) selected</span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => setSelectedTickets([])}>
               Clear
             </Button>
+
+            {/* Archive Button */}
             <Button size="sm" variant="glass" onClick={handleBulkArchive}>
               <Archive className="w-4 h-4 mr-1.5" />
-              Archive Selected
+              Archive
+            </Button>
+
+            {/* Status Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <Button
+                size="sm"
+                variant="glass"
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                className="text-blue-600 dark:text-blue-400"
+              >
+                Change Status
+                <ChevronDown className={`w-4 h-4 ml-1.5 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+              </Button>
+
+              <AnimatePresence>
+                {statusDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full right-0 mt-2 w-40 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50"
+                  >
+                    <button
+                      onClick={() => {
+                        handleBulkStatusChangeTickets('Selected');
+                        setStatusDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      Selected
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleBulkStatusChangeTickets('Graded');
+                        setStatusDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Graded
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Delete Button */}
+            <Button
+              size="sm"
+              variant="glass"
+              onClick={handleBulkDeleteTickets}
+              className="text-red-600 dark:text-red-400"
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete
             </Button>
           </div>
         </div>
@@ -292,7 +367,7 @@ const QATickets = () => {
                           setSelectedTickets([]);
                         }
                       }}
-                      className="rounded border-gray-300 dark:border-neutral-600"
+                      className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer"
                     />
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">ID</th>
@@ -350,7 +425,7 @@ const QATickets = () => {
                               setSelectedTickets(selectedTickets.filter(id => id !== ticket._id));
                             }
                           }}
-                          className="rounded border-gray-300 dark:border-neutral-600"
+                          className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer"
                         />
                       </td>
                       <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-neutral-400" onClick={(e) => e.stopPropagation()}>{ticket.ticketId || ticket._id.slice(-6)}</td>
