@@ -13,6 +13,14 @@ const QA_ADMIN_EMAILS = [
   'nevena@mebit.io'
 ];
 
+// Reviewer emails - these users can access the Review feature
+const REVIEWER_EMAILS = [
+  'filipkozomara@mebit.io',
+  'nevena@mebit.io',
+  'majabasic@mebit.io',
+  'ana@mebit.io'
+];
+
 export const useQAManager = () => {
   const context = useContext(QAManagerContext);
   if (!context) {
@@ -29,6 +37,9 @@ export const QAManagerProvider = ({ children }) => {
 
   // Check if current user is a QA admin (Filip or Nevena)
   const isQAAdmin = QA_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+
+  // Check if current user is a reviewer (can access Review feature)
+  const isReviewer = REVIEWER_EMAILS.includes(user?.email?.toLowerCase());
 
   // ============================================
   // HELPER: Get active tab from URL path
@@ -93,10 +104,53 @@ export const QAManagerProvider = ({ children }) => {
     searchMode: 'text'
   });
 
+  // ============================================
+  // REVIEW STATE
+  // ============================================
+  const [reviewFilters, setReviewFilters] = useState({
+    agent: '',
+    dateFrom: '',
+    dateTo: '',
+    scoreMin: 0,
+    scoreMax: 100,
+    search: '',
+    categories: [],
+    createdBy: '',
+    searchMode: 'text'
+  });
+  const [reviewTickets, setReviewTickets] = useState([]);
+  const [reviewPagination, setReviewPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0
+  });
+  const [reviewPendingCount, setReviewPendingCount] = useState(0);
+  const [showReviewBanner, setShowReviewBanner] = useState(() => {
+    // Check localStorage for banner dismiss state
+    const dismissed = localStorage.getItem('reviewBannerDismissed');
+    if (dismissed) {
+      const { timestamp, count } = JSON.parse(dismissed);
+      // Banner was dismissed, will show again if count changes
+      return false;
+    }
+    return true;
+  });
+
   // Get current filters based on active tab
   const activeTab = getActiveTabFromPath();
-  const filters = activeTab === 'archive' ? archiveFilters : ticketsFilters;
-  const setFilters = activeTab === 'archive' ? setArchiveFilters : setTicketsFilters;
+  const getFiltersForTab = (tab) => {
+    if (tab === 'archive') return archiveFilters;
+    if (tab === 'review') return reviewFilters;
+    return ticketsFilters;
+  };
+  const getSetFiltersForTab = (tab) => {
+    if (tab === 'archive') return setArchiveFilters;
+    if (tab === 'review') return setReviewFilters;
+    return setTicketsFilters;
+  };
+  const filters = getFiltersForTab(activeTab);
+  const setFilters = getSetFiltersForTab(activeTab);
 
   // ============================================
   // DIALOG STATE
@@ -359,6 +413,189 @@ export const QAManagerProvider = ({ children }) => {
   const fetchArchivedTickets = useCallback(() => {
     return fetchTickets(null, true);
   }, [fetchTickets]);
+
+  // ============================================
+  // REVIEW FUNCTIONS
+  // ============================================
+
+  // Fetch review pending count (for notification badge)
+  const fetchReviewPendingCount = useCallback(async () => {
+    if (!isReviewer) return;
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/pending-count`,
+        getAuthHeaders()
+      );
+      const newCount = response.data.count || 0;
+
+      // Check if count changed since banner was dismissed
+      const dismissed = localStorage.getItem('reviewBannerDismissed');
+      if (dismissed) {
+        const { count: dismissedCount } = JSON.parse(dismissed);
+        if (newCount > dismissedCount) {
+          // New tickets arrived, show banner again
+          setShowReviewBanner(true);
+          localStorage.removeItem('reviewBannerDismissed');
+        }
+      }
+
+      setReviewPendingCount(newCount);
+    } catch (err) {
+      console.error('Error fetching review pending count:', err);
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Dismiss review banner
+  const dismissReviewBanner = useCallback(() => {
+    setShowReviewBanner(false);
+    localStorage.setItem('reviewBannerDismissed', JSON.stringify({
+      timestamp: Date.now(),
+      count: reviewPendingCount
+    }));
+  }, [reviewPendingCount]);
+
+  // Fetch review tickets
+  const fetchReviewTickets = useCallback(async (customFilters = null) => {
+    if (!isReviewer) return;
+    try {
+      setLoading(true);
+      const currentFilters = customFilters || reviewFilters;
+
+      const params = new URLSearchParams();
+      if (currentFilters.agent) params.append('agent', currentFilters.agent);
+      if (currentFilters.dateFrom) params.append('dateFrom', currentFilters.dateFrom);
+      if (currentFilters.dateTo) params.append('dateTo', currentFilters.dateTo);
+      if (currentFilters.scoreMin) params.append('scoreMin', currentFilters.scoreMin);
+      if (currentFilters.scoreMax && currentFilters.scoreMax < 100) params.append('scoreMax', currentFilters.scoreMax);
+      if (currentFilters.categories && currentFilters.categories.length > 0) {
+        params.append('categories', currentFilters.categories.join(','));
+      }
+      if (currentFilters.createdBy) params.append('createdBy', currentFilters.createdBy);
+      if (currentFilters.search) params.append('search', currentFilters.search);
+      params.append('page', reviewPagination.page);
+      params.append('limit', reviewPagination.limit);
+
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/tickets?${params.toString()}`,
+        getAuthHeaders()
+      );
+
+      setReviewTickets(response.data.tickets || []);
+
+      if (response.data.pagination) {
+        setReviewPagination(prev => ({
+          ...prev,
+          total: response.data.pagination.total,
+          pages: response.data.pagination.pages
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching review tickets:', err);
+      toast.error('Failed to load review tickets');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_URL, getAuthHeaders, isReviewer, reviewFilters, reviewPagination.page, reviewPagination.limit]);
+
+  // Get single review ticket
+  const fetchReviewTicket = useCallback(async (ticketId) => {
+    if (!isReviewer) return null;
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/tickets/${ticketId}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching review ticket:', err);
+      toast.error('Failed to load review ticket');
+      return null;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Update review ticket
+  const handleUpdateReviewTicket = useCallback(async (ticketId, formData) => {
+    if (!isReviewer) return;
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/qa/review/tickets/${ticketId}`,
+        formData,
+        getAuthHeaders()
+      );
+      // Update local state
+      setReviewTickets(prev => prev.map(t =>
+        t._id === ticketId ? response.data : t
+      ));
+      return response.data;
+    } catch (err) {
+      console.error('Error updating review ticket:', err);
+      toast.error('Failed to update review ticket');
+      throw err;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Approve ticket
+  const handleApproveTicket = useCallback(async (ticketId, note = '') => {
+    if (!isReviewer) return;
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/qa/review/tickets/${ticketId}/approve`,
+        { note },
+        getAuthHeaders()
+      );
+      // Remove from review tickets list
+      setReviewTickets(prev => prev.filter(t => t._id !== ticketId));
+      setReviewPendingCount(prev => Math.max(0, prev - 1));
+      toast.success('Ticket approved successfully');
+      return response.data;
+    } catch (err) {
+      console.error('Error approving ticket:', err);
+      toast.error('Failed to approve ticket');
+      throw err;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Deny ticket
+  const handleDenyTicket = useCallback(async (ticketId, note = '') => {
+    if (!isReviewer) return;
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/qa/review/tickets/${ticketId}/deny`,
+        { note },
+        getAuthHeaders()
+      );
+      // Remove from review tickets list
+      setReviewTickets(prev => prev.filter(t => t._id !== ticketId));
+      setReviewPendingCount(prev => Math.max(0, prev - 1));
+      toast.success('Ticket denied - grader will be notified');
+      return response.data;
+    } catch (err) {
+      console.error('Error denying ticket:', err);
+      toast.error('Failed to deny ticket');
+      throw err;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Fetch review analytics
+  const fetchReviewAnalytics = useCallback(async (dateFrom = null, dateTo = null, createdBy = null) => {
+    if (!isReviewer) return null;
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('dateFrom', dateFrom);
+      if (dateTo) params.append('dateTo', dateTo);
+      if (createdBy) params.append('createdBy', createdBy);
+
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/analytics?${params.toString()}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching review analytics:', err);
+      toast.error('Failed to load review analytics');
+      return null;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
 
   // ============================================
   // AGENT CRUD
@@ -1548,7 +1785,8 @@ export const QAManagerProvider = ({ children }) => {
     fetchAllExistingAgents();
     fetchPendingMacroTickets();
     fetchGraders();
-  }, [fetchAgents, fetchAgentsForFilter, fetchAllExistingAgents, fetchPendingMacroTickets, fetchGraders]);
+    fetchReviewPendingCount();
+  }, [fetchAgents, fetchAgentsForFilter, fetchAllExistingAgents, fetchPendingMacroTickets, fetchGraders, fetchReviewPendingCount]);
 
   // ============================================
   // EXTENSION MESSAGE LISTENER
@@ -1657,6 +1895,25 @@ export const QAManagerProvider = ({ children }) => {
     user,
     getAuthHeaders,
     isQAAdmin,
+    isReviewer,
+
+    // Review
+    reviewFilters,
+    setReviewFilters,
+    reviewTickets,
+    setReviewTickets,
+    reviewPagination,
+    setReviewPagination,
+    reviewPendingCount,
+    showReviewBanner,
+    dismissReviewBanner,
+    fetchReviewPendingCount,
+    fetchReviewTickets,
+    fetchReviewTicket,
+    handleUpdateReviewTicket,
+    handleApproveTicket,
+    handleDenyTicket,
+    fetchReviewAnalytics,
 
     // Loading
     loading,

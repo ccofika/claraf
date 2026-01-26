@@ -32,6 +32,8 @@ const QADashboard = () => {
   const totalTickets = dashboardStats.totalTickets || 0;
   const selectedTickets = dashboardStats.selectedTickets || 0;
   const gradedTickets = dashboardStats.gradedTickets || 0;
+  const draftTickets = dashboardStats.draftTickets || 0;
+  const waitingTickets = dashboardStats.waitingTickets || 0;
   const gradedRate = totalTickets > 0 ? ((gradedTickets / totalTickets) * 100).toFixed(0) : 0;
 
   return (
@@ -108,7 +110,7 @@ const QADashboard = () => {
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Quality metrics and ticket distribution</p>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
@@ -125,6 +127,24 @@ const QADashboard = () => {
               </div>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">{gradedTickets}</p>
               <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Quality evaluated</p>
+            </div>
+
+            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-amber-600 dark:bg-amber-400 rounded-full"></div>
+                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">In Review</span>
+              </div>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{draftTickets}</p>
+              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pending review approval</p>
+            </div>
+
+            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-red-600 dark:bg-red-400 rounded-full"></div>
+                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">Needs Your Input</span>
+              </div>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{waitingTickets}</p>
+              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Requires your action</p>
             </div>
           </div>
         </div>

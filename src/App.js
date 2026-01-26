@@ -46,7 +46,9 @@ import {
   QAActiveOverview,
   QABugsPage,
   QACoaching,
-  QACoachingDetail
+  QACoachingDetail,
+  QAReview,
+  QAReviewAnalytics
 } from './pages/qa-manager';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
@@ -168,6 +170,10 @@ function App() {
                           <Route path="archive" element={<QAArchive />} />
                           <Route path="archive/:ticketId" element={<QAArchive />} />
                           <Route path="archive/:ticketId/edit" element={<QAArchive />} />
+                          <Route path="review" element={<QAReview />} />
+                          <Route path="review/analytics" element={<QAReviewAnalytics />} />
+                          <Route path="review/:ticketId" element={<QAReview />} />
+                          <Route path="review/:ticketId/edit" element={<QAReview />} />
                           <Route path="analytics" element={<QAAnalyticsDashboard />} />
                           <Route path="summaries" element={<QASummaries />} />
                           <Route path="coaching" element={<QACoaching />} />

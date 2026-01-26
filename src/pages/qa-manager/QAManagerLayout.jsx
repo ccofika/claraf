@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, FileText, UsersRound, TrendingUp, Target, Bug,
   Keyboard, RefreshCw, Search, AlertTriangle, Loader2, X, Check,
-  RotateCcw, ClipboardList, Edit, Hash, ChevronLeft, ChevronRight,
+  RotateCcw, ClipboardList, ClipboardCheck, Edit, Hash, ChevronLeft, ChevronRight,
   MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
   ChevronDown, Wand2, GraduationCap
 } from 'lucide-react';
@@ -26,7 +26,7 @@ import SimilarFeedbacksPanel from '../../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
 import ScorecardEditor from '../../components/ScorecardEditor';
 import { hasScorecard } from '../../data/scorecardConfig';
-import { Button, StatusBadge, QualityScoreBadge } from './components';
+import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from './components';
 import TicketDialog from './TicketDialog';
 
 // Inner layout component that uses the context
@@ -237,9 +237,10 @@ const QAManagerLayoutInner = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, filters.searchMode, navigate, openTicketDialog, handleExportSelectedTickets, setFilters, fetchDashboardStats, fetchAgents, fetchTickets]);
 
-  // Check if user is admin
+  // Check if user is admin or reviewer
   const isAdmin = ['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email);
   const isFilipAdmin = user?.email === 'filipkozomara@mebit.io';
+  const { isReviewer, reviewPendingCount } = useQAManager();
 
   return (
     <motion.div
@@ -325,6 +326,7 @@ const QAManagerLayoutInner = () => {
                   { value: 'agents', label: 'Agents' },
                   { value: 'tickets', label: 'Tickets' },
                   { value: 'archive', label: 'Archive' },
+                  ...(isReviewer ? [{ value: 'review', label: 'Review', badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
                   { value: 'analytics', label: 'Analytics', icon: BarChart3 },
                 ];
 
@@ -360,6 +362,11 @@ const QAManagerLayoutInner = () => {
                       >
                         {tab.icon && <tab.icon className="w-4 h-4" />}
                         {tab.label}
+                        {tab.badge && (
+                          <span className="ml-1.5 px-1.5 py-0.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                            {tab.badge}
+                          </span>
+                        )}
                         {activeTab === tab.value && (
                           <motion.div
                             layoutId="activeTabIndicator"
@@ -712,6 +719,7 @@ const QAManagerLayoutInner = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: duration.normal, ease: easing.smooth }}
             >
+              <ReviewNotificationBanner />
               <Outlet />
             </motion.div>
           </AnimatePresence>
