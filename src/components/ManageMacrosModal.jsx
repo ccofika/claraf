@@ -892,7 +892,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         )}
                       </p>
                       <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-                        You can change visibility settings but cannot edit the content.
+                        {canEdit ? 'You have admin access to edit this macro.' : 'View only - you cannot edit this macro.'}
                       </p>
                     </div>
                   )}
@@ -1073,7 +1073,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                       </div>
 
                       {/* Visibility Section - Public & Share */}
-                      <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50 dark:bg-neutral-800/50">
+                      <div className={`border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50 dark:bg-neutral-800/50 ${!canEdit ? 'opacity-75' : ''}`}>
                         <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-2 block">
                           Visibility
                         </Label>
@@ -1082,12 +1082,13 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         <div className="flex items-center gap-2 mb-3">
                           <button
                             type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, isPublic: !prev.isPublic }))}
+                            onClick={() => canEdit && setFormData(prev => ({ ...prev, isPublic: !prev.isPublic }))}
+                            disabled={!canEdit}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors ${
                               formData.isPublic
                                 ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
                                 : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-700'
-                            }`}
+                            } ${!canEdit ? 'cursor-not-allowed' : ''}`}
                           >
                             <Globe className="w-4 h-4" />
                             <span className="text-sm">Public</span>
@@ -1104,8 +1105,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                             <span className="text-xs text-gray-600 dark:text-neutral-400">Share with</span>
                           </div>
                           <div
-                            className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 cursor-text min-h-[38px] border border-gray-200 dark:border-neutral-700 ${showShareDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
-                            onClick={() => shareInputRef.current?.focus()}
+                            className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-800 min-h-[38px] border border-gray-200 dark:border-neutral-700 ${canEdit ? 'cursor-text' : 'cursor-not-allowed'} ${showShareDropdown && canEdit ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                            onClick={() => canEdit && shareInputRef.current?.focus()}
                           >
                             {(formData.sharedWith || [])
                               .filter(id => String(id) !== String(user?._id)) // Don't show current user in the list
@@ -1129,21 +1130,23 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                 )}
                               </span>
                             ))}
-                            <input
-                              ref={shareInputRef}
-                              type="text"
-                              value={shareSearch}
-                              onChange={(e) => {
-                                setShareSearch(e.target.value);
-                                setShowShareDropdown(true);
-                              }}
-                              onFocus={() => setShowShareDropdown(true)}
-                              onKeyDown={handleShareKeyDown}
-                              placeholder={(formData.sharedWith || []).length === 0 ? "Search QA graders..." : ""}
-                              className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
-                            />
+                            {canEdit && (
+                              <input
+                                ref={shareInputRef}
+                                type="text"
+                                value={shareSearch}
+                                onChange={(e) => {
+                                  setShareSearch(e.target.value);
+                                  setShowShareDropdown(true);
+                                }}
+                                onFocus={() => setShowShareDropdown(true)}
+                                onKeyDown={handleShareKeyDown}
+                                placeholder={(formData.sharedWith || []).length === 0 ? "Search QA graders..." : ""}
+                                className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                              />
+                            )}
                           </div>
-                          {showShareDropdown && (
+                          {showShareDropdown && canEdit && (
                             <div
                               ref={shareListRef}
                               className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-32 overflow-y-auto"
@@ -1176,11 +1179,6 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                 </div>
                               )}
                             </div>
-                          )}
-                          {!isOwner && (
-                            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-                              You can add graders but cannot remove those added by the owner.
-                            </p>
                           )}
                         </div>
                       </div>
@@ -1220,7 +1218,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                                     {variant.label}
                                   </span>
-                                  {sourceScorecardForCopy && (
+                                  {sourceScorecardForCopy && canEdit && (
                                     <button
                                       type="button"
                                       onClick={() => copyFromScorecard(sourceScorecardForCopy)}
@@ -1238,14 +1236,14 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                                   values={getValuesForVariant(selectedScorecardPosition, variant.key)}
                                   onChange={(values) => updateScorecardValues(selectedScorecardPosition, variant.key, values)}
                                   hideVariantSelector={true}
-                                  disabled={false}
+                                  disabled={!canEdit}
                                 />
                               </div>
                             ))}
                           </div>
                         ) : (
                           <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50 dark:bg-neutral-800/50">
-                            {sourceScorecardForCopy && (
+                            {sourceScorecardForCopy && canEdit && (
                               <div className="flex items-center justify-end mb-2 pb-1 border-b border-gray-200 dark:border-neutral-700">
                                 <button
                                   type="button"
@@ -1264,7 +1262,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                               values={getValuesForVariant(selectedScorecardPosition, 'use_this_one')}
                               onChange={(values) => updateScorecardValues(selectedScorecardPosition, 'use_this_one', values)}
                               hideVariantSelector={true}
-                              disabled={false}
+                              disabled={!canEdit}
                             />
                           </div>
                         )}
@@ -1282,7 +1280,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                 <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
                   <div className="flex items-center justify-between">
                     <div>
-                      {selectedMacro && !isCreating && isOwner && (
+                      {/* Show delete button for owners and admins */}
+                      {selectedMacro && !isCreating && canEdit && (
                         <button
                           onClick={handleDelete}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
@@ -1304,15 +1303,18 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         }}
                         className="px-4 py-2 text-sm text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                       >
-                        Cancel
+                        {canEdit ? 'Cancel' : 'Close'}
                       </button>
-                      <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50"
-                      >
-                        {isSaving ? 'Saving...' : isCreating ? 'Create Macro' : 'Save Changes'}
-                      </button>
+                      {/* Only show Save button if user can edit */}
+                      {canEdit && (
+                        <button
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        >
+                          {isSaving ? 'Saving...' : isCreating ? 'Create Macro' : 'Save Changes'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
