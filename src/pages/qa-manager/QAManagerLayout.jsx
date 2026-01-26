@@ -95,6 +95,12 @@ const QAManagerLayoutInner = () => {
     getCurrentTicketIndex,
     navigateToTicket,
     navigateWithUnsavedCheck,
+    // Review functions
+    handleApproveTicket,
+    handleDenyTicket,
+    handleUpdateReviewTicket,
+    fetchReviewTickets,
+    reviewTickets,
   } = useQAManager();
 
   // Local state for modals and UI
@@ -1095,18 +1101,43 @@ const QAManagerLayoutInner = () => {
       <TicketDialog
         ticketDialog={ticketDialog}
         setTicketDialog={setTicketDialog}
-        agents={ticketDialog.source === 'archive' ? allExistingAgents : agents}
-        tickets={tickets}
+        agents={ticketDialog.source === 'archive' || ticketDialog.source === 'review' ? allExistingAgents : agents}
+        tickets={ticketDialog.source === 'review' ? reviewTickets : tickets}
         ticketFormDataRef={ticketFormDataRef}
         originalFormDataRef={originalFormDataRef}
         hasUnsavedChangesRef={hasUnsavedChangesRef}
         handleCreateTicket={handleCreateTicket}
-        handleUpdateTicket={handleUpdateTicket}
+        handleUpdateTicket={ticketDialog.source === 'review' ? handleUpdateReviewTicket : handleUpdateTicket}
         getCurrentTicketIndex={getCurrentTicketIndex}
         navigateWithUnsavedCheck={navigateWithUnsavedCheck}
         setUnsavedChangesModal={setUnsavedChangesModal}
         setSaveAsMacroDialog={setSaveAsMacroDialog}
         routerNavigate={navigate}
+        isReviewMode={ticketDialog.source === 'review'}
+        onApprove={async (ticketId, formData) => {
+          // First update the ticket with any changes
+          if (formData) {
+            await handleUpdateReviewTicket(ticketId, formData);
+          }
+          // Then approve
+          await handleApproveTicket(ticketId);
+          // Close dialog and refresh
+          setTicketDialog({ open: false, mode: 'create', data: null, source: 'tickets' });
+          fetchReviewTickets();
+          navigate('/qa-manager/review');
+        }}
+        onDeny={async (ticketId, formData) => {
+          // First update the ticket with any changes
+          if (formData) {
+            await handleUpdateReviewTicket(ticketId, formData);
+          }
+          // Then deny
+          await handleDenyTicket(ticketId);
+          // Close dialog and refresh
+          setTicketDialog({ open: false, mode: 'create', data: null, source: 'tickets' });
+          fetchReviewTickets();
+          navigate('/qa-manager/review');
+        }}
       />
 
       {/* Bug Report Floating Button */}
@@ -1131,7 +1162,11 @@ const ViewTicketDialog = ({
   const ticket = viewDialog.ticket;
   // Determine the source page - default to 'tickets' if not specified
   const source = viewDialog.source || 'tickets';
-  const basePath = source === 'archive' ? '/qa-manager/archive' : '/qa-manager/tickets';
+  const basePath = source === 'review'
+    ? '/qa-manager/review'
+    : source === 'archive'
+      ? '/qa-manager/archive'
+      : '/qa-manager/tickets';
 
   const currentIndex = ticket ? getCurrentTicketIndex(ticket._id) : -1;
   const canGoPrev = currentIndex > 0;

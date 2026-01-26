@@ -8,6 +8,8 @@ const Button = ({ children, variant = 'default', size = 'default', className = '
     secondary: 'bg-white dark:bg-neutral-800 text-black dark:text-white border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 dark:focus:ring-neutral-600',
     ghost: 'hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300',
     destructive: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-2 focus:ring-offset-2 focus:ring-red-600 dark:focus:ring-red-500',
+    danger: 'bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 focus:ring-2 focus:ring-offset-2 focus:ring-red-600 dark:focus:ring-red-500',
+    success: 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600 focus:ring-2 focus:ring-offset-2 focus:ring-green-600 dark:focus:ring-green-500',
     glass: '', // Glass variant uses custom styling below
   };
 

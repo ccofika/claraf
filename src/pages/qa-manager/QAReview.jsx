@@ -7,7 +7,6 @@ import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, Button, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
 import QASearchBar from '../../components/QASearchBar';
 import TicketHoverPreview from '../../components/TicketHoverPreview';
-import ReviewTicketDialog from './components/ReviewTicketDialog';
 
 const QAReview = () => {
   const { ticketId } = useParams();
@@ -29,17 +28,14 @@ const QAReview = () => {
     fetchReviewTicket,
     handleApproveTicket,
     handleDenyTicket,
-    handleUpdateReviewTicket,
     getSortedData,
+    openTicketDialog,
+    setViewDialog,
   } = useQAManager();
 
   // Local state
   const [selectedTickets, setSelectedTickets] = useState([]);
   const [focusedTicketIndex, setFocusedTicketIndex] = useState(-1);
-  const [viewTicket, setViewTicket] = useState(null);
-  const [editTicket, setEditTicket] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState('view'); // 'view' or 'edit'
   const ticketListRef = useRef(null);
 
   // Redirect if not a reviewer
@@ -68,19 +64,15 @@ const QAReview = () => {
         const ticket = await fetchReviewTicket(ticketId);
         if (ticket) {
           if (isEditMode) {
-            setEditTicket(ticket);
-            setDialogMode('edit');
-            setDialogOpen(true);
+            openTicketDialog('edit', ticket, 'review');
           } else {
-            setViewTicket(ticket);
-            setDialogMode('view');
-            setDialogOpen(true);
+            setViewDialog({ open: true, ticket, source: 'review' });
           }
         }
       }
     };
     loadTicketFromUrl();
-  }, [ticketId, isEditMode, isReviewer, fetchReviewTicket]);
+  }, [ticketId, isEditMode, isReviewer, fetchReviewTicket, openTicketDialog, setViewDialog]);
 
   const sortedTickets = getSortedData(reviewTickets);
 
@@ -92,44 +84,6 @@ const QAReview = () => {
   // Navigate to ticket edit
   const handleEditTicket = (ticket) => {
     navigate(`/qa-manager/review/${ticket._id}/edit`);
-  };
-
-  // Close dialog
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setViewTicket(null);
-    setEditTicket(null);
-    navigate('/qa-manager/review');
-  };
-
-  // Handle approve from dialog
-  const handleApprove = async (ticketId, formData) => {
-    try {
-      // First update the ticket with any changes
-      if (formData) {
-        await handleUpdateReviewTicket(ticketId, formData);
-      }
-      // Then approve
-      await handleApproveTicket(ticketId);
-      handleCloseDialog();
-    } catch (err) {
-      console.error('Error approving ticket:', err);
-    }
-  };
-
-  // Handle deny from dialog
-  const handleDeny = async (ticketId, formData) => {
-    try {
-      // First update the ticket with any changes
-      if (formData) {
-        await handleUpdateReviewTicket(ticketId, formData);
-      }
-      // Then deny
-      await handleDenyTicket(ticketId);
-      handleCloseDialog();
-    } catch (err) {
-      console.error('Error denying ticket:', err);
-    }
   };
 
   // Page change handler
@@ -238,7 +192,7 @@ const QAReview = () => {
                       className={`hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer ${
                         selectedTickets.includes(ticket._id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                       } ${focusedTicketIndex === index ? 'ring-2 ring-inset ring-blue-500' : ''}`}
-                      onClick={() => handleViewTicket(ticket)}
+                      onClick={() => handleEditTicket(ticket)}
                     >
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -357,17 +311,6 @@ const QAReview = () => {
           )}
         </>
       )}
-
-      {/* Review Ticket Dialog */}
-      <ReviewTicketDialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        ticket={dialogMode === 'edit' ? editTicket : viewTicket}
-        mode={dialogMode}
-        onApprove={handleApprove}
-        onDeny={handleDeny}
-        onUpdate={handleUpdateReviewTicket}
-      />
     </div>
   );
 };

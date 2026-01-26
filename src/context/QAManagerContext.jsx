@@ -1589,7 +1589,8 @@ export const QAManagerProvider = ({ children }) => {
         qualityScorePercent: data.qualityScorePercent !== undefined ? data.qualityScorePercent : '',
         categories: data.categories || [],
         scorecardVariant: data.scorecardVariant || null,
-        scorecardValues: scorecardValuesObj
+        scorecardValues: scorecardValuesObj,
+        additionalNote: data.additionalNote || ''
       };
     }
     setTicketDialog({ open: true, mode, data, source });

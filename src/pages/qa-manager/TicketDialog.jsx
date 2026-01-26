@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
-  AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive
+  AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive,
+  CheckCircle, XCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -33,7 +34,11 @@ const TicketDialog = ({
   navigateWithUnsavedCheck,
   setUnsavedChangesModal,
   setSaveAsMacroDialog,
-  routerNavigate
+  routerNavigate,
+  // Review mode props
+  isReviewMode = false,
+  onApprove,
+  onDeny
 }) => {
   const formRef = useRef(null);
   const [rightPanelMode, setRightPanelMode] = useState('ai');
@@ -73,15 +78,20 @@ const TicketDialog = ({
 
   // Sync agent search query with selected agent
   useEffect(() => {
+    if (!ticketDialog.open) return;
+
     if (formData.agent) {
       const selectedAgentObj = agents.find(a => a._id === formData.agent);
       if (selectedAgentObj) {
         setAgentSearchQuery(selectedAgentObj.name);
+      } else if (ticketDialog.data?.agent?.name) {
+        // Fallback: use agent name directly from ticket data if not found in agents list
+        setAgentSearchQuery(ticketDialog.data.agent.name);
       }
     } else {
       setAgentSearchQuery('');
     }
-  }, [formData.agent, agents]);
+  }, [ticketDialog.open, formData.agent, agents, ticketDialog.data?.agent?.name]);
 
   // Filtered agents based on search
   const filteredAgents = agents.filter(agent =>
@@ -305,7 +315,11 @@ const TicketDialog = ({
 
   // Determine base path based on source
   const source = ticketDialog.source || 'tickets';
-  const basePath = source === 'archive' ? '/qa-manager/archive' : '/qa-manager/tickets';
+  const basePath = isReviewMode
+    ? '/qa-manager/review'
+    : source === 'archive'
+      ? '/qa-manager/archive'
+      : '/qa-manager/tickets';
 
   // Navigate to ticket with URL update
   const handleNavigateTicket = (direction) => {
@@ -396,7 +410,7 @@ const TicketDialog = ({
           <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
-                {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Edit Ticket'}
+                {ticketDialog.mode === 'create' ? 'Create Ticket' : isReviewMode ? 'Review Ticket' : 'Edit Ticket'}
               </DialogTitle>
               <div className="flex items-center gap-1">
                 {ticketDialog.mode === 'edit' && (
@@ -446,6 +460,51 @@ const TicketDialog = ({
           <form ref={formRef} onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
             <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Review Mode: Additional Note */}
+                {isReviewMode && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <Label className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        Reviewer Note (visible to grader)
+                      </Label>
+                    </div>
+                    <textarea
+                      value={formData.additionalNote || ''}
+                      onChange={(e) => setFormData({ ...formData, additionalNote: e.target.value })}
+                      placeholder="Add a note for the grader explaining what needs to be fixed..."
+                      className="w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-amber-300 dark:border-amber-700 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                      rows={3}
+                    />
+                    {/* Show original vs current score */}
+                    {ticketDialog.data?.originalReviewScore !== undefined && (
+                      <div className="mt-3 flex items-center gap-4 text-sm">
+                        <span className="text-gray-600 dark:text-neutral-400">
+                          Original Score: <span className="font-medium text-gray-900 dark:text-white">{ticketDialog.data.originalReviewScore}%</span>
+                        </span>
+                        <span className="text-gray-600 dark:text-neutral-400">
+                          Current Score: <span className="font-medium text-gray-900 dark:text-white">{formData.qualityScorePercent || '-'}%</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Show Additional Note for non-review mode if it exists */}
+                {!isReviewMode && ticketDialog.data?.additionalNote && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        Reviewer Note
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 dark:text-neutral-300">
+                      {ticketDialog.data.additionalNote}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 gap-4">
                   <div className="relative" ref={agentDropdownRef}>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
@@ -564,18 +623,39 @@ const TicketDialog = ({
                   />
                 )}
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                    >
-                      <option value="Selected">Selected</option>
-                      <option value="Graded">Graded</option>
-                    </select>
-                  </div>
+                <div className={`grid gap-4 ${isReviewMode ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {!isReviewMode && (
+                    <div>
+                      <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
+                      {formData.status === 'Draft' ? (
+                        <div className="w-full px-3 py-2 text-sm border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300">
+                          Draft (Pending Review)
+                          <span className="block text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                            Set score ≥ 85% to bypass review
+                          </span>
+                        </div>
+                      ) : formData.status === 'Waiting on your input' ? (
+                        <select
+                          value={formData.status}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-red-300 dark:border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300"
+                        >
+                          <option value="Waiting on your input">Waiting on your input</option>
+                          <option value="Draft">Resubmit for Review</option>
+                          <option value="Selected">Selected (requires score ≥ 85%)</option>
+                        </select>
+                      ) : (
+                        <select
+                          value={formData.status}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                        >
+                          <option value="Selected">Selected</option>
+                          <option value="Graded">Graded</option>
+                        </select>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Quality Score (%)</Label>
                     <Input
@@ -769,9 +849,38 @@ const TicketDialog = ({
                   <Button type="button" variant="ghost" onClick={handleCloseDialog}>
                     Cancel
                   </Button>
-                  <Button type="submit" variant="glass">
-                    {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Save Changes'}
-                  </Button>
+                  {isReviewMode ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => {
+                          if (onDeny && ticketDialog.data) {
+                            onDeny(ticketDialog.data._id, formData);
+                          }
+                        }}
+                      >
+                        <XCircle className="w-4 h-4 mr-1.5" />
+                        Deny
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="success"
+                        onClick={() => {
+                          if (onApprove && ticketDialog.data) {
+                            onApprove(ticketDialog.data._id, formData);
+                          }
+                        }}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1.5" />
+                        Approve
+                      </Button>
+                    </>
+                  ) : (
+                    <Button type="submit" variant="glass">
+                      {ticketDialog.mode === 'create' ? 'Create Ticket' : 'Save Changes'}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
