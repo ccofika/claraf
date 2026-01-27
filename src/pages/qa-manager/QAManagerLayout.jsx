@@ -1158,8 +1158,33 @@ const ViewTicketDialog = ({
   routerNavigate
 }) => {
   const [rightPanelMode, setRightPanelMode] = useState('ai');
+  const [fullTicketData, setFullTicketData] = useState(null);
 
-  const ticket = viewDialog.ticket;
+  const ticket = fullTicketData || viewDialog.ticket;
+  const baseTicket = viewDialog.ticket;
+
+  // Fetch full ticket data to get reviewHistory with populated reviewedBy
+  useEffect(() => {
+    const fetchFullTicket = async () => {
+      if (!baseTicket?._id) {
+        setFullTicketData(null);
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/qa/tickets/${baseTicket._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFullTicketData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch full ticket data:', error);
+      }
+    };
+    fetchFullTicket();
+  }, [baseTicket?._id]);
   // Determine the source page - default to 'tickets' if not specified
   const source = viewDialog.source || 'tickets';
   const basePath = source === 'review'
@@ -1168,25 +1193,28 @@ const ViewTicketDialog = ({
       ? '/qa-manager/archive'
       : '/qa-manager/tickets';
 
-  const currentIndex = ticket ? getCurrentTicketIndex(ticket._id) : -1;
+  const currentIndex = baseTicket ? getCurrentTicketIndex(baseTicket._id) : -1;
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex >= 0 && currentIndex < tickets.length - 1;
 
   // Close dialog and navigate back
   const handleClose = () => {
+    setFullTicketData(null);
     setViewDialog({ open: false, ticket: null, source: null });
     routerNavigate(basePath);
   };
 
   // Navigate to edit
   const handleEditClick = () => {
+    setFullTicketData(null);
     setViewDialog({ open: false, ticket: null, source: null });
-    routerNavigate(`${basePath}/${ticket._id}/edit`);
+    routerNavigate(`${basePath}/${baseTicket._id}/edit`);
   };
 
   // Navigate to ticket with URL update
   const handleNavigateTicket = (direction) => {
-    const newTicket = navigateToTicket(direction, ticket._id, 'view');
+    setFullTicketData(null); // Reset so new ticket data is fetched
+    const newTicket = navigateToTicket(direction, baseTicket._id, 'view');
     if (newTicket && routerNavigate) {
       routerNavigate(`${basePath}/${newTicket._id}`);
     }
@@ -1208,9 +1236,9 @@ const ViewTicketDialog = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ticket?._id, canGoPrev, canGoNext, navigateToTicket, routerNavigate]);
+  }, [baseTicket?._id, canGoPrev, canGoNext, navigateToTicket, routerNavigate]);
 
-  if (!ticket) return null;
+  if (!baseTicket) return null;
 
   const adminEmails = ['filipkozomara@mebit.io', 'neven@mebit.io'];
   const isCreator = ticket.createdBy === user?._id || ticket.createdBy?._id === user?._id;
@@ -1302,6 +1330,27 @@ const ViewTicketDialog = ({
           {/* LEFT SIDE - Ticket Information */}
           <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Reviewer Note Section - At Top */}
+              {ticket.additionalNote && (() => {
+                const reviewAction = ticket.reviewHistory?.find(h =>
+                  h.action === 'approved' || h.action === 'denied'
+                );
+                const reviewerName = reviewAction?.reviewedBy?.name ||
+                  (reviewAction?.reviewedBy?.email?.split('@')[0]) || null;
+
+                return (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                    <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Reviewer Note{reviewerName ? ` - ${reviewerName}` : ''}
+                    </h4>
+                    <p className="text-sm text-amber-900 dark:text-amber-200">
+                      {ticket.additionalNote}
+                    </p>
+                  </div>
+                );
+              })()}
+
               {/* Top Section: Agent, Ticket ID, Date Entered */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">

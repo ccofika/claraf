@@ -491,19 +491,28 @@ const TicketDialog = ({
                 )}
 
                 {/* Show Additional Note for non-review mode if it exists */}
-                {!isReviewMode && ticketDialog.data?.additionalNote && (
-                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                        Reviewer Note
-                      </span>
+                {!isReviewMode && ticketDialog.data?.additionalNote && (() => {
+                  // Find the reviewer who did the approve/deny action
+                  const reviewAction = ticketDialog.data.reviewHistory?.find(h =>
+                    h.action === 'approved' || h.action === 'denied'
+                  );
+                  const reviewerName = reviewAction?.reviewedBy?.name ||
+                    (reviewAction?.reviewedBy?.email?.split('@')[0]) || null;
+
+                  return (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                          Reviewer Note{reviewerName ? ` - ${reviewerName}` : ''}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 dark:text-neutral-300">
+                        {ticketDialog.data.additionalNote}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-neutral-300">
-                      {ticketDialog.data.additionalNote}
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="relative" ref={agentDropdownRef}>

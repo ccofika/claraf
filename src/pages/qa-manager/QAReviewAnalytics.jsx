@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  BarChart2, ArrowLeft, TrendingDown, TrendingUp, Calendar, User, FileText, AlertTriangle
+  BarChart2, ArrowLeft, TrendingDown, TrendingUp, Calendar, User, FileText, AlertTriangle, Eye
 } from 'lucide-react';
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, Button } from './components';
 import { staggerContainer, staggerItem } from '../../utils/animations';
+import AnalyticsTicketPanel from '../../components/AnalyticsTicketPanel';
 
 const QAReviewAnalytics = () => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const QAReviewAnalytics = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedGrader, setSelectedGrader] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showTicketPanel, setShowTicketPanel] = useState(false);
 
   // Redirect if not a reviewer
   useEffect(() => {
@@ -54,6 +57,17 @@ const QAReviewAnalytics = () => {
       color: 'text-red-600 dark:text-red-400',
       icon: TrendingDown
     };
+  };
+
+  // Handle view ticket
+  const handleViewTicket = (ticket) => {
+    setSelectedTicket(ticket);
+    setShowTicketPanel(true);
+  };
+
+  const handleCloseTicketPanel = () => {
+    setShowTicketPanel(false);
+    setSelectedTicket(null);
   };
 
   return (
@@ -229,6 +243,9 @@ const QAReviewAnalytics = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">
                           Review Date
                         </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
@@ -268,6 +285,15 @@ const QAReviewAnalytics = () => {
                                 ? new Date(ticket.firstReviewDate).toLocaleDateString()
                                 : '-'}
                             </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={() => handleViewTicket(ticket)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                View
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -303,6 +329,13 @@ const QAReviewAnalytics = () => {
           </motion.div>
         </motion.div>
       )}
+
+      {/* Ticket View Panel */}
+      <AnalyticsTicketPanel
+        ticket={selectedTicket}
+        isOpen={showTicketPanel}
+        onClose={handleCloseTicketPanel}
+      />
     </div>
   );
 };
