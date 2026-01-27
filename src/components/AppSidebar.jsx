@@ -33,6 +33,7 @@ import {
   CloseFilled,
   Chat as ChatBubble,
   Analytics,
+  Notebook,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -112,6 +113,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     // { id: 'affiliate-bonus-finder', icon: <Gift size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Affiliate Bonus Finder' },
     { id: 'kyc', icon: <CheckmarkFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Management' },
     { id: 'countries-restrictions', icon: <EarthFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Countries & Restrictions' },
+    { id: 'knowledge-base', icon: <Notebook size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Knowledge Base' },
   ];
 
   // Add developer dashboard for admin/developer roles only
@@ -149,6 +151,11 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     // Navigate to chat page
     if (item.id === 'chat') {
       navigate('/chat');
+      return;
+    }
+    // Navigate to knowledge base
+    if (item.id === 'knowledge-base') {
+      navigate('/knowledge-base');
       return;
     }
     // All items use section change now

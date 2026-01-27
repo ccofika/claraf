@@ -50,6 +50,12 @@ import {
   QAReview,
   QAReviewAnalytics
 } from './pages/qa-manager';
+import {
+  KnowledgeBaseLayout,
+  KBHome,
+  KBPageView,
+  KBAdmin
+} from './pages/knowledge-base';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
 
@@ -183,6 +189,22 @@ function App() {
                           <Route path="import-tickets" element={<QAImportTickets />} />
                           <Route path="active-overview" element={<QAActiveOverview />} />
                           <Route path="bugs" element={<QABugsPage />} />
+                        </Route>
+
+                        {/* Knowledge Base routes with nested routing */}
+                        <Route
+                          path="/knowledge-base"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="knowledge-base">
+                                <KnowledgeBaseLayout />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        >
+                          <Route index element={<KBHome />} />
+                          <Route path="admin" element={<KBAdmin />} />
+                          <Route path=":slug" element={<KBPageView />} />
                         </Route>
 
                         <Route
