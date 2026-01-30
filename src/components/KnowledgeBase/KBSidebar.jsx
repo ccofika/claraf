@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, ChevronLeft, Search,
   Book, Settings, Menu, X, Plus, MoreHorizontal,
-  Edit, Trash2, GripVertical, Home
+  Edit, Trash2, GripVertical, Home, Star, Clock, Tag,
+  FilePlus, ArrowUpToLine
 } from 'lucide-react';
 import { useKnowledgeBase } from '../../context/KnowledgeBaseContext';
 import { toast } from 'sonner';
 
 // Context Menu Portal Component
-const ContextMenu = ({ position, onClose, onEdit, onDelete, isSection }) => {
+const ContextMenu = ({ position, onClose, onEdit, onDelete, onAddSubPage, onMoveToRoot, isSection, hasParent }) => {
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -28,18 +29,39 @@ const ContextMenu = ({ position, onClose, onEdit, onDelete, isSection }) => {
     <div
       ref={menuRef}
       className="fixed z-[9999] bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
-        rounded-lg shadow-xl py-1 min-w-36"
+        rounded-lg shadow-xl py-1 min-w-44"
       style={{ top: position.y, left: position.x }}
     >
       {!isSection && (
-        <button
-          onClick={onEdit}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-neutral-300
-            hover:bg-gray-100 dark:hover:bg-neutral-800"
-        >
-          <Edit size={14} />
-          Edit Page
-        </button>
+        <>
+          <button
+            onClick={onEdit}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-neutral-300
+              hover:bg-gray-100 dark:hover:bg-neutral-800"
+          >
+            <Edit size={14} />
+            Edit Page
+          </button>
+          <button
+            onClick={onAddSubPage}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-neutral-300
+              hover:bg-gray-100 dark:hover:bg-neutral-800"
+          >
+            <FilePlus size={14} />
+            Add Sub-page
+          </button>
+          {hasParent && (
+            <button
+              onClick={onMoveToRoot}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-neutral-300
+                hover:bg-gray-100 dark:hover:bg-neutral-800"
+            >
+              <ArrowUpToLine size={14} />
+              Move to Root
+            </button>
+          )}
+          <div className="my-1 border-t border-gray-100 dark:border-neutral-800" />
+        </>
       )}
       <button
         onClick={onDelete}
@@ -181,6 +203,8 @@ const PageItem = ({
   currentSlug,
   onEdit,
   onDelete,
+  onAddSubPage,
+  onMoveToRoot,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -276,7 +300,16 @@ const PageItem = ({
             setMenuPosition(null);
             onDelete(page._id, page.title);
           }}
+          onAddSubPage={() => {
+            setMenuPosition(null);
+            onAddSubPage?.(page._id);
+          }}
+          onMoveToRoot={() => {
+            setMenuPosition(null);
+            onMoveToRoot?.(page._id);
+          }}
           isSection={false}
+          hasParent={!!page.parentPage}
         />
       )}
 
@@ -298,6 +331,8 @@ const PageItem = ({
                 currentSlug={currentSlug}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onAddSubPage={onAddSubPage}
+                onMoveToRoot={onMoveToRoot}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
@@ -334,7 +369,11 @@ const KBSidebar = () => {
     setSections,
     addSection,
     removeSection,
-    renameSection
+    renameSection,
+    favorites,
+    recentPages,
+    allTags,
+    fetchAllTags
   } = useKnowledgeBase();
 
   const [expandedNodes, setExpandedNodes] = useState(new Set());
@@ -344,12 +383,20 @@ const KBSidebar = () => {
   const [newPageTitle, setNewPageTitle] = useState('');
   const [newPageIcon, setNewPageIcon] = useState('📄');
   const [newPageSection, setNewPageSection] = useState(null);
+  const [newPageParent, setNewPageParent] = useState(null);
   const [creating, setCreating] = useState(false);
   const [draggingNode, setDraggingNode] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
   const [dropSectionId, setDropSectionId] = useState(null);
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [showTags, setShowTags] = useState(false);
 
   const currentSlug = location.pathname.replace('/knowledge-base/', '').replace('/knowledge-base', '');
+
+  // Fetch all tags for filtering
+  useEffect(() => {
+    if (fetchAllTags) fetchAllTags();
+  }, [fetchAllTags]);
 
   const toggleNode = (nodeId) => {
     setExpandedNodes(prev => {
@@ -360,21 +407,22 @@ const KBSidebar = () => {
     });
   };
 
-  // Filter pages by search
+  // Filter pages by search and tag
   const filterTree = useMemo(() => {
-    const filter = (nodes, query) => {
-      if (!query) return nodes;
+    const filter = (nodes, query, tag) => {
+      if (!query && !tag) return nodes;
       return nodes.filter(node => {
-        const matches = node.title.toLowerCase().includes(query.toLowerCase());
-        const filteredChildren = node.children ? filter(node.children, query) : [];
-        return matches || filteredChildren.length > 0;
+        const matchesSearch = !query || node.title.toLowerCase().includes(query.toLowerCase());
+        const matchesTag = !tag || (node.tags && node.tags.includes(tag));
+        const filteredChildren = node.children ? filter(node.children, query, tag) : [];
+        return (matchesSearch && matchesTag) || filteredChildren.length > 0;
       }).map(node => ({
         ...node,
-        children: node.children ? filter(node.children, query) : []
+        children: node.children ? filter(node.children, query, tag) : []
       }));
     };
-    return filter(pageTree, searchQuery);
-  }, [pageTree, searchQuery]);
+    return filter(pageTree, searchQuery, selectedTag);
+  }, [pageTree, searchQuery, selectedTag]);
 
   // Group pages by section
   const groupedPages = useMemo(() => {
@@ -413,6 +461,7 @@ const KBSidebar = () => {
         title: newPageTitle.trim(),
         icon: newPageIcon,
         sectionId: newPageSection,
+        parentPage: newPageParent || null,
         blocks: [],
         dropdowns: []
       });
@@ -421,6 +470,10 @@ const KBSidebar = () => {
       setNewPageTitle('');
       setNewPageIcon('📄');
       setNewPageSection(null);
+      setNewPageParent(null);
+      if (newPageParent) {
+        setExpandedNodes(prev => new Set([...prev, newPageParent]));
+      }
       navigate(`/knowledge-base/${page.slug}`);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create');
@@ -443,6 +496,21 @@ const KBSidebar = () => {
     navigate(`/knowledge-base/admin?edit=${pageId}`);
   };
 
+  const handleAddSubPage = (parentId) => {
+    setNewPageParent(parentId);
+    setNewPageSection(null);
+    setShowCreateModal(true);
+  };
+
+  const handleMoveToRoot = async (pageId) => {
+    try {
+      await reorderPage(pageId, 0, null);
+      toast.success('Moved to root');
+    } catch (error) {
+      toast.error('Failed to move');
+    }
+  };
+
   const handleAddSection = () => {
     const name = prompt('Section name:');
     if (name?.trim()) {
@@ -458,6 +526,7 @@ const KBSidebar = () => {
 
   const handleAddPageToSection = (sectionId) => {
     setNewPageSection(sectionId);
+    setNewPageParent(null);
     setShowCreateModal(true);
   };
 
@@ -581,6 +650,7 @@ const KBSidebar = () => {
               <button
                 onClick={() => {
                   setNewPageSection(null);
+                  setNewPageParent(null);
                   setShowCreateModal(true);
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2
@@ -600,6 +670,120 @@ const KBSidebar = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Tag Filter */}
+      {!sidebarCollapsed && allTags?.length > 0 && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setShowTags(!showTags)}
+            className="flex items-center gap-1.5 px-1 py-1 text-[11px] uppercase tracking-wider text-gray-400 dark:text-neutral-500 font-medium w-full"
+          >
+            <Tag size={10} />
+            Tags
+            <ChevronRight size={10} className={`ml-auto transition-transform ${showTags ? 'rotate-90' : ''}`} />
+          </button>
+          <AnimatePresence>
+            {showTags && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden"
+              >
+                <div className="flex flex-wrap gap-1.5 py-1.5">
+                  {selectedTag && (
+                    <button
+                      onClick={() => setSelectedTag(null)}
+                      className="px-2 py-0.5 text-[11px] bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400
+                        border border-red-200 dark:border-red-800 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {allTags.slice(0, 20).map(tag => {
+                    const tagName = typeof tag === 'string' ? tag : tag.name || tag._id;
+                    const isActive = selectedTag === tagName;
+                    return (
+                      <button
+                        key={tagName}
+                        onClick={() => setSelectedTag(isActive ? null : tagName)}
+                        className={`px-2 py-0.5 text-[11px] rounded-md transition-colors border ${
+                          isActive
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                            : 'bg-gray-50 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 border-gray-200 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        {tagName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Favorites & Recent - only when expanded */}
+      {!sidebarCollapsed && (favorites?.length > 0 || recentPages?.length > 0) && (
+        <div className="px-3 pb-2 space-y-2 border-b border-gray-100 dark:border-neutral-800/50 mb-1">
+          {/* Favorites */}
+          {favorites?.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 px-1 py-1 text-[11px] uppercase tracking-wider text-gray-400 dark:text-neutral-500 font-medium">
+                <Star size={10} />
+                Favorites
+              </div>
+              <div className="space-y-0.5">
+                {favorites.slice(0, 5).map(fav => (
+                  <button
+                    key={fav._id}
+                    onClick={() => navigate(`/knowledge-base/${fav.slug}`)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors truncate
+                      ${currentSlug === fav.slug
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800/50'
+                      }`}
+                  >
+                    <span className="text-sm">{fav.icon || '📄'}</span>
+                    <span className="truncate">{fav.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent Pages */}
+          {recentPages?.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 px-1 py-1 text-[11px] uppercase tracking-wider text-gray-400 dark:text-neutral-500 font-medium">
+                <Clock size={10} />
+                Recent
+              </div>
+              <div className="space-y-0.5">
+                {recentPages.slice(0, 4).map(item => {
+                  const page = item.page || item;
+                  return (
+                    <button
+                      key={page._id}
+                      onClick={() => navigate(`/knowledge-base/${page.slug}`)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors truncate
+                        ${currentSlug === page.slug
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                          : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800/50'
+                        }`}
+                    >
+                      <span className="text-sm">{page.icon || '📄'}</span>
+                      <span className="truncate">{page.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Pages */}
@@ -635,6 +819,29 @@ const KBSidebar = () => {
           </div>
         ) : (
           <>
+            {/* Root Drop Zone - drag pages here to move to root level */}
+            {isAdmin && draggingNode && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDropTargetId('__root__'); }}
+                onDragLeave={() => setDropTargetId(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggingNode && draggingNode.parentPage) {
+                    handleMoveToRoot(draggingNode._id);
+                  }
+                  setDraggingNode(null);
+                  setDropTargetId(null);
+                }}
+                className={`mb-2 px-3 py-2 rounded-lg border-2 border-dashed text-center text-[12px] transition-colors ${
+                  dropTargetId === '__root__'
+                    ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-200 dark:border-neutral-700 text-gray-400 dark:text-neutral-500'
+                }`}
+              >
+                Drop here to move to root level
+              </div>
+            )}
+
             {/* Unsectioned pages first */}
             {groupedPages.unsectioned.length > 0 && (
               <div className="space-y-0.5">
@@ -645,6 +852,8 @@ const KBSidebar = () => {
                     currentSlug={currentSlug}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
+                    onAddSubPage={handleAddSubPage}
+                    onMoveToRoot={handleMoveToRoot}
                     onDragStart={handleDragStart}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -681,6 +890,8 @@ const KBSidebar = () => {
                       currentSlug={currentSlug}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      onAddSubPage={handleAddSubPage}
+                      onMoveToRoot={handleMoveToRoot}
                       onDragStart={handleDragStart}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
@@ -786,6 +997,7 @@ const KBSidebar = () => {
               setShowCreateModal(false);
               setNewPageTitle('');
               setNewPageSection(null);
+              setNewPageParent(null);
             }}
           />
           <motion.div
@@ -794,10 +1006,12 @@ const KBSidebar = () => {
             className="relative bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl p-6 w-full max-w-md"
           >
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
-              Create New Page
+              {newPageParent ? 'Create Sub-page' : 'Create New Page'}
             </h3>
             <p className="text-sm text-gray-500 dark:text-neutral-400 mb-6">
-              Add a new page to your knowledge base
+              {newPageParent
+                ? 'Add a nested sub-page under the selected parent'
+                : 'Add a new page to your knowledge base'}
             </p>
 
             <div className="space-y-4">
@@ -834,13 +1048,46 @@ const KBSidebar = () => {
                       if (e.key === 'Escape') {
                         setShowCreateModal(false);
                         setNewPageTitle('');
+                        setNewPageParent(null);
                       }
                     }}
                   />
                 </div>
               </div>
 
-              {sections && sections.length > 0 && (
+              {/* Parent Page selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">
+                  Parent Page (optional)
+                </label>
+                <select
+                  value={newPageParent || ''}
+                  onChange={(e) => setNewPageParent(e.target.value || null)}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-neutral-800
+                    border border-gray-200 dark:border-neutral-700 rounded-xl
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 text-[15px]"
+                >
+                  <option value="">No parent (root level)</option>
+                  {(() => {
+                    const flatList = [];
+                    const flatten = (nodes, depth = 0) => {
+                      if (!nodes) return;
+                      for (const n of nodes) {
+                        flatList.push({ _id: n._id, title: n.title, icon: n.icon, depth });
+                        if (n.children) flatten(n.children, depth + 1);
+                      }
+                    };
+                    flatten(pageTree);
+                    return flatList.map(p => (
+                      <option key={p._id} value={p._id}>
+                        {'  '.repeat(p.depth)}{p.icon || '📄'} {p.title}
+                      </option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              {sections && sections.length > 0 && !newPageParent && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">
                     Section (optional)
@@ -867,6 +1114,7 @@ const KBSidebar = () => {
                   setShowCreateModal(false);
                   setNewPageTitle('');
                   setNewPageSection(null);
+                  setNewPageParent(null);
                 }}
                 className="px-5 py-2.5 text-gray-600 dark:text-neutral-400 hover:bg-gray-100
                   dark:hover:bg-neutral-800 rounded-xl font-medium transition-colors"
@@ -879,7 +1127,7 @@ const KBSidebar = () => {
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl
                   font-medium disabled:opacity-50 transition-colors"
               >
-                {creating ? 'Creating...' : 'Create Page'}
+                {creating ? 'Creating...' : newPageParent ? 'Create Sub-page' : 'Create Page'}
               </button>
             </div>
           </motion.div>

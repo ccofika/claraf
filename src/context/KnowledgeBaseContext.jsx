@@ -358,6 +358,368 @@ export const KnowledgeBaseProvider = ({ children }) => {
     }
   }, [API_URL]);
 
+  // ==================== TEMPLATES ====================
+
+  const [templates, setTemplates] = useState([]);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/templates`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTemplates(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  const createTemplate = useCallback(async (data) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/templates`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setTemplates(prev => [response.data, ...prev]);
+    return response.data;
+  }, [API_URL]);
+
+  const deleteTemplate = useCallback(async (templateId) => {
+    const token = localStorage.getItem('token');
+    await axios.delete(`${API_URL}/api/knowledge-base/templates/${templateId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setTemplates(prev => prev.filter(t => t._id !== templateId));
+  }, [API_URL]);
+
+  const useTemplate = useCallback(async (templateId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/templates/${templateId}/use`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    await fetchPageTree();
+    return response.data;
+  }, [API_URL, fetchPageTree]);
+
+  const saveAsTemplate = useCallback(async (pageId, data) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/pages/${pageId}/save-as-template`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setTemplates(prev => [response.data, ...prev]);
+    return response.data;
+  }, [API_URL]);
+
+  // ==================== VERSION HISTORY ====================
+
+  const [versions, setVersions] = useState([]);
+
+  const fetchVersions = useCallback(async (pageId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/versions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVersions(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching versions:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  const fetchVersion = useCallback(async (pageId, versionNumber) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/versions/${versionNumber}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const restoreVersion = useCallback(async (pageId, versionNumber) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/pages/${pageId}/restore/${versionNumber}`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    await fetchPageTree();
+    if (currentPage?._id === pageId) {
+      setCurrentPage(response.data);
+    }
+    return response.data;
+  }, [API_URL, fetchPageTree, currentPage]);
+
+  // ==================== COMMENTS ====================
+
+  const [comments, setComments] = useState([]);
+
+  const fetchComments = useCallback(async (pageId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/comments`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setComments(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  const addComment = useCallback(async (pageId, data) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/pages/${pageId}/comments`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setComments(prev => [...prev, response.data]);
+    return response.data;
+  }, [API_URL]);
+
+  const updateComment = useCallback(async (commentId, content) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.put(`${API_URL}/api/knowledge-base/comments/${commentId}`, { content }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setComments(prev => prev.map(c => c._id === commentId ? response.data : c));
+    return response.data;
+  }, [API_URL]);
+
+  const deleteComment = useCallback(async (commentId) => {
+    const token = localStorage.getItem('token');
+    await axios.delete(`${API_URL}/api/knowledge-base/comments/${commentId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setComments(prev => prev.filter(c => c._id !== commentId));
+  }, [API_URL]);
+
+  const resolveComment = useCallback(async (commentId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/comments/${commentId}/resolve`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setComments(prev => prev.map(c => c._id === commentId ? response.data : c));
+    return response.data;
+  }, [API_URL]);
+
+  const reactToComment = useCallback(async (commentId, emoji) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/comments/${commentId}/react`, { emoji }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setComments(prev => prev.map(c => c._id === commentId ? response.data : c));
+    return response.data;
+  }, [API_URL]);
+
+  // ==================== FAVORITES & RECENT ====================
+
+  const [favorites, setFavorites] = useState([]);
+  const [recentPages, setRecentPages] = useState([]);
+
+  const fetchFavorites = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/favorites`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFavorites(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  const toggleFavorite = useCallback(async (pageId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/favorites/${pageId}`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setFavorites(response.data.favorites || []);
+    return response.data;
+  }, [API_URL]);
+
+  const fetchRecentPages = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/recent`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRecentPages(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent pages:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  const trackPageVisit = useCallback(async (pageId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/api/knowledge-base/recent/${pageId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (error) {
+      // Silent fail - tracking is not critical
+    }
+  }, [API_URL]);
+
+  // Fetch favorites and recent on mount
+  useEffect(() => {
+    if (user) {
+      fetchFavorites();
+      fetchRecentPages();
+    }
+  }, [user, fetchFavorites, fetchRecentPages]);
+
+  // ==================== SEARCH ====================
+
+  const searchSuggestions = useCallback(async (query) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/search/suggestions?q=${encodeURIComponent(query || '')}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const searchPages = useCallback(async (query, filters = {}) => {
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams({ q: query });
+    if (filters.tags) params.append('tags', filters.tags);
+    if (filters.author) params.append('author', filters.author);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+
+    const response = await axios.get(`${API_URL}/api/knowledge-base/search?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Normalize results to flat array for SearchModal
+    const data = response.data;
+    if (data.results) {
+      return data.results.map(r => ({
+        _id: r.page?._id || r._id,
+        title: r.page?.title || r.title,
+        slug: r.page?.slug || r.slug,
+        icon: r.page?.icon || r.icon,
+        tags: r.page?.tags || r.tags,
+        matchedContent: r.matchedContent
+      }));
+    }
+    return data;
+  }, [API_URL]);
+
+  // ==================== SHARING & PERMISSIONS ====================
+
+  const fetchPermissions = useCallback(async (pageId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/permissions`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const updatePermissions = useCallback(async (pageId, permissions) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.put(`${API_URL}/api/knowledge-base/pages/${pageId}/permissions`, permissions, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const generateShareLink = useCallback(async (pageId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/pages/${pageId}/share`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const revokeShareLink = useCallback(async (pageId) => {
+    const token = localStorage.getItem('token');
+    await axios.delete(`${API_URL}/api/knowledge-base/pages/${pageId}/share`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }, [API_URL]);
+
+  // ==================== ANALYTICS ====================
+
+  const fetchPageAnalytics = useCallback(async (pageId, days = 30) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/analytics?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const fetchTopPages = useCallback(async (limit = 10) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/analytics/top-pages?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const fetchOverallStats = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/analytics/stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const fetchContentStats = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/analytics/content-stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const fetchActiveEditors = useCallback(async (days = 30) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/analytics/active-editors?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  // ==================== TAGS ====================
+
+  const [allTags, setAllTags] = useState([]);
+
+  const fetchAllTags = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/tags`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAllTags(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+      return [];
+    }
+  }, [API_URL]);
+
+  // ==================== IMPORT / EXPORT ====================
+
+  const exportPage = useCallback(async (pageId, format = 'json') => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/knowledge-base/pages/${pageId}/export/${format}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const importPage = useCallback(async (data) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/api/knowledge-base/import`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    await fetchPageTree();
+    return response.data;
+  }, [API_URL, fetchPageTree]);
+
   const value = {
     // State
     isAdmin,
@@ -400,7 +762,63 @@ export const KnowledgeBaseProvider = ({ children }) => {
     setSections,
     addSection,
     removeSection,
-    renameSection
+    renameSection,
+
+    // Templates
+    templates,
+    fetchTemplates,
+    createTemplate,
+    deleteTemplate,
+    useTemplate,
+    saveAsTemplate,
+
+    // Version History
+    versions,
+    fetchVersions,
+    fetchVersion,
+    restoreVersion,
+
+    // Comments
+    comments,
+    fetchComments,
+    addComment,
+    updateComment,
+    deleteComment,
+    resolveComment,
+    reactToComment,
+
+    // Favorites & Recent
+    favorites,
+    recentPages,
+    fetchFavorites,
+    toggleFavorite,
+    fetchRecentPages,
+    trackPageVisit,
+
+    // Search
+    searchPages,
+    searchSuggestions,
+
+    // Sharing & Permissions
+    fetchPermissions,
+    updatePermissions,
+    generateShareLink,
+    revokeShareLink,
+
+    // Analytics
+    fetchPageAnalytics,
+    fetchTopPages,
+    fetchOverallStats,
+    fetchContentStats,
+    fetchActiveEditors,
+
+    // Tags
+    allTags,
+    fetchAllTags,
+
+    // Import/Export
+    exportPage,
+    importPage
   };
 
   return (

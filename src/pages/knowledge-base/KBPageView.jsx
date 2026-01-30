@@ -108,7 +108,7 @@ const KBPageView = () => {
         </div>
 
         {/* Page Blocks */}
-        <div className="space-y-1">
+        <div className="space-y-1" data-kb-content>
           {currentPage.blocks && currentPage.blocks.length > 0 ? (
             currentPage.blocks.map((block, index) => (
               <BlockRenderer key={block.id || index} block={block} />

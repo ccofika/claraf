@@ -14,6 +14,14 @@ export { default as CodeBlock } from './blocks/CodeBlock';
 export { default as ImageBlock } from './blocks/ImageBlock';
 export { default as TableBlock } from './blocks/TableBlock';
 export { default as DividerBlock } from './blocks/DividerBlock';
+// New block components
+export { default as VideoBlock } from './blocks/VideoBlock';
+export { default as EmbedBlock } from './blocks/EmbedBlock';
+export { default as BookmarkBlock } from './blocks/BookmarkBlock';
+export { default as FileBlock } from './blocks/FileBlock';
+export { default as EquationBlock } from './blocks/EquationBlock';
+export { default as ButtonBlock } from './blocks/ButtonBlock';
+export { default as TableOfContentsBlock } from './blocks/TableOfContentsBlock';
 
 // Editor components
 export { default as BlockEditor } from './editor/BlockEditor';

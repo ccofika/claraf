@@ -3,12 +3,36 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Users, History, Shield, Clock, User,
-  Trash2, Plus, Search, ChevronRight, ExternalLink
+  Trash2, Plus, Search, ChevronRight, ExternalLink,
+  BarChart3, Layout, MessageCircle, Eye, TrendingUp, Download, Star,
+  FileText, Type, Hash, Pencil
 } from 'lucide-react';
 import { useKnowledgeBase } from '../../context/KnowledgeBaseContext';
 import { toast } from 'sonner';
 import PageEditor from '../../components/KnowledgeBase/editor/PageEditor';
+import TemplateGallery from '../../components/KnowledgeBase/templates/TemplateGallery';
+import SettingsPanel from '../../components/KnowledgeBase/admin/SettingsPanel';
 import axios from 'axios';
+
+// Lazy Template Gallery wrapper that fetches templates
+const TemplateGalleryLazy = ({ onClose }) => {
+  const { templates, fetchTemplates, useTemplate, createTemplate, deleteTemplate, isAdmin } = useKnowledgeBase();
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  return (
+    <TemplateGallery
+      templates={templates}
+      onUseTemplate={useTemplate}
+      onCreateTemplate={createTemplate}
+      onDeleteTemplate={deleteTemplate}
+      isAdmin={isAdmin}
+      onClose={onClose}
+    />
+  );
+};
 
 // Stats Card Component
 const StatCard = ({ label, value, icon: Icon, color = 'blue' }) => {
@@ -314,6 +338,210 @@ const RecentActivity = () => {
   );
 };
 
+// Content Overview Section
+const ContentOverview = () => {
+  const { fetchContentStats } = useKnowledgeBase();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchContentStats();
+        setStats(data);
+      } catch (error) {
+        // Content stats are optional
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-8">
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  return (
+    <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+        <div className="flex items-center gap-3">
+          <FileText size={20} className="text-gray-400" />
+          <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white">
+            Content Overview
+          </h2>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-neutral-800">
+        <div className="bg-white dark:bg-neutral-900 p-4">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Published</p>
+          <p className="text-[22px] font-bold text-emerald-600 dark:text-emerald-400">{stats.publishedPages || 0}</p>
+        </div>
+        <div className="bg-white dark:bg-neutral-900 p-4">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Drafts</p>
+          <p className="text-[22px] font-bold text-amber-600 dark:text-amber-400">{stats.draftPages || 0}</p>
+        </div>
+        <div className="bg-white dark:bg-neutral-900 p-4">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Total Blocks</p>
+          <p className="text-[22px] font-bold text-blue-600 dark:text-blue-400">{stats.totalBlocks || 0}</p>
+        </div>
+        <div className="bg-white dark:bg-neutral-900 p-4">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Total Words</p>
+          <p className="text-[22px] font-bold text-purple-600 dark:text-purple-400">{(stats.totalWords || 0).toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Block Type Distribution */}
+      {stats.blockTypeDistribution && stats.blockTypeDistribution.length > 0 && (
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-neutral-800">
+          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-3">Block Types</p>
+          <div className="space-y-2">
+            {stats.blockTypeDistribution.slice(0, 6).map(item => {
+              const maxCount = stats.blockTypeDistribution[0]?.count || 1;
+              const pct = Math.round((item.count / maxCount) * 100);
+              return (
+                <div key={item.type} className="flex items-center gap-3">
+                  <span className="text-[12px] text-gray-500 dark:text-neutral-400 w-24 truncate capitalize">
+                    {(item.type || 'unknown').replace(/_/g, ' ')}
+                  </span>
+                  <div className="flex-1 bg-gray-100 dark:bg-neutral-800 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 dark:bg-blue-400 rounded-full h-2 transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-[12px] text-gray-400 w-8 text-right">{item.count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Deleted pages */}
+      {stats.deletedPages > 0 && (
+        <div className="px-6 py-3 border-t border-gray-100 dark:border-neutral-800">
+          <div className="flex items-center gap-2 text-[13px] text-gray-400">
+            <Trash2 size={14} />
+            <span>{stats.deletedPages} page{stats.deletedPages !== 1 ? 's' : ''} in trash</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// User Activity Section
+const UserActivity = () => {
+  const { fetchActiveEditors } = useKnowledgeBase();
+  const [editors, setEditors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchActiveEditors(30);
+        setEditors(data || []);
+      } catch (error) {
+        // User activity is optional
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const formatTime = (date) => {
+    const now = new Date();
+    const d = new Date(date);
+    const diff = now - d;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    return d.toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-8">
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+        <div className="flex items-center gap-3">
+          <Pencil size={20} className="text-gray-400" />
+          <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white">
+            Most Active Editors
+          </h2>
+          <span className="text-[12px] text-gray-400 ml-auto">Last 30 days</span>
+        </div>
+      </div>
+
+      {editors.length === 0 ? (
+        <div className="px-6 py-12 text-center">
+          <Users size={40} className="mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
+          <p className="text-[14px] text-gray-500 dark:text-neutral-400">No editor activity</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+          {editors.map((editor, idx) => (
+            <div key={editor._id || idx} className="flex items-center gap-4 px-6 py-3.5">
+              {/* Rank */}
+              <span className={`text-[14px] font-bold w-5 text-center ${
+                idx === 0 ? 'text-amber-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-amber-700' : 'text-gray-300'
+              }`}>
+                {idx + 1}
+              </span>
+
+              {/* Avatar */}
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-neutral-700 dark:to-neutral-800
+                flex items-center justify-center text-[13px] font-semibold text-gray-600 dark:text-neutral-300 flex-shrink-0">
+                {(editor.name || editor.email || '?')[0]?.toUpperCase()}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-medium text-gray-900 dark:text-white truncate">
+                  {editor.name || editor.email || 'Unknown'}
+                </p>
+                <div className="flex items-center gap-3 text-[11px] text-gray-400">
+                  <span className="text-emerald-500">{editor.creates || 0} created</span>
+                  <span className="text-blue-500">{editor.updates || 0} edited</span>
+                  {(editor.deletes || 0) > 0 && (
+                    <span className="text-red-400">{editor.deletes} deleted</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Total & Last Edit */}
+              <div className="text-right flex-shrink-0">
+                <p className="text-[15px] font-bold text-gray-900 dark:text-white">{editor.editCount}</p>
+                <p className="text-[11px] text-gray-400">{formatTime(editor.lastEdit)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Count pages recursively
 const countPages = (tree) => {
   let count = 0;
@@ -330,10 +558,13 @@ const countPages = (tree) => {
 const KBAdmin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAdmin, isSuperAdmin, loading, pageTree, updatePage, deletePage, fetchPageTree } = useKnowledgeBase();
+  const { isAdmin, isSuperAdmin, loading, pageTree, updatePage, deletePage, fetchPageTree, fetchTopPages, fetchOverallStats, fetchContentStats, fetchActiveEditors, fetchTemplates, templates } = useKnowledgeBase();
   const [editingPage, setEditingPage] = useState(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const [admins, setAdmins] = useState([]);
+  const [topPages, setTopPages] = useState([]);
+  const [overallStats, setOverallStats] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(false);
   const API_URL = process.env.REACT_APP_API_URL;
 
   // Check for edit param in URL
@@ -361,6 +592,27 @@ const KBAdmin = () => {
       loadAdminCount();
     }
   }, [isSuperAdmin, API_URL]);
+
+  // Load analytics data
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        if (fetchTopPages) {
+          const pages = await fetchTopPages(5);
+          setTopPages(pages || []);
+        }
+        if (fetchOverallStats) {
+          const stats = await fetchOverallStats();
+          setOverallStats(stats);
+        }
+      } catch (error) {
+        // Analytics are optional, don't block dashboard
+      }
+    };
+    if (isAdmin) {
+      loadAnalytics();
+    }
+  }, [isAdmin, fetchTopPages, fetchOverallStats]);
 
   const handleEditPage = async (pageId) => {
     try {
@@ -526,6 +778,16 @@ const KBAdmin = () => {
               <ExternalLink size={16} />
               View Knowledge Base
             </button>
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-[14px] font-medium
+                bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
+                text-gray-700 dark:text-neutral-300 rounded-lg
+                hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <Layout size={16} />
+              Templates
+            </button>
           </div>
         </div>
 
@@ -537,7 +799,105 @@ const KBAdmin = () => {
           {/* Recent Activity */}
           <RecentActivity />
         </div>
+
+        {/* Content & Activity Section */}
+        <div className="grid lg:grid-cols-2 gap-6 mt-6">
+          {/* Content Overview */}
+          <ContentOverview />
+
+          {/* User Activity */}
+          <UserActivity />
+        </div>
+
+        {/* Settings Section */}
+        {isSuperAdmin && (
+          <div className="mt-6">
+            <h2 className="text-[12px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-4">
+              Configuration
+            </h2>
+            <SettingsPanel />
+          </div>
+        )}
+
+        {/* Analytics Section */}
+        {(topPages.length > 0 || overallStats) && (
+          <div className="mt-8">
+            <h2 className="text-[12px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-4">
+              Analytics
+            </h2>
+
+            {/* Overall Stats Row */}
+            {overallStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <StatCard
+                  label="Total Views"
+                  value={overallStats.totalViews || 0}
+                  icon={Eye}
+                  color="blue"
+                />
+                <StatCard
+                  label="Unique Viewers"
+                  value={overallStats.uniqueViewers || 0}
+                  icon={Users}
+                  color="green"
+                />
+                <StatCard
+                  label="Pages with Content"
+                  value={overallStats.pagesWithViews || 0}
+                  icon={BarChart3}
+                  color="purple"
+                />
+                <StatCard
+                  label="Avg. Time on Page"
+                  value={overallStats.avgTimeOnPage ? `${Math.round(overallStats.avgTimeOnPage)}s` : '0s'}
+                  icon={Clock}
+                  color="amber"
+                />
+              </div>
+            )}
+
+            {/* Top Pages */}
+            {topPages.length > 0 && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp size={20} className="text-gray-400" />
+                    <h3 className="text-[17px] font-semibold text-gray-900 dark:text-white">
+                      Most Viewed Pages
+                    </h3>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                  {topPages.map((page, idx) => (
+                    <div
+                      key={page._id || idx}
+                      className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                      onClick={() => page.slug && navigate(`/knowledge-base/${page.slug}`)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-400 w-5">{idx + 1}.</span>
+                        <span className="text-lg">{page.icon || '📄'}</span>
+                        <span className="text-[14px] font-medium text-gray-900 dark:text-white">
+                          {page.title || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[13px] text-gray-500">
+                        <Eye size={14} />
+                        <span>{page.totalViews || 0} views</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Template Gallery Modal */}
+      {showTemplates && (
+        <TemplateGalleryLazy onClose={() => setShowTemplates(false)} />
+      )}
     </motion.div>
   );
 };

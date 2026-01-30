@@ -12,6 +12,19 @@ import CodeBlock from './blocks/CodeBlock';
 import ImageBlock from './blocks/ImageBlock';
 import TableBlock from './blocks/TableBlock';
 import DividerBlock from './blocks/DividerBlock';
+// New Block Components
+import VideoBlock from './blocks/VideoBlock';
+import EmbedBlock from './blocks/EmbedBlock';
+import BookmarkBlock from './blocks/BookmarkBlock';
+import FileBlock from './blocks/FileBlock';
+import EquationBlock from './blocks/EquationBlock';
+import ButtonBlock from './blocks/ButtonBlock';
+import TableOfContentsBlock from './blocks/TableOfContentsBlock';
+import AudioBlock from './blocks/AudioBlock';
+import PDFBlock from './blocks/PDFBlock';
+import BreadcrumbsBlock from './blocks/BreadcrumbsBlock';
+import SyncedBlock from './blocks/SyncedBlock';
+import ColumnsBlock from './blocks/ColumnsBlock';
 
 const blockComponents = {
   paragraph: ParagraphBlock,
@@ -26,7 +39,20 @@ const blockComponents = {
   code: CodeBlock,
   image: ImageBlock,
   table: TableBlock,
-  divider: DividerBlock
+  divider: DividerBlock,
+  // New block types
+  video: VideoBlock,
+  embed: EmbedBlock,
+  bookmark: BookmarkBlock,
+  file: FileBlock,
+  equation: EquationBlock,
+  button: ButtonBlock,
+  table_of_contents: TableOfContentsBlock,
+  audio: AudioBlock,
+  pdf: PDFBlock,
+  breadcrumbs: BreadcrumbsBlock,
+  synced_block: SyncedBlock,
+  columns: ColumnsBlock
 };
 
 const BlockRenderer = ({ block, isEditing = false, onUpdate }) => {

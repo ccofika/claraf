@@ -3,7 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Trash2, GripVertical, Type, Heading1, Heading2, Heading3,
   List, ListOrdered, ChevronRight, AlertCircle, Quote, Code,
-  Image as ImageIcon, Table, Minus, Settings
+  Image as ImageIcon, Table, Minus, Settings,
+  // New icons for new block types
+  Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
+  Music, FileType, Navigation, RefreshCw, Columns
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -11,19 +14,35 @@ import { CSS } from '@dnd-kit/utilities';
 import BlockRenderer from '../BlockRenderer';
 
 const blockTypeOptions = [
-  { type: 'paragraph', label: 'Paragraph', icon: Type },
-  { type: 'heading_1', label: 'Heading 1', icon: Heading1 },
-  { type: 'heading_2', label: 'Heading 2', icon: Heading2 },
-  { type: 'heading_3', label: 'Heading 3', icon: Heading3 },
-  { type: 'bulleted_list', label: 'Bullet List', icon: List },
-  { type: 'numbered_list', label: 'Numbered List', icon: ListOrdered },
-  { type: 'toggle', label: 'Toggle', icon: ChevronRight },
-  { type: 'callout', label: 'Callout', icon: AlertCircle },
-  { type: 'quote', label: 'Quote', icon: Quote },
-  { type: 'code', label: 'Code', icon: Code },
-  { type: 'image', label: 'Image', icon: ImageIcon },
-  { type: 'table', label: 'Table', icon: Table },
-  { type: 'divider', label: 'Divider', icon: Minus }
+  // Basic
+  { type: 'paragraph', label: 'Paragraph', icon: Type, category: 'basic' },
+  { type: 'heading_1', label: 'Heading 1', icon: Heading1, category: 'basic' },
+  { type: 'heading_2', label: 'Heading 2', icon: Heading2, category: 'basic' },
+  { type: 'heading_3', label: 'Heading 3', icon: Heading3, category: 'basic' },
+  { type: 'bulleted_list', label: 'Bullet List', icon: List, category: 'basic' },
+  { type: 'numbered_list', label: 'Numbered List', icon: ListOrdered, category: 'basic' },
+  { type: 'toggle', label: 'Toggle', icon: ChevronRight, category: 'basic' },
+  { type: 'callout', label: 'Callout', icon: AlertCircle, category: 'basic' },
+  { type: 'quote', label: 'Quote', icon: Quote, category: 'basic' },
+  { type: 'divider', label: 'Divider', icon: Minus, category: 'basic' },
+  // Media
+  { type: 'image', label: 'Image', icon: ImageIcon, category: 'media' },
+  { type: 'video', label: 'Video', icon: Play, category: 'media' },
+  { type: 'audio', label: 'Audio', icon: Music, category: 'media' },
+  { type: 'file', label: 'File', icon: FileText, category: 'media' },
+  { type: 'pdf', label: 'PDF', icon: FileType, category: 'media' },
+  // Embeds
+  { type: 'code', label: 'Code', icon: Code, category: 'embed' },
+  { type: 'embed', label: 'Embed', icon: Code2, category: 'embed' },
+  { type: 'bookmark', label: 'Bookmark', icon: Link, category: 'embed' },
+  // Advanced
+  { type: 'table', label: 'Table', icon: Table, category: 'advanced' },
+  { type: 'equation', label: 'Equation', icon: FunctionSquare, category: 'advanced' },
+  { type: 'button', label: 'Button', icon: MousePointer, category: 'advanced' },
+  { type: 'table_of_contents', label: 'Table of Contents', icon: ListTree, category: 'advanced' },
+  { type: 'columns', label: 'Columns', icon: Columns, category: 'advanced' },
+  { type: 'breadcrumbs', label: 'Breadcrumbs', icon: Navigation, category: 'advanced' },
+  { type: 'synced_block', label: 'Synced Block', icon: RefreshCw, category: 'advanced' }
 ];
 
 const SortableBlock = ({
@@ -162,19 +181,69 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
   );
 
   const addBlock = (type, afterIndex) => {
+    // Default content based on block type
+    const getDefaultContent = (blockType) => {
+      switch (blockType) {
+        case 'table':
+          return { headers: ['Column 1', 'Column 2'], rows: [['', '']] };
+        case 'toggle':
+          return { title: '', body: '' };
+        case 'callout':
+          return { text: '' };
+        case 'code':
+          return { code: '', language: 'javascript' };
+        case 'image':
+          return { url: '', alt: '', caption: '' };
+        case 'video':
+          return { url: '', caption: '' };
+        case 'embed':
+          return { url: '', height: 400, caption: '' };
+        case 'bookmark':
+          return { url: '', title: '', description: '', image: '' };
+        case 'file':
+          return { url: '', name: '', size: '', type: '' };
+        case 'equation':
+          return { latex: '', displayMode: true };
+        case 'button':
+          return { label: 'Click me', action: 'link', url: '', copyText: '', style: 'primary', align: 'left' };
+        case 'table_of_contents':
+          return { title: 'Table of Contents', maxDepth: 3, showNumbers: false };
+        case 'audio':
+          return { url: '', title: '', caption: '' };
+        case 'pdf':
+          return { url: '', title: '', height: 600 };
+        case 'breadcrumbs':
+          return {};
+        case 'synced_block':
+          return { sourcePageId: '', sourceBlockId: '' };
+        case 'columns':
+          return { columns: [
+            { id: 'col1', width: 50, blocks: [] },
+            { id: 'col2', width: 50, blocks: [] }
+          ] };
+        default:
+          return '';
+      }
+    };
+
+    // Default properties based on block type
+    const getDefaultProperties = (blockType) => {
+      switch (blockType) {
+        case 'callout':
+          return { variant: 'info' };
+        case 'code':
+          return { language: 'javascript' };
+        default:
+          return {};
+      }
+    };
+
     const newBlock = {
       id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
-      defaultContent: type === 'table' ? { headers: ['Column 1', 'Column 2'], rows: [['', '']] } :
-                       type === 'toggle' ? { title: '', body: '' } :
-                       type === 'callout' ? { text: '' } :
-                       type === 'code' ? { code: '', language: '' } :
-                       type === 'image' ? { url: '', alt: '', caption: '' } :
-                       '',
+      defaultContent: getDefaultContent(type),
       variants: {},
-      properties: type === 'callout' ? { variant: 'info' } :
-                  type === 'code' ? { language: 'javascript' } :
-                  {}
+      properties: getDefaultProperties(type)
     };
 
     const newBlocks = [...blocks];
