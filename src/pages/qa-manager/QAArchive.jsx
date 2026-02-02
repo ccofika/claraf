@@ -294,17 +294,17 @@ const QAArchive = () => {
         />
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {advancedView ? 'Advanced Management' : 'Archive'}
           </h2>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
             {advancedView
-              ? 'All tickets from all graders • Full management capabilities'
+              ? 'All tickets from all graders'
               : isAISearch
-                ? `Found ${tickets.length} semantically similar tickets`
-                : 'Archived tickets from all QA agents • You can restore tickets you created'}
+                ? `Found ${tickets.length} similar tickets`
+                : 'Archived tickets • Restore your own'}
           </p>
         </div>
         {isQAAdmin && (
@@ -314,8 +314,8 @@ const QAArchive = () => {
             onClick={toggleAdvancedView}
             className={advancedView ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'text-purple-600 dark:text-purple-400'}
           >
-            <Settings2 className="w-4 h-4 mr-1.5" />
-            {advancedView ? 'Exit Advanced View' : 'Advanced View'}
+            <Settings2 className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">{advancedView ? 'Exit Advanced View' : 'Advanced View'}</span>
           </Button>
         )}
       </div>
@@ -352,7 +352,168 @@ const QAArchive = () => {
         </div>
       ) : (
         <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-          <table className="w-full">
+          {/* Mobile Card View */}
+          <div className="block md:hidden">
+            {/* Mobile header with select all */}
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950 flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selectedArchivedTickets.length === currentTickets.length && currentTickets.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedArchivedTickets(currentTickets.map(t => t._id));
+                  } else {
+                    setSelectedArchivedTickets([]);
+                  }
+                }}
+                className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer"
+              />
+              <span className="text-xs text-gray-500 dark:text-neutral-400">Select all</span>
+            </div>
+            {/* Mobile cards */}
+            <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+              {sortedTickets.map((ticket, index) => (
+                <div
+                  key={ticket._id}
+                  className={`p-3 ${
+                    selectedArchivedTickets.includes(ticket._id)
+                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      : focusedTicketIndex === index
+                      ? 'bg-gray-50 dark:bg-neutral-800/50'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    setFocusedTicketIndex(index);
+                    handleViewTicket(ticket);
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedArchivedTickets.includes(ticket._id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        if (e.target.checked) {
+                          setSelectedArchivedTickets([...selectedArchivedTickets, ticket._id]);
+                        } else {
+                          setSelectedArchivedTickets(selectedArchivedTickets.filter(id => id !== ticket._id));
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {ticket.agent?.name || 'Unknown'}
+                        </span>
+                        <QualityScoreBadge score={ticket.qualityScorePercent} />
+                      </div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-mono text-gray-500 dark:text-neutral-400">
+                          #{ticket.ticketId || ticket._id.slice(-6)}
+                        </span>
+                        {isAISearch && !advancedView && ticket.relevanceScore && (
+                          <span className={`text-xs font-medium ${
+                            ticket.relevanceScore >= 70 ? 'text-green-600' :
+                            ticket.relevanceScore >= 50 ? 'text-yellow-600' :
+                            'text-gray-500'
+                          }`}>
+                            {ticket.relevanceScore}% match
+                          </span>
+                        )}
+                        {advancedView && (
+                          ticket.isArchived ? (
+                            <span className="text-xs text-gray-500">Archived</span>
+                          ) : (
+                            <span className="text-xs text-green-600">Active</span>
+                          )
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-neutral-400 mb-2">
+                        <User className="w-3 h-3" />
+                        <span className="truncate">
+                          {ticket.createdBy?.name || ticket.createdBy?.email?.split('@')[0] || 'Unknown'}
+                          {(ticket.createdBy?._id === user?._id || ticket.createdBy === user?._id) && (
+                            <span className="text-green-600 ml-1">(you)</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <StatusBadge status={ticket.status} />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${ticket.ticketId}`, '_blank');
+                            }}
+                            className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                          {advancedView && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditTicket(ticket);
+                              }}
+                              className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {advancedView ? (
+                            ticket.isArchived ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRestoreWithCheck(ticket);
+                                }}
+                                className="p-1.5 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchiveTicket(ticket);
+                                }}
+                                className="p-1.5 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded transition-colors"
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+                            )
+                          ) : (
+                            canRestoreTicket(ticket) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRestoreWithCheck(ticket);
+                                }}
+                                className="p-1.5 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Pagination
+              currentPage={currentPagination.page}
+              totalPages={currentPagination.pages}
+              totalItems={currentPagination.total}
+              onPageChange={currentPageChange}
+            />
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
               <tr>
                 <th className="px-4 py-2.5 w-8">
@@ -567,9 +728,9 @@ const QAArchive = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+            className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto max-w-full"
           >
-            <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-4">
+            <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xl px-3 sm:px-4 py-2 sm:py-3 flex flex-wrap items-center justify-center gap-2 sm:gap-4">
               <span className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                 {selectedArchivedTickets.length} ticket(s) selected
                 {advancedView && (

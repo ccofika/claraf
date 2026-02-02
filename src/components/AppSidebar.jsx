@@ -163,7 +163,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
   };
 
   return (
-    <aside className="bg-white dark:bg-black flex flex-col gap-2 items-center p-4 w-16 h-screen border-r border-gray-200 dark:border-neutral-800">
+    <aside className="bg-white dark:bg-black hidden lg:flex flex-col gap-2 items-center p-4 w-16 h-screen border-r border-gray-200 dark:border-neutral-800">
       {/* Navigation Icons */}
       <div className="flex flex-col gap-2 w-full items-center">
         {navItems.map((item) => (

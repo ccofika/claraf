@@ -105,46 +105,46 @@ const QADashboard = () => {
 
       {/* Performance Overview */}
       <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-neutral-800">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Overview</h3>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Quality metrics and ticket distribution</p>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+        <div className="p-3 sm:p-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
-                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">Selected Tickets</span>
+                <span className="text-[10px] sm:text-xs font-medium text-gray-700 dark:text-neutral-300">Selected Tickets</span>
               </div>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{selectedTickets}</p>
-              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Awaiting grading</p>
+              <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{selectedTickets}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 mt-1 hidden sm:block">Awaiting grading</p>
             </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full"></div>
-                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">Graded Tickets</span>
+                <span className="text-[10px] sm:text-xs font-medium text-gray-700 dark:text-neutral-300">Graded Tickets</span>
               </div>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{gradedTickets}</p>
-              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Quality evaluated</p>
+              <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{gradedTickets}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 mt-1 hidden sm:block">Quality evaluated</p>
             </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-amber-600 dark:bg-amber-400 rounded-full"></div>
-                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">In Review</span>
+                <span className="text-[10px] sm:text-xs font-medium text-gray-700 dark:text-neutral-300">In Review</span>
               </div>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{draftTickets}</p>
-              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pending review approval</p>
+              <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{draftTickets}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 mt-1 hidden sm:block">Pending review approval</p>
             </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
+            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-100 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-red-600 dark:bg-red-400 rounded-full"></div>
-                <span className="text-xs font-medium text-gray-700 dark:text-neutral-300">Needs Your Input</span>
+                <span className="text-[10px] sm:text-xs font-medium text-gray-700 dark:text-neutral-300">Needs Your Input</span>
               </div>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{waitingTickets}</p>
-              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">Requires your action</p>
+              <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{waitingTickets}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 mt-1 hidden sm:block">Requires your action</p>
             </div>
           </div>
         </div>
@@ -153,11 +153,82 @@ const QADashboard = () => {
       {/* Agent Performance Table */}
       {dashboardStats.agentStats && dashboardStats.agentStats.length > 0 && (
         <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-neutral-800">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Agent Performance</h3>
             <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Individual metrics and progress</p>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* Mobile Card View */}
+          <div className="block md:hidden divide-y divide-gray-200 dark:divide-neutral-800">
+            {dashboardStats.agentStats.map((stat, idx) => (
+              <motion.div
+                key={idx}
+                className="p-4"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03, duration: duration.fast, ease: easing.smooth }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                      {stat.agentName?.charAt(0) || '?'}
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{stat.agentName || 'Unknown'}</span>
+                  </div>
+                  <QualityScoreBadge score={stat.avgScore ? parseFloat(stat.avgScore.toFixed(1)) : null} />
+                </div>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="text-xs">
+                    <span className="text-gray-500 dark:text-neutral-400">Tickets:</span>
+                    <span className="ml-1 text-gray-900 dark:text-white font-medium">{stat.ticketCount || 0}</span>
+                  </div>
+                  <div className="text-xs">
+                    <span className="text-gray-500 dark:text-neutral-400">Graded:</span>
+                    <span className="ml-1 text-gray-900 dark:text-white font-medium">{stat.gradedCount || 0}</span>
+                  </div>
+                  <div className="flex-1 bg-gray-100 dark:bg-neutral-800 rounded-full h-1.5">
+                    <div
+                      className="bg-black dark:bg-white h-1.5 rounded-full transition-all"
+                      style={{ width: `${stat.ticketCount > 0 ? (stat.gradedCount / stat.ticketCount) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleViewAgentTickets(stat.agentId)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    View
+                  </button>
+                  <button
+                    onClick={() => handleExportMaestro(stat.agentId)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => handleStartGrading(stat.agentId)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Grade
+                  </button>
+                  <button
+                    onClick={() => handleViewAssignments(stat.agentId)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    Assignments
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
                 <tr>
@@ -255,14 +326,14 @@ const QADashboard = () => {
 
       {/* Extension Download Section */}
       <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-neutral-800">
           <div className="flex items-center gap-2">
             <Download className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Clara QA Extension</h3>
           </div>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Automatski ocenjuj tikete na MaestroQA</p>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           {/* Download Link */}
           <div className="flex items-center gap-3">
             <a

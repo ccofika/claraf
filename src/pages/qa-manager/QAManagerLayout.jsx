@@ -7,7 +7,9 @@ import {
   Keyboard, RefreshCw, Search, AlertTriangle, Loader2, X, Check,
   RotateCcw, ClipboardList, ClipboardCheck, Edit, Hash, ChevronLeft, ChevronRight,
   MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
-  ChevronDown, Wand2, GraduationCap
+  ChevronDown, Wand2, GraduationCap, Menu, Home, Calculator, Link2,
+  CheckCircle, Globe, LayoutDashboard, Archive, UserCheck, LogOut,
+  BookOpen, LineChart, PieChart
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
@@ -28,11 +30,13 @@ import ScorecardEditor from '../../components/ScorecardEditor';
 import { hasScorecard } from '../../data/scorecardConfig';
 import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from './components';
 import TicketDialog from './TicketDialog';
+import { useAuth } from '../../context/AuthContext';
 
 // Inner layout component that uses the context
 const QAManagerLayoutInner = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const {
     user,
     getAuthHeaders,
@@ -110,6 +114,10 @@ const QAManagerLayoutInner = () => {
   const [generateDropdownPosition, setGenerateDropdownPosition] = useState({ top: 0, left: 0 });
   const searchInputRef = useRef(null);
   const generateButtonRef = useRef(null);
+
+  // Mobile hamburger menus
+  const [showAppMenu, setShowAppMenu] = useState(false);
+  const [showQANavMenu, setShowQANavMenu] = useState(false);
 
   // Local state for create assignment form in Assignments dialog
   const [showCreateAssignmentForm, setShowCreateAssignmentForm] = useState(false);
@@ -262,12 +270,30 @@ const QAManagerLayoutInner = () => {
         transition={{ duration: duration.normal, ease: easing.smooth }}
         className="flex-shrink-0 bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800"
       >
-        <div className="flex items-center justify-between px-6 py-3 gap-4">
-          {/* Left: Title */}
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white whitespace-nowrap">QA Manager</h1>
+        <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 gap-2 sm:gap-4">
+          {/* Left: App Menu Hamburger (mobile) + Title */}
+          <div className="flex items-center gap-2">
+            {/* App Sidebar Hamburger - Mobile only */}
+            <button
+              onClick={() => setShowAppMenu(true)}
+              className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+              aria-label="Open app menu"
+            >
+              <Menu className="w-5 h-5 text-gray-600 dark:text-neutral-400" />
+            </button>
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white whitespace-nowrap">QA Manager</h1>
+            {/* QA Nav Hamburger - Mobile only */}
+            <button
+              onClick={() => setShowQANavMenu(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors border border-gray-200 dark:border-neutral-700"
+              aria-label="Open navigation menu"
+            >
+              <ChevronDown className="w-4 h-4 text-gray-600 dark:text-neutral-400" />
+            </button>
+          </div>
 
-          {/* Center: Navigation Tabs with Sliding Glass Pill */}
-          <div className="flex-1 flex justify-center items-center min-w-0 relative gap-1">
+          {/* Center: Navigation Tabs with Sliding Glass Pill - Hidden on mobile */}
+          <div className="hidden md:flex flex-1 justify-center items-center min-w-0 relative gap-1">
             {/* Left scroll button */}
             <button
               className="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all opacity-0 pointer-events-none nav-scroll-left"
@@ -360,7 +386,7 @@ const QAManagerLayoutInner = () => {
                       <button
                         key={tab.value}
                         onClick={() => handleTabChange(tab.value)}
-                        className={`relative z-10 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
+                        className={`relative z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
                           activeTab === tab.value
                             ? 'text-gray-900 dark:text-white'
                             : 'text-gray-500 dark:text-neutral-500 hover:text-gray-700 dark:hover:text-neutral-300'
@@ -445,14 +471,14 @@ const QAManagerLayoutInner = () => {
                       onMouseLeave={() => setGenerateDropdownOpen(false)}
                     >
                       <button
-                        className={`relative z-10 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
+                        className={`relative z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
                           isGenerateActive
                             ? 'text-gray-900 dark:text-white'
                             : 'text-gray-500 dark:text-neutral-500 hover:text-gray-700 dark:hover:text-neutral-300'
                         }`}
                       >
-                        <Wand2 className="w-4 h-4" />
-                        Generate
+                        <Wand2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden xs:inline">Generate</span>
                         <ChevronDown className={`w-3 h-3 transition-transform ${generateDropdownOpen ? 'rotate-180' : ''}`} />
                         {isGenerateActive && (
                           <motion.div
@@ -551,13 +577,13 @@ const QAManagerLayoutInner = () => {
                       <button
                         key={tab.value}
                         onClick={() => handleTabChange(tab.value)}
-                        className={`relative z-10 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
+                        className={`relative z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-xl transition-colors duration-200 whitespace-nowrap ${
                           activeTab === tab.value
                             ? 'text-gray-900 dark:text-white'
                             : 'text-gray-500 dark:text-neutral-500 hover:text-gray-700 dark:hover:text-neutral-300'
                         }`}
                       >
-                        {tab.icon && <tab.icon className="w-4 h-4" />}
+                        {tab.icon && <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                         {tab.label}
                         {activeTab === tab.value && (
                           <motion.div
@@ -659,11 +685,11 @@ const QAManagerLayoutInner = () => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCommandPalette(true)}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg hover:border-gray-300 dark:hover:border-neutral-700 transition-colors whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg hover:border-gray-300 dark:hover:border-neutral-700 transition-colors whitespace-nowrap"
           >
             <Search className="w-4 h-4" />
-            <span>Quick Search</span>
-            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
+            <span className="hidden sm:inline">Quick Search</span>
+            <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
               Alt+K
             </kbd>
           </motion.button>
@@ -673,18 +699,18 @@ const QAManagerLayoutInner = () => {
       {/* Pending Macro Tickets Banner */}
       {pendingMacroTickets.length > 0 && (
         <div className="flex-shrink-0 bg-orange-50 dark:bg-orange-950/30 border-b border-orange-200 dark:border-orange-900/50">
-          <div className="max-w-7xl mx-auto px-6 py-3">
-            <div className="flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-500" />
-                <span className="text-sm text-orange-700 dark:text-orange-400">
+                <AlertTriangle className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-400">
                   You have {pendingMacroTickets.length} pending ticket{pendingMacroTickets.length !== 1 ? 's' : ''} from other graders
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {pendingMacroTickets.slice(0, 2).map((macroTicket) => (
-                  <div key={macroTicket._id} className="flex items-center gap-2 bg-white dark:bg-neutral-900 rounded-lg px-3 py-1.5 border border-orange-200 dark:border-orange-900/50">
-                    <span className="text-xs text-gray-600 dark:text-neutral-400">
+                  <div key={macroTicket._id} className="flex items-center gap-1.5 sm:gap-2 bg-white dark:bg-neutral-900 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 border border-orange-200 dark:border-orange-900/50">
+                    <span className="text-xs text-gray-600 dark:text-neutral-400 truncate max-w-[120px] sm:max-w-none">
                       {macroTicket.ticketId} from {macroTicket.sentBy?.name || macroTicket.sentBy?.email?.split('@')[0]}
                     </span>
                     <button
@@ -716,7 +742,7 @@ const QAManagerLayoutInner = () => {
 
       {/* Content - Scrollable */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1142,6 +1168,186 @@ const QAManagerLayoutInner = () => {
 
       {/* Bug Report Floating Button */}
       <BugReportButton getAuthHeaders={getAuthHeaders} />
+
+      {/* Mobile App Sidebar Menu */}
+      <AnimatePresence>
+        {showAppMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] lg:hidden"
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowAppMenu(false)}
+            />
+            {/* Menu Panel */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute left-0 top-0 bottom-0 w-72 bg-white dark:bg-neutral-900 shadow-2xl flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Menu</h2>
+                <button
+                  onClick={() => setShowAppMenu(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              {/* Navigation Items */}
+              <div className="flex-1 overflow-y-auto py-2">
+                <nav className="space-y-1 px-2">
+                  {(() => {
+                    const isDeveloperOrAdmin = user?.role === 'admin' || user?.role === 'developer';
+                    const appNavItems = [
+                      { icon: Home, label: 'Workspaces', path: '/' },
+                      { icon: Calculator, label: 'VIP Calculator', path: '/vip-calculator' },
+                      { icon: Search, label: 'Hash Explorer', path: '/hash-explorer' },
+                      { icon: Link2, label: 'Quick Links', path: '/quick-links' },
+                      { icon: MessageSquare, label: 'Chat', path: '/chat' },
+                      { icon: CheckCircle, label: 'KYC Management', path: '/kyc' },
+                      { icon: Globe, label: 'Countries & Restrictions', path: '/countries-restrictions' },
+                      { icon: BookOpen, label: 'Knowledge Base', path: '/knowledge-base' },
+                      ...(isDeveloperOrAdmin ? [{ icon: LineChart, label: 'Developer Dashboard', path: '/developer-dashboard' }] : []),
+                      { icon: ClipboardCheck, label: 'QA Manager', path: '/qa-manager', isActive: true },
+                      { icon: PieChart, label: 'KYC Agent Stats', path: '/kyc-agent-stats' },
+                    ];
+                    return appNavItems.map((item) => (
+                      <button
+                        key={item.path}
+                        onClick={() => {
+                          navigate(item.path);
+                          setShowAppMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                          item.isActive
+                            ? 'bg-gray-200 dark:bg-neutral-800 text-gray-900 dark:text-white'
+                            : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </button>
+                    ));
+                  })()}
+                </nav>
+              </div>
+              {/* Footer */}
+              <div className="border-t border-gray-200 dark:border-neutral-800 p-4 space-y-3">
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-neutral-400">
+                  <div className="w-8 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full flex items-center justify-center">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <span className="truncate flex-1">{user?.email}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate('/login');
+                    setShowAppMenu(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span className="text-sm font-medium">Logout</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile QA Navigation Menu */}
+      <AnimatePresence>
+        {showQANavMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] md:hidden"
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowQANavMenu(false)}
+            />
+            {/* Menu Panel - Slides from top */}
+            <motion.div
+              initial={{ y: '-100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute left-0 right-0 top-0 bg-white dark:bg-neutral-900 shadow-2xl rounded-b-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">QA Navigation</h2>
+                <button
+                  onClick={() => setShowQANavMenu(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              {/* Navigation Items */}
+              <div className="flex-1 overflow-y-auto py-2">
+                <nav className="space-y-1 px-2">
+                  {(() => {
+                    const allTabs = [
+                      { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                      { value: 'agents', label: 'Agents', icon: Users },
+                      { value: 'tickets', label: 'Tickets', icon: FileText },
+                      { value: 'archive', label: 'Archive', icon: Archive },
+                      ...(isReviewer ? [{ value: 'review', label: 'Review', icon: UserCheck, badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
+                      { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+                      { value: 'summaries', label: 'AI Summary', icon: FileText },
+                      { value: 'coaching', label: 'Coaching', icon: GraduationCap },
+                      ...(isAdmin ? [
+                        { value: 'all-agents', label: 'All Agents', icon: UsersRound },
+                        { value: 'statistics', label: 'Statistics', icon: TrendingUp },
+                        { value: 'active-overview', label: 'Active Overview', icon: Target },
+                      ] : []),
+                      ...(isFilipAdmin ? [{ value: 'bugs', label: 'Bugs', icon: Bug }] : []),
+                    ];
+
+                    return allTabs.map((tab) => (
+                      <button
+                        key={tab.value}
+                        onClick={() => {
+                          handleTabChange(tab.value);
+                          setShowQANavMenu(false);
+                        }}
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                          activeTab === tab.value
+                            ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
+                            : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <tab.icon className="w-5 h-5" />
+                          <span className="text-sm font-medium">{tab.label}</span>
+                        </div>
+                        {tab.badge && (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                            {tab.badge}
+                          </span>
+                        )}
+                      </button>
+                    ));
+                  })()}
+                </nav>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -1249,12 +1455,12 @@ const ViewTicketDialog = ({
     <Dialog open={viewDialog.open} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent hideCloseButton overlayClassName="z-[60]" className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col z-[60]">
         {/* Header */}
-        <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+        <DialogHeader className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+            <DialogTitle className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
               Ticket Details
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {ticket.feedback && ticket.feedback.trim() && (
                 <Button
                   size="sm"
@@ -1271,6 +1477,7 @@ const ViewTicketDialog = ({
                       agentPosition
                     });
                   }}
+                  className="hidden sm:flex"
                 >
                   <Hash className="w-4 h-4 mr-1.5" />
                   Save as Macro
@@ -1281,10 +1488,43 @@ const ViewTicketDialog = ({
                   size="sm"
                   variant="glass"
                   onClick={handleEditClick}
+                  className="hidden sm:flex"
                 >
                   <Edit className="w-4 h-4 mr-1.5" />
                   Edit Ticket
                 </Button>
+              )}
+              {/* Mobile: Icon-only buttons */}
+              {ticket.feedback && ticket.feedback.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const agentPosition = ticket.agent?.position || null;
+                    setSaveAsMacroDialog({
+                      open: true,
+                      feedback: ticket.feedback,
+                      categories: ticket.categories || [],
+                      scorecardData: agentPosition && ticket.scorecardValues && Object.keys(ticket.scorecardValues).length > 0
+                        ? { [agentPosition]: { values: ticket.scorecardValues, variant: ticket.scorecardVariant || null } }
+                        : {},
+                      agentPosition
+                    });
+                  }}
+                  className="sm:hidden p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
+                  title="Save as Macro"
+                >
+                  <Hash className="w-4 h-4" />
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleEditClick}
+                  className="sm:hidden p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
+                  title="Edit Ticket"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
               )}
               {ticket.ticketId && (
                 <button
@@ -1296,11 +1536,11 @@ const ViewTicketDialog = ({
                   <ExternalLink className="w-4 h-4" />
                 </button>
               )}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 <button
                   onClick={() => handleNavigateTicket('prev')}
                   disabled={!canGoPrev}
-                  className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1 sm:p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   title="Previous ticket"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -1308,16 +1548,16 @@ const ViewTicketDialog = ({
                 <button
                   onClick={() => handleNavigateTicket('next')}
                   disabled={!canGoNext}
-                  className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1 sm:p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   title="Next ticket"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-              <div className="w-px h-4 bg-gray-300 dark:bg-neutral-700" />
+              <div className="w-px h-4 bg-gray-300 dark:bg-neutral-700 hidden sm:block" />
               <button
                 onClick={handleClose}
-                className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
+                className="p-1 sm:p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1325,11 +1565,11 @@ const ViewTicketDialog = ({
           </div>
         </DialogHeader>
 
-        {/* Main Content - 60/40 Split */}
-        <div className="flex flex-1 overflow-hidden">
+        {/* Main Content - 60/40 Split on desktop, stacked on mobile */}
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* LEFT SIDE - Ticket Information */}
-          <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="w-full lg:w-3/5 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
               {/* Reviewer Note Section - At Top */}
               {ticket.additionalNote && (() => {
                 const reviewAction = ticket.reviewHistory?.find(h =>
@@ -1352,16 +1592,16 @@ const ViewTicketDialog = ({
               })()}
 
               {/* Top Section: Agent, Ticket ID, Date Entered */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Agent</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">{ticket.agent?.name || ticket.agentName || 'Unknown'}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Ticket ID</p>
                   <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{ticket.ticketId}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1 uppercase tracking-wide">Date Entered</p>
                   <p className="text-sm text-gray-900 dark:text-white">
                     {new Date(ticket.dateEntered || ticket.createdAt).toLocaleDateString('en-US', {
@@ -1375,11 +1615,11 @@ const ViewTicketDialog = ({
 
               {/* Notes Section */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Notes
                 </h4>
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800 min-h-[120px]">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800 min-h-[80px] sm:min-h-[120px]">
                   {ticket.notes ? (
                     <TicketContentDisplay
                       content={ticket.notes}
@@ -1416,12 +1656,12 @@ const ViewTicketDialog = ({
               )}
 
               {/* Bottom Section: Status, Quality Score */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">Status</p>
                   <StatusBadge status={ticket.status} />
                 </div>
-                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 border border-gray-200 dark:border-neutral-800">
+                <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-neutral-800">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 mb-2 uppercase tracking-wide">Quality Score</p>
                   <QualityScoreBadge score={ticket.qualityScorePercent} />
                 </div>
@@ -1429,11 +1669,11 @@ const ViewTicketDialog = ({
 
               {/* Feedback Section */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Feedback
                 </h4>
-                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800 min-h-[120px]">
+                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 sm:p-4 border border-blue-200 dark:border-blue-800 min-h-[80px] sm:min-h-[120px]">
                   {ticket.feedback ? (
                     <TicketContentDisplay
                       content={ticket.feedback}
@@ -1447,7 +1687,7 @@ const ViewTicketDialog = ({
 
               {/* Additional Metadata */}
               {((ticket.categories && ticket.categories.length > 0) || ticket.createdBy || (ticket.isArchived && ticket.archivedDate) || ticket.gradedDate) && (
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-neutral-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-gray-200 dark:border-neutral-800">
                   {ticket.categories && ticket.categories.length > 0 && (
                     <div className="col-span-2">
                       <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">Categories</p>
@@ -1498,7 +1738,7 @@ const ViewTicketDialog = ({
           </div>
 
           {/* RIGHT SIDE - AI/Related Toggle Panel */}
-          <div className="w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+          <div className="w-full lg:w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative min-h-[300px] lg:min-h-0">
             <div
               className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
               style={{
@@ -1508,30 +1748,30 @@ const ViewTicketDialog = ({
             />
 
             {/* Toggle Header */}
-            <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
-              <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+            <div className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
+              <div className="flex items-center gap-1 sm:gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
                 <button
                   type="button"
                   onClick={() => setRightPanelMode('ai')}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
                     rightPanelMode === 'ai'
                       ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                   }`}
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   AI Similar
                 </button>
                 <button
                   type="button"
                   onClick={() => setRightPanelMode('related')}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
                     rightPanelMode === 'related'
                       ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                   }`}
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Related
                 </button>
               </div>

@@ -111,14 +111,14 @@ const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-            <Bug className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center flex-shrink-0">
+            <Bug className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Bug Reports</h2>
-            <p className="text-sm text-gray-500 dark:text-neutral-400">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Bug Reports</h2>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-neutral-400">
               {bugReports.length} report{bugReports.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -127,7 +127,7 @@ const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={fetchBugReports}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors flex-shrink-0"
         >
           <RefreshCw className="w-5 h-5 text-gray-500 dark:text-neutral-400" />
         </motion.button>
@@ -151,13 +151,13 @@ const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
             >
               {/* Main row */}
               <div
-                className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+                className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
                 onClick={() => setExpandedId(expandedId === bug._id ? null : bug._id)}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                      <h3 className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">
                         {bug.title}
                       </h3>
                       <motion.div
@@ -167,23 +167,23 @@ const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
                         <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       </motion.div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-neutral-400">
-                      <span className="flex items-center gap-1">
-                        <User className="w-3.5 h-3.5" />
-                        {bug.reporterEmail}
+                    <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-3 text-xs sm:text-sm text-gray-500 dark:text-neutral-400">
+                      <span className="flex items-center gap-1 truncate">
+                        <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                        <span className="truncate">{bug.reporterEmail}</span>
                       </span>
                       <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                         {formatDate(bug.createdAt)}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(bug.status)}`}>
+                  <div className="flex items-center gap-2 flex-shrink-0 self-start">
+                    <span className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium ${getStatusColor(bug.status)}`}>
                       {getStatusIcon(bug.status)}
-                      {bug.status.replace('_', ' ')}
+                      <span className="hidden xs:inline">{bug.status.replace('_', ' ')}</span>
                     </span>
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPriorityColor(bug.priority)}`}>
+                    <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium ${getPriorityColor(bug.priority)}`}>
                       {bug.priority}
                     </span>
                   </div>
@@ -200,7 +200,7 @@ const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <div className="px-4 pb-4 pt-0 border-t border-gray-100 dark:border-neutral-800">
+                    <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-gray-100 dark:border-neutral-800">
                       {/* Description */}
                       {bug.description && (
                         <div className="mt-3">

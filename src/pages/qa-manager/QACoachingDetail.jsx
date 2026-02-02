@@ -404,26 +404,26 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => navigate('/qa-manager/coaching')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5 text-gray-500" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-              <GraduationCap className="w-7 h-7 text-purple-500" />
-              {agent.name}
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3">
+              <GraduationCap className="w-5 h-5 sm:w-7 sm:h-7 text-purple-500 flex-shrink-0" />
+              <span className="truncate">{agent.name}</span>
             </h1>
-            <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-neutral-400 mt-1">
               {agent.position || 'Agent'} | Kreirano {new Date(session.createdAt).toLocaleDateString('sr-RS')}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Status Dropdown */}
           {session.isOwner && (
             <div className="relative">
@@ -463,30 +463,30 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
           {session.isOwner && (
             <button
               onClick={handleOpenShareModal}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg text-xs sm:text-sm transition-colors"
             >
-              <Share2 className="w-4 h-4" />
-              Podeli
+              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Podeli</span>
             </button>
           )}
 
           {/* Copy Button */}
           <button
             onClick={handleCopyReport}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg text-sm transition-colors"
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg text-xs sm:text-sm transition-colors"
           >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-            {copied ? 'Kopirano' : 'Kopiraj'}
+            {copied ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+            <span className="hidden xs:inline">{copied ? 'Kopirano' : 'Kopiraj'}</span>
           </button>
 
           {/* Delete Button */}
           {session.isOwner && (
             <button
               onClick={() => setDeleteModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-xs sm:text-sm transition-colors"
             >
-              <Trash2 className="w-4 h-4" />
-              Obrisi
+              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Obrisi</span>
             </button>
           )}
         </div>
@@ -512,27 +512,27 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
         {/* Report - 2 columns */}
         <div className="lg:col-span-2 space-y-6">
           {/* Summary Stats */}
-          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Ukupno tiketa</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{reportData.summary.totalTickets}</p>
+          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 sm:p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Ukupno tiketa</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1">{reportData.summary.totalTickets}</p>
               </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Sa problemima</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{reportData.summary.ticketsWithIssues}</p>
+              <div className="p-2 sm:p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Sa problemima</p>
+                <p className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{reportData.summary.ticketsWithIssues}</p>
               </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Prosecan score</p>
-                <p className={`text-2xl font-bold mt-1 ${reportData.summary.avgScore >= 80 ? 'text-green-600 dark:text-green-400' : reportData.summary.avgScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
+              <div className="p-2 sm:p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Prosecan score</p>
+                <p className={`text-xl sm:text-2xl font-bold mt-1 ${reportData.summary.avgScore >= 80 ? 'text-green-600 dark:text-green-400' : reportData.summary.avgScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                   {reportData.summary.avgScore}%
                 </p>
               </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Trend</p>
+              <div className="p-2 sm:p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Trend</p>
                 <div className="flex items-center gap-2 mt-1">
                   {getTrendIcon(reportData.summary.trend)}
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">
+                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                     {reportData.summary.trendValue}%
                   </span>
                 </div>
@@ -541,13 +541,13 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
           </div>
 
           {/* Scorecard Analysis */}
-          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-purple-500" />
               Scorecard Analiza
             </h3>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
@@ -785,7 +785,7 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute right-0 top-0 bottom-0 w-[600px] bg-white dark:bg-neutral-900 shadow-2xl border-l border-gray-200 dark:border-neutral-800 flex flex-col"
+              className="absolute right-0 top-0 bottom-0 w-full sm:w-[600px] bg-white dark:bg-neutral-900 shadow-2xl sm:border-l border-gray-200 dark:border-neutral-800 flex flex-col"
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
                 <div>

@@ -324,7 +324,7 @@ const QAAgents = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agents</h2>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Manage QA agents for this week's grading</p>
@@ -334,12 +334,12 @@ const QAAgents = () => {
             fetchAllExistingAgents();
             setAddExistingAgentDialog({ open: true });
           }}>
-            <Users className="w-4 h-4 mr-1.5" />
-            Add Existing
+            <Users className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Add Existing</span>
           </Button>
           <Button variant="glass" size="sm" onClick={() => setAgentDialog({ open: true, mode: 'create', data: null })}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Agent
+            <Plus className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">New Agent</span>
           </Button>
         </div>
       </div>
@@ -362,7 +362,127 @@ const QAAgents = () => {
         </div>
       ) : (
         <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
-          <table className="w-full">
+          {/* Mobile Card View */}
+          <div className="block md:hidden divide-y divide-gray-100 dark:divide-neutral-800">
+            {sortedAgents.map((agent) => {
+              const isHighlightedForValidation = validationErrors.validationMode && validationErrors.highlightedAgentId === agent._id;
+              return (
+                <div
+                  key={agent._id}
+                  className={`p-4 ${
+                    isHighlightedForValidation
+                      ? 'bg-red-50 dark:bg-red-900/20'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={() => handleAgentExpand(agent._id)}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center text-xs font-medium">
+                        {agent.name?.charAt(0) || '?'}
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{agent.name}</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 mb-3 text-xs text-gray-500 dark:text-neutral-400">
+                    <span>{agent.position || 'No position'}</span>
+                    {agent.team && (
+                      <>
+                        <span>•</span>
+                        <span>{agent.team}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleStartGrading(agent._id, 'agents')}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Grade
+                    </button>
+                    <button
+                      onClick={() => setHistoryPanel({ open: true, agentId: agent._id, agentName: agent.name })}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      History
+                    </button>
+                    <button
+                      onClick={() => handleViewAgentTickets(agent._id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => setAgentDialog({ open: true, mode: 'edit', data: agent })}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
+                        isHighlightedForValidation
+                          ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400 animate-pulse'
+                          : 'bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteDialog({ open: true, type: 'agent', id: agent._id, name: agent.name })}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {/* Expanded Issues - Mobile */}
+                  {expandedAgentId === agent._id && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-neutral-700">
+                      {agentIssues.loading ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-neutral-400">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading issues...
+                        </div>
+                      ) : agentIssues.data?.unresolvedCount === 0 ? (
+                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                          <CheckCircle className="w-4 h-4" />
+                          No unresolved issues
+                        </div>
+                      ) : agentIssues.data?.issues?.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="w-4 h-4" />
+                            {agentIssues.data.unresolvedCount} unresolved issue(s)
+                          </div>
+                          {agentIssues.data.issues.slice(0, 3).map((issue, idx) => (
+                            <div
+                              key={issue.ticketId || idx}
+                              className="bg-gray-50 dark:bg-neutral-800 rounded-lg p-2 text-xs"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-mono text-gray-500">{issue.ticketNumber}</span>
+                                <span className={`px-1.5 py-0.5 rounded font-medium ${
+                                  issue.qualityScore < 70
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                }`}>
+                                  {issue.qualityScore}%
+                                </span>
+                              </div>
+                              <p className="text-gray-700 dark:text-neutral-300 line-clamp-2">{issue.summary}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800">
               <tr>
                 <th

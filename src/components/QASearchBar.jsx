@@ -428,12 +428,12 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
       className="relative w-full"
     >
       {/* Main Search Bar */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <div className="flex-1 relative">
           <motion.div
             whileFocus={{ scale: 1.01 }}
             className="
-              flex items-center gap-2 px-3 py-2
+              flex items-center gap-2 px-2 sm:px-3 py-2
               rounded-xl
               bg-white dark:bg-neutral-900
               border border-neutral-200 dark:border-neutral-800
@@ -514,7 +514,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
           className={`
-            relative flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium
+            relative flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 rounded-xl text-sm font-medium
             transition-all duration-200
             ${showAdvancedFilters
               ? 'bg-neutral-900 dark:bg-white text-white dark:text-black'
@@ -523,7 +523,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
           `}
         >
           <Filter className="w-4 h-4" />
-          Filters
+          <span className="hidden sm:inline">Filters</span>
           {getActiveFilterCount() > 0 && (
             <motion.span
               initial={{ scale: 0 }}
@@ -544,7 +544,7 @@ const QASearchBar = ({ currentFilters = {}, onFilterChange, agents = [], graders
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="mt-2 p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg"
+          className="mt-2 p-3 sm:p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Advanced Filters</h3>

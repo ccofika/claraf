@@ -21,28 +21,29 @@ import { getScorecardValues, SHORT_LABELS } from '../data/scorecardConfig';
 // Sub-tab components
 const SubTabs = ({ activeTab, onTabChange }) => {
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: BarChart3 },
-    { id: 'agents', label: 'Agent Management', icon: Users },
-    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-    { id: 'week-setup', label: 'Week Setup', icon: Calendar }
+    { id: 'overview', label: 'Overview', shortLabel: 'Overview', icon: BarChart3 },
+    { id: 'agents', label: 'Agent Management', shortLabel: 'Agents', icon: Users },
+    { id: 'analytics', label: 'Analytics', shortLabel: 'Stats', icon: TrendingUp },
+    { id: 'week-setup', label: 'Week Setup', shortLabel: 'Setup', icon: Calendar }
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl mb-6">
+    <div className="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl mb-4 sm:mb-6 overflow-x-auto">
       {tabs.map(tab => {
         const Icon = tab.icon;
         return (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.id
                 ? 'bg-white dark:bg-neutral-900 text-purple-600 dark:text-purple-400 shadow-sm'
                 : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
             }`}
           >
             <Icon className="w-4 h-4" />
-            {tab.label}
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.shortLabel}</span>
           </button>
         );
       })}
@@ -743,65 +744,65 @@ const QAActiveOverview = () => {
 
   // Render Overview Tab
   const renderOverviewTab = () => (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Global Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Ticket className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalTickets || 0}</p>
-              <p className="text-xs text-neutral-500">Total Active</p>
+              <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalTickets || 0}</p>
+              <p className="text-[10px] sm:text-xs text-neutral-500">Total Active</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalGraded || 0}</p>
-              <p className="text-xs text-neutral-500">Graded</p>
+              <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalGraded || 0}</p>
+              <p className="text-[10px] sm:text-xs text-neutral-500">Graded</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalSelected || 0}</p>
-              <p className="text-xs text-neutral-500">Pending</p>
+              <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalSelected || 0}</p>
+              <p className="text-[10px] sm:text-xs text-neutral-500">Pending</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalGraders || 0}</p>
-              <p className="text-xs text-neutral-500">Active Graders</p>
+              <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.totalGraders || 0}</p>
+              <p className="text-[10px] sm:text-xs text-neutral-500">Graders</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4 col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.avgScore || 0}%</p>
-              <p className="text-xs text-neutral-500">Avg Score</p>
+              <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-white">{data.globalStats?.avgScore || 0}%</p>
+              <p className="text-[10px] sm:text-xs text-neutral-500">Avg Score</p>
             </div>
           </div>
         </div>
@@ -809,12 +810,13 @@ const QAActiveOverview = () => {
 
       {/* Workload Balance */}
       {data.graders && data.graders.length > 0 && (
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
             <Users className="w-4 h-4 text-purple-500" />
-            Workload Balance (by number of agents)
+            <span className="hidden sm:inline">Workload Balance (by number of agents)</span>
+            <span className="sm:hidden">Workload</span>
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {(() => {
               const maxAgents = Math.max(...data.graders.map(g => g.stats?.agentCount || 0), 1);
               const avgAgents = totalAgents / data.graders.length;
@@ -826,36 +828,36 @@ const QAActiveOverview = () => {
                 const isUnderloaded = agentCount < avgAgents * 0.7 && agentCount > 0;
 
                 return (
-                  <div key={graderData.grader?._id || `grader-${index}`} className="flex items-center gap-3">
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                  <div key={graderData.grader?._id || `grader-${index}`} className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-16 sm:w-28 flex-shrink-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white truncate">
                         {graderData.grader?.name?.split(' ')[0] || 'Unknown'}
                       </p>
                     </div>
-                    <div className="flex-1 h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
+                    <div className="flex-1 h-5 sm:h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
                           isOverloaded ? 'bg-red-500' : isUnderloaded ? 'bg-amber-500' : 'bg-purple-500'
                         }`}
                         style={{ width: `${percentage}%` }}
                       />
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                        {agentCount} agent{agentCount !== 1 ? 's' : ''}
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                        {agentCount}
                       </span>
                     </div>
-                    {isOverloaded && <span className="text-xs text-red-500 flex-shrink-0">High</span>}
-                    {isUnderloaded && <span className="text-xs text-amber-500 flex-shrink-0">Low</span>}
+                    {isOverloaded && <span className="text-[10px] sm:text-xs text-red-500 flex-shrink-0">High</span>}
+                    {isUnderloaded && <span className="text-[10px] sm:text-xs text-amber-500 flex-shrink-0">Low</span>}
                   </div>
                 );
               });
             })()}
           </div>
-          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between text-xs text-neutral-500">
-            <span>Average: {(totalAgents / data.graders.length).toFixed(1)} agents per grader</span>
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-purple-500" />Balanced</span>
-              <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500" />High</span>
-              <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-500" />Low</span>
+          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] sm:text-xs text-neutral-500">
+            <span>Avg: {(totalAgents / data.graders.length).toFixed(1)} agents/grader</span>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-purple-500" />OK</span>
+              <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500" />High</span>
+              <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500" />Low</span>
             </div>
           </div>
         </div>
@@ -863,34 +865,36 @@ const QAActiveOverview = () => {
 
       {/* Progress by Grader */}
       {data.graders && data.graders.length > 0 && (
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-green-500" />
-            Grading Progress This Week
+            <span className="hidden sm:inline">Grading Progress This Week</span>
+            <span className="sm:hidden">Progress</span>
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {data.graders.map((graderData, index) => {
               const total = graderData.stats?.total || 0;
               const graded = graderData.stats?.graded || 0;
               const progress = total > 0 ? Math.round((graded / total) * 100) : 0;
 
               return (
-                <div key={graderData.grader?._id || `grader-${index}`} className="flex items-center gap-3">
-                  <div className="w-28 flex-shrink-0">
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                <div key={graderData.grader?._id || `grader-${index}`} className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-16 sm:w-28 flex-shrink-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white truncate">
                       {graderData.grader?.name?.split(' ')[0] || 'Unknown'}
                     </p>
                   </div>
-                  <div className="flex-1 h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
+                  <div className="flex-1 h-5 sm:h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
                     <div
                       className="h-full bg-green-500 rounded-full transition-all duration-500"
                       style={{ width: `${progress}%` }}
                     />
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                      {graded}/{total} ({progress}%)
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                      <span className="hidden sm:inline">{graded}/{total} ({progress}%)</span>
+                      <span className="sm:hidden">{progress}%</span>
                     </span>
                   </div>
-                  {progress === 100 && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                  {progress === 100 && <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />}
                 </div>
               );
             })}
@@ -900,15 +904,16 @@ const QAActiveOverview = () => {
 
       {/* Grade Button Usage This Week */}
       {data.graders && data.graders.length > 0 && gradeClicksData && (
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-4">
+          <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex flex-wrap items-center gap-1 sm:gap-2">
             <Play className="w-4 h-4 text-blue-500" />
-            Grade Button Usage This Week
-            <span className="text-xs font-normal text-neutral-500 ml-2">
+            <span className="hidden sm:inline">Grade Button Usage This Week</span>
+            <span className="sm:hidden">Grade Clicks</span>
+            <span className="text-[10px] sm:text-xs font-normal text-neutral-500">
               ({gradeClicksData.weekStart} - {gradeClicksData.weekEnd})
             </span>
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {(() => {
               const counts = gradeClicksData.counts || {};
               const maxClicks = Math.max(...Object.values(counts), 1);
@@ -919,19 +924,19 @@ const QAActiveOverview = () => {
                 const percentage = (clickCount / maxClicks) * 100;
 
                 return (
-                  <div key={graderId || `grader-${index}`} className="flex items-center gap-3">
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                  <div key={graderId || `grader-${index}`} className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-16 sm:w-28 flex-shrink-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white truncate">
                         {graderData.grader?.name?.split(' ')[0] || 'Unknown'}
                       </p>
                     </div>
-                    <div className="flex-1 h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
+                    <div className="flex-1 h-5 sm:h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden relative">
                       <div
                         className="h-full bg-blue-500 rounded-full transition-all duration-500"
                         style={{ width: `${percentage}%` }}
                       />
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                        {clickCount} click{clickCount !== 1 ? 's' : ''}
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                        {clickCount}
                       </span>
                     </div>
                   </div>
@@ -939,15 +944,15 @@ const QAActiveOverview = () => {
               });
             })()}
           </div>
-          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 text-xs text-neutral-500">
-            Total: {Object.values(gradeClicksData.counts || {}).reduce((sum, c) => sum + c, 0)} grade button clicks this week
+          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 text-[10px] sm:text-xs text-neutral-500">
+            Total: {Object.values(gradeClicksData.counts || {}).reduce((sum, c) => sum + c, 0)} clicks
           </div>
         </div>
       )}
 
       {/* Filters and Actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
             type="text"
@@ -958,53 +963,57 @@ const QAActiveOverview = () => {
           />
         </div>
 
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-          className="px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          <option value="">All Statuses</option>
-          <option value="Selected">Selected</option>
-          <option value="Graded">Graded</option>
-        </select>
-
-        <select
-          value={filters.grader}
-          onChange={(e) => setFilters(prev => ({ ...prev, grader: e.target.value }))}
-          className="px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          <option value="">All Graders</option>
-          {(data.qaGraderList || []).map(grader => (
-            <option key={grader._id} value={grader._id}>{grader.name}</option>
-          ))}
-        </select>
-
-        {(filters.search || filters.status || filters.grader) && (
-          <button
-            onClick={() => setFilters({ search: '', status: '', grader: '' })}
-            className="p-2 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+        <div className="flex gap-2">
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+            className="flex-1 sm:flex-none px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+            <option value="">All Status</option>
+            <option value="Selected">Selected</option>
+            <option value="Graded">Graded</option>
+          </select>
 
-        <div className="flex-1" />
+          <select
+            value={filters.grader}
+            onChange={(e) => setFilters(prev => ({ ...prev, grader: e.target.value }))}
+            className="flex-1 sm:flex-none px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="">All Graders</option>
+            {(data.qaGraderList || []).map(grader => (
+              <option key={grader._id} value={grader._id}>{grader.name}</option>
+            ))}
+          </select>
+
+          {(filters.search || filters.status || filters.grader) && (
+            <button
+              onClick={() => setFilters({ search: '', status: '', grader: '' })}
+              className="p-2 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="hidden sm:block flex-1" />
 
         {selectedTickets.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-neutral-500">{selectedTickets.length} selected</span>
+          <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-200 dark:border-neutral-700">
+            <span className="text-xs sm:text-sm text-neutral-500">{selectedTickets.length} sel.</span>
             <button
               onClick={() => setReassignDialog({ open: true, ticketIds: selectedTickets, single: false })}
-              className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-purple-600 text-white text-xs sm:text-sm rounded-lg hover:bg-purple-700"
             >
-              <UserPlus className="w-4 h-4" />Reassign
+              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Reassign</span>
             </button>
             <button
               onClick={handleBulkArchive}
               disabled={actionLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-amber-600 text-white text-xs sm:text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50"
             >
-              <Archive className="w-4 h-4" />Archive
+              <Archive className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Archive</span>
             </button>
             <button onClick={() => setSelectedTickets([])} className="p-1.5 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded">
               <X className="w-4 h-4" />
@@ -1037,64 +1046,66 @@ const QAActiveOverview = () => {
               <div key={graderId} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden">
                 {/* Grader Header */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-200 dark:border-neutral-800 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-200 dark:border-neutral-800 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
                   onClick={() => toggleGrader(graderId)}
                 >
-                  <button onClick={(e) => { e.stopPropagation(); selectAllForGrader(graderData); }} className="p-0.5">
-                    {allSelected ? <CheckSquare className="w-5 h-5 text-purple-600" />
-                      : someSelected ? <div className="w-5 h-5 border-2 border-purple-600 rounded bg-purple-100 dark:bg-purple-900/30" />
-                      : <Square className="w-5 h-5 text-neutral-400" />}
-                  </button>
-
-                  {isExpanded ? <ChevronDown className="w-5 h-5 text-neutral-400" /> : <ChevronRight className="w-5 h-5 text-neutral-400" />}
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-neutral-900 dark:text-white">{graderData.grader?.name || 'Unknown'}</h3>
-                      <p className="text-xs text-neutral-500">{graderData.grader?.email || ''}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex-1" />
-
-                  {/* Quick Actions */}
-                  <div className="flex items-center gap-1 mr-4">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleArchiveForGrader(graderData.grader._id); }}
-                      className="p-1.5 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
-                      title="Archive all tickets"
-                    >
-                      <Archive className="w-4 h-4" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <button onClick={(e) => { e.stopPropagation(); selectAllForGrader(graderData); }} className="p-0.5">
+                      {allSelected ? <CheckSquare className="w-5 h-5 text-purple-600" />
+                        : someSelected ? <div className="w-5 h-5 border-2 border-purple-600 rounded bg-purple-100 dark:bg-purple-900/30" />
+                        : <Square className="w-5 h-5 text-neutral-400" />}
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setVacationDialog({ open: true, grader: graderData.grader }); }}
-                      className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg"
-                      title="Vacation mode"
-                    >
-                      <Plane className="w-4 h-4" />
-                    </button>
+
+                    {isExpanded ? <ChevronDown className="w-5 h-5 text-neutral-400" /> : <ChevronRight className="w-5 h-5 text-neutral-400" />}
+
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white truncate">{graderData.grader?.name || 'Unknown'}</h3>
+                        <p className="text-[10px] sm:text-xs text-neutral-500 truncate hidden sm:block">{graderData.grader?.email || ''}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1" />
+
+                    {/* Quick Actions - visible on all sizes */}
+                    <div className="flex items-center gap-1 sm:mr-4">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleArchiveForGrader(graderData.grader._id); }}
+                        className="p-1 sm:p-1.5 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
+                        title="Archive all tickets"
+                      >
+                        <Archive className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setVacationDialog({ open: true, grader: graderData.grader }); }}
+                        className="p-1 sm:p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg"
+                        title="Vacation mode"
+                      >
+                        <Plane className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Grader Stats */}
-                  <div className="flex items-center gap-6 text-sm">
+                  <div className="flex items-center gap-3 sm:gap-6 text-xs sm:text-sm ml-7 sm:ml-0">
                     <div className="text-center">
                       <p className="font-semibold text-neutral-900 dark:text-white">{graderData.stats?.total || 0}</p>
-                      <p className="text-xs text-neutral-500">Tickets</p>
+                      <p className="text-[10px] sm:text-xs text-neutral-500">Total</p>
                     </div>
                     <div className="text-center">
                       <p className="font-semibold text-green-600 dark:text-green-400">{graderData.stats?.graded || 0}</p>
-                      <p className="text-xs text-neutral-500">Graded</p>
+                      <p className="text-[10px] sm:text-xs text-neutral-500">Graded</p>
                     </div>
                     <div className="text-center">
                       <p className="font-semibold text-amber-600 dark:text-amber-400">{graderData.stats?.selected || 0}</p>
-                      <p className="text-xs text-neutral-500">Pending</p>
+                      <p className="text-[10px] sm:text-xs text-neutral-500">Pending</p>
                     </div>
                     <div className="text-center">
                       <p className={`font-semibold ${getScoreColor(graderData.stats?.avgScore)}`}>{graderData.stats?.avgScore || '-'}%</p>
-                      <p className="text-xs text-neutral-500">Avg Score</p>
+                      <p className="text-[10px] sm:text-xs text-neutral-500">Avg</p>
                     </div>
                     <div className="text-center">
                       <p className="font-semibold text-neutral-900 dark:text-white">{graderData.stats?.agentCount || 0}</p>
@@ -1105,7 +1116,7 @@ const QAActiveOverview = () => {
 
                 {/* Agents List */}
                 {isExpanded && (
-                  <div className="p-4 space-y-3">
+                  <div className="p-2 sm:p-4 space-y-2 sm:space-y-3">
                     {graderData.agents.length === 0 ? (
                       <p className="text-sm text-neutral-500 text-center py-4">No active agents</p>
                     ) : (
@@ -1120,119 +1131,163 @@ const QAActiveOverview = () => {
                           <div key={agentKey} className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
                             {/* Agent Header */}
                             <div
-                              className="flex items-center gap-3 px-3 py-2 bg-neutral-50 dark:bg-neutral-800/50 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 bg-neutral-50 dark:bg-neutral-800/50 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                               onClick={() => toggleAgent(graderId, agent.agentId || `agent-${agentIndex}`)}
                             >
-                              <button onClick={(e) => { e.stopPropagation(); selectAllForAgent(agent); }} className="p-0.5" disabled={agent.tickets.length === 0}>
-                                {allAgentSelected ? <CheckSquare className="w-4 h-4 text-purple-600" />
-                                  : someAgentSelected ? <div className="w-4 h-4 border-2 border-purple-600 rounded bg-purple-100 dark:bg-purple-900/30" />
-                                  : <Square className={`w-4 h-4 ${agent.tickets.length === 0 ? 'text-neutral-300' : 'text-neutral-400'}`} />}
-                              </button>
-
-                              {isAgentExpanded ? <ChevronDown className="w-4 h-4 text-neutral-400" /> : <ChevronRight className="w-4 h-4 text-neutral-400" />}
-
-                              <span className="font-medium text-neutral-900 dark:text-white">{agent.agentName || 'Unknown Agent'}</span>
-                              {agent.agentTeam && (
-                                <span className="text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-700 px-2 py-0.5 rounded">{agent.agentTeam}</span>
-                              )}
-
-                              <div className="flex-1" />
-
-                              {/* Agent Quick Actions */}
-                              <div className="flex items-center gap-1 mr-2">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setReassignAgentDialog({ open: true, agent, fromGrader: graderData.grader }); }}
-                                  className="p-1 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded"
-                                  title="Reassign agent"
-                                >
-                                  <UserPlus className="w-3.5 h-3.5" />
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <button onClick={(e) => { e.stopPropagation(); selectAllForAgent(agent); }} className="p-0.5" disabled={agent.tickets.length === 0}>
+                                  {allAgentSelected ? <CheckSquare className="w-4 h-4 text-purple-600" />
+                                    : someAgentSelected ? <div className="w-4 h-4 border-2 border-purple-600 rounded bg-purple-100 dark:bg-purple-900/30" />
+                                    : <Square className={`w-4 h-4 ${agent.tickets.length === 0 ? 'text-neutral-300' : 'text-neutral-400'}`} />}
                                 </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setSwapAgentsDialog({ open: true, agent1: agent, grader1: graderData.grader }); }}
-                                  className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                                  title="Swap with another agent"
-                                >
-                                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAgentHistoryDialog({ open: true, agent });
-                                    fetchAgentHistory(agent.agentId);
-                                  }}
-                                  className="p-1 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded"
-                                  title="View history"
-                                >
-                                  <History className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openEditAgentDialog(agent); }}
-                                  className="p-1 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded"
-                                  title="Edit agent"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
+
+                                {isAgentExpanded ? <ChevronDown className="w-4 h-4 text-neutral-400" /> : <ChevronRight className="w-4 h-4 text-neutral-400" />}
+
+                                <span className="font-medium text-sm sm:text-base text-neutral-900 dark:text-white truncate max-w-[120px] sm:max-w-none">{agent.agentName || 'Unknown Agent'}</span>
+                                {agent.agentTeam && (
+                                  <span className="hidden sm:inline text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-700 px-2 py-0.5 rounded">{agent.agentTeam}</span>
+                                )}
+
+                                <div className="flex-1" />
+
+                                {/* Agent Quick Actions */}
+                                <div className="flex items-center gap-0.5 sm:gap-1">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setReassignAgentDialog({ open: true, agent, fromGrader: graderData.grader }); }}
+                                    className="p-1 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded"
+                                    title="Reassign agent"
+                                  >
+                                    <UserPlus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setSwapAgentsDialog({ open: true, agent1: agent, grader1: graderData.grader }); }}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
+                                    title="Swap with another agent"
+                                  >
+                                    <ArrowLeftRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAgentHistoryDialog({ open: true, agent });
+                                      fetchAgentHistory(agent.agentId);
+                                    }}
+                                    className="hidden sm:block p-1 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded"
+                                    title="View history"
+                                  >
+                                    <History className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditAgentDialog(agent); }}
+                                    className="p-1 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded"
+                                    title="Edit agent"
+                                  >
+                                    <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                  </button>
+                                </div>
                               </div>
 
-                              <div className="flex items-center gap-4 text-xs">
-                                <span className="text-neutral-600 dark:text-neutral-400"><strong>{agent.tickets.length}</strong> tickets</span>
+                              <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs ml-6 sm:ml-0">
+                                <span className="text-neutral-600 dark:text-neutral-400"><strong>{agent.tickets.length}</strong> tkts</span>
                                 <span className="text-green-600 dark:text-green-400"><strong>{agent.filteredStats?.graded || agent.stats?.graded || 0}</strong> graded</span>
-                                <span className={getScoreColor(agent.stats?.avgScore)}><strong>{agent.stats?.avgScore || '-'}%</strong> avg</span>
+                                <span className={getScoreColor(agent.stats?.avgScore)}><strong>{agent.stats?.avgScore || '-'}%</strong></span>
                               </div>
                             </div>
 
-                            {/* Tickets Table */}
+                            {/* Tickets List */}
                             {isAgentExpanded && (
                               <div>
                                 {agent.tickets.length === 0 ? (
                                   <p className="text-sm text-neutral-500 text-center py-4">No tickets for this agent</p>
                                 ) : (
-                                  <table className="w-full text-sm">
-                                    <thead className="bg-neutral-100 dark:bg-neutral-800">
-                                      <tr>
-                                        <th className="w-10 px-3 py-2"></th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">ID</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Description</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Date</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Status</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Score</th>
-                                        <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                                  <>
+                                    {/* Mobile Card View */}
+                                    <div className="block sm:hidden divide-y divide-neutral-200 dark:divide-neutral-700">
                                       {agent.tickets.map((ticket, ticketIndex) => {
                                         const isSelected = selectedTickets.includes(ticket._id);
                                         return (
-                                          <tr key={ticket._id || `ticket-${ticketIndex}`} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
-                                            <td className="px-3 py-2">
-                                              <button onClick={() => toggleTicketSelection(ticket._id)} className="p-0.5">
+                                          <div key={ticket._id || `ticket-${ticketIndex}`} className={`p-2.5 ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                            <div className="flex items-start gap-2">
+                                              <button onClick={() => toggleTicketSelection(ticket._id)} className="p-0.5 mt-0.5">
                                                 {isSelected ? <CheckSquare className="w-4 h-4 text-purple-600" /> : <Square className="w-4 h-4 text-neutral-400" />}
                                               </button>
-                                            </td>
-                                            <td className="px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">{ticket.ticketId || '-'}</td>
-                                            <td className="px-3 py-2 text-neutral-900 dark:text-white max-w-xs truncate">{ticket.shortDescription || '-'}</td>
-                                            <td className="px-3 py-2 text-neutral-500 text-xs">{formatDate(ticket.dateEntered)}</td>
-                                            <td className="px-3 py-2">{getStatusBadge(ticket.status)}</td>
-                                            <td className="px-3 py-2">
-                                              <span className={`font-semibold ${getScoreColor(ticket.qualityScorePercent)}`}>
-                                                {ticket.qualityScorePercent !== null && ticket.qualityScorePercent !== undefined ? `${ticket.qualityScorePercent}%` : '-'}
-                                              </span>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                              <div className="flex items-center justify-end gap-1">
-                                                <button onClick={() => setViewTicketDialog({ open: true, ticket })} className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="View">
-                                                  <Eye className="w-4 h-4 text-neutral-500" />
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                  <span className="font-mono text-[10px] text-neutral-500 truncate">{ticket.ticketId || '-'}</span>
+                                                  <span className={`font-semibold text-xs ${getScoreColor(ticket.qualityScorePercent)}`}>
+                                                    {ticket.qualityScorePercent !== null && ticket.qualityScorePercent !== undefined ? `${ticket.qualityScorePercent}%` : '-'}
+                                                  </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] text-neutral-500 mb-1.5">
+                                                  <span>{formatDate(ticket.dateEntered)}</span>
+                                                  {getStatusBadge(ticket.status)}
+                                                </div>
+                                                {ticket.shortDescription && (
+                                                  <p className="text-xs text-neutral-700 dark:text-neutral-300 truncate">{ticket.shortDescription}</p>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-0.5">
+                                                <button onClick={() => setViewTicketDialog({ open: true, ticket })} className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="View">
+                                                  <Eye className="w-3.5 h-3.5 text-neutral-500" />
                                                 </button>
-                                                <button onClick={() => setReassignDialog({ open: true, ticketIds: [ticket._id], single: true })} className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="Reassign">
-                                                  <UserPlus className="w-4 h-4 text-purple-500" />
+                                                <button onClick={() => setReassignDialog({ open: true, ticketIds: [ticket._id], single: true })} className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="Reassign">
+                                                  <UserPlus className="w-3.5 h-3.5 text-purple-500" />
                                                 </button>
                                               </div>
-                                            </td>
-                                          </tr>
+                                            </div>
+                                          </div>
                                         );
                                       })}
-                                    </tbody>
-                                  </table>
+                                    </div>
+
+                                    {/* Desktop Table View */}
+                                    <table className="hidden sm:table w-full text-sm">
+                                      <thead className="bg-neutral-100 dark:bg-neutral-800">
+                                        <tr>
+                                          <th className="w-10 px-3 py-2"></th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">ID</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Description</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Date</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Status</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Score</th>
+                                          <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                                        {agent.tickets.map((ticket, ticketIndex) => {
+                                          const isSelected = selectedTickets.includes(ticket._id);
+                                          return (
+                                            <tr key={ticket._id || `ticket-${ticketIndex}`} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                              <td className="px-3 py-2">
+                                                <button onClick={() => toggleTicketSelection(ticket._id)} className="p-0.5">
+                                                  {isSelected ? <CheckSquare className="w-4 h-4 text-purple-600" /> : <Square className="w-4 h-4 text-neutral-400" />}
+                                                </button>
+                                              </td>
+                                              <td className="px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">{ticket.ticketId || '-'}</td>
+                                              <td className="px-3 py-2 text-neutral-900 dark:text-white max-w-xs truncate">{ticket.shortDescription || '-'}</td>
+                                              <td className="px-3 py-2 text-neutral-500 text-xs">{formatDate(ticket.dateEntered)}</td>
+                                              <td className="px-3 py-2">{getStatusBadge(ticket.status)}</td>
+                                              <td className="px-3 py-2">
+                                                <span className={`font-semibold ${getScoreColor(ticket.qualityScorePercent)}`}>
+                                                  {ticket.qualityScorePercent !== null && ticket.qualityScorePercent !== undefined ? `${ticket.qualityScorePercent}%` : '-'}
+                                                </span>
+                                              </td>
+                                              <td className="px-3 py-2">
+                                                <div className="flex items-center justify-end gap-1">
+                                                  <button onClick={() => setViewTicketDialog({ open: true, ticket })} className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="View">
+                                                    <Eye className="w-4 h-4 text-neutral-500" />
+                                                  </button>
+                                                  <button onClick={() => setReassignDialog({ open: true, ticketIds: [ticket._id], single: true })} className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded" title="Reassign">
+                                                    <UserPlus className="w-4 h-4 text-purple-500" />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </>
                                 )}
                               </div>
                             )}
@@ -1252,51 +1307,67 @@ const QAActiveOverview = () => {
 
   // Render Agent Management Tab
   const renderAgentManagementTab = () => (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-purple-500" />
+    <div className="space-y-4 sm:space-y-6">
+      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white mb-2 sm:mb-4 flex items-center gap-2">
+          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
           Agent Assignments
         </h3>
-        <p className="text-sm text-neutral-500 mb-6">
-          Drag agents between graders or use the action buttons to reassign, swap, or manage agents.
+        <p className="text-xs sm:text-sm text-neutral-500 mb-4 sm:mb-6">
+          Use action buttons to reassign, swap, or manage agents.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {data.graders?.map((graderData, index) => (
             <div key={graderData.grader?._id || `grader-${index}`} className="border border-neutral-200 dark:border-neutral-700 rounded-xl overflow-hidden">
-              <div className="bg-neutral-50 dark:bg-neutral-800 px-4 py-3 flex items-center justify-between">
+              <div className="bg-neutral-50 dark:bg-neutral-800 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h4 className="font-medium text-neutral-900 dark:text-white">{graderData.grader?.name?.split(' ')[0]}</h4>
-                    <p className="text-xs text-neutral-500">{graderData.stats?.agentCount || 0} agents</p>
+                    <h4 className="text-sm sm:text-base font-medium text-neutral-900 dark:text-white">{graderData.grader?.name?.split(' ')[0]}</h4>
+                    <p className="text-[10px] sm:text-xs text-neutral-500">{graderData.stats?.agentCount || 0} agents</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setVacationDialog({ open: true, grader: graderData.grader })}
-                    className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg"
+                    className="p-1 sm:p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg"
                     title="Vacation mode"
                   >
-                    <Plane className="w-4 h-4" />
+                    <Plane className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>
-              <div className="p-3 max-h-64 overflow-y-auto">
+              <div className="p-2 sm:p-3 max-h-64 overflow-y-auto">
                 {graderData.agents?.length === 0 ? (
-                  <p className="text-sm text-neutral-400 text-center py-4">No agents assigned</p>
+                  <p className="text-xs sm:text-sm text-neutral-400 text-center py-4">No agents assigned</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {graderData.agents.map((agent, agentIndex) => (
                       <div
                         key={agent.agentId || `agent-${agentIndex}`}
-                        className="flex items-center gap-2 p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg group"
+                        className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg group"
                       >
-                        <GripVertical className="w-4 h-4 text-neutral-300 cursor-grab" />
-                        <span className="flex-1 text-sm text-neutral-900 dark:text-white truncate">{agent.agentName}</span>
+                        <GripVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-300 cursor-grab hidden sm:block" />
+                        <span className="flex-1 text-xs sm:text-sm text-neutral-900 dark:text-white truncate">{agent.agentName}</span>
+                        <div className="flex sm:hidden items-center gap-0.5">
+                          <button
+                            onClick={() => setReassignAgentDialog({ open: true, agent, fromGrader: graderData.grader })}
+                            className="p-1 text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded"
+                            title="Reassign"
+                          >
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => openEditAgentDialog(agent)}
+                            className="p-1 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
                         <div className="hidden group-hover:flex items-center gap-1">
                           <button
                             onClick={() => setReassignAgentDialog({ open: true, agent, fromGrader: graderData.grader })}
@@ -1320,7 +1391,7 @@ const QAActiveOverview = () => {
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <span className="text-xs text-neutral-400">{agent.tickets?.length || 0}</span>
+                        <span className="text-[10px] sm:text-xs text-neutral-400">{agent.tickets?.length || 0}</span>
                       </div>
                     ))}
                   </div>
@@ -1335,7 +1406,7 @@ const QAActiveOverview = () => {
 
   // Render Analytics Tab
   const renderAnalyticsTab = () => (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {analyticsLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
@@ -1345,26 +1416,27 @@ const QAActiveOverview = () => {
         <>
           {/* Grading Velocity */}
           {velocityData && (
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-blue-500" />
-                Grading Velocity (Last {velocityData.period.days} Days)
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 sm:p-6">
+              <h3 className="text-sm sm:text-lg font-semibold text-neutral-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+                <span className="hidden sm:inline">Grading Velocity (Last {velocityData.period.days} Days)</span>
+                <span className="sm:hidden">Velocity ({velocityData.period.days}d)</span>
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {velocityData.graders?.map((grader, index) => (
-                  <div key={grader.grader?._id || `grader-${index}`} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
+                  <div key={grader.grader?._id || `grader-${index}`} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-2.5 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-purple-500" />
-                        <span className="font-medium text-neutral-900 dark:text-white">{grader.grader?.name}</span>
+                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />
+                        <span className="text-sm sm:text-base font-medium text-neutral-900 dark:text-white">{grader.grader?.name?.split(' ')[0]}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-neutral-500">Total: <strong className="text-neutral-900 dark:text-white">{grader.stats?.totalGraded}</strong></span>
-                        <span className="text-neutral-500">Avg/Day: <strong className="text-blue-600">{grader.stats?.avgPerDay}</strong></span>
-                        <span className="text-neutral-500">Active Days: <strong className="text-green-600">{grader.stats?.activeDays}</strong></span>
+                      <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-sm">
+                        <span className="text-neutral-500">Tot: <strong className="text-neutral-900 dark:text-white">{grader.stats?.totalGraded}</strong></span>
+                        <span className="text-neutral-500">Avg: <strong className="text-blue-600">{grader.stats?.avgPerDay}</strong></span>
+                        <span className="text-neutral-500">Days: <strong className="text-green-600">{grader.stats?.activeDays}</strong></span>
                       </div>
                     </div>
-                    <div className="flex items-end gap-1 h-16">
+                    <div className="flex items-end gap-0.5 sm:gap-1 h-12 sm:h-16">
                       {grader.dailyData?.slice(-14).map((day, dayIndex) => {
                         const maxCount = Math.max(...grader.dailyData.map(d => d.count), 1);
                         const height = (day.count / maxCount) * 100;
@@ -1387,12 +1459,13 @@ const QAActiveOverview = () => {
 
           {/* Score Comparison */}
           {scoreComparison && (
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-purple-500" />
-                Score Comparison (Last {scoreComparison.period.weeks} Weeks)
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+                <span className="hidden sm:inline">Score Comparison (Last {scoreComparison.period.weeks} Weeks)</span>
+                <span className="sm:hidden">Scores ({scoreComparison.period.weeks}w)</span>
               </h3>
-              <p className="text-sm text-neutral-500 mb-4">
+              <p className="text-xs sm:text-sm text-neutral-500 mb-3 sm:mb-4">
                 Overall Average: <strong className="text-purple-600">{scoreComparison.overallAvg}%</strong>
               </p>
               <div className="space-y-3">
@@ -1402,13 +1475,16 @@ const QAActiveOverview = () => {
                   const isLenient = deviation > 5;
 
                   return (
-                    <div key={item.grader?._id || `grader-${index}`} className="flex items-center gap-4">
-                      <div className="w-28 flex-shrink-0">
-                        <span className="text-sm font-medium text-neutral-900 dark:text-white">{item.grader?.name?.split(' ')[0]}</span>
+                    <div key={item.grader?._id || `grader-${index}`} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                      <div className="flex items-center justify-between sm:w-28 sm:flex-shrink-0">
+                        <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white">{item.grader?.name?.split(' ')[0]}</span>
+                        <span className={`sm:hidden text-xs font-semibold ${getScoreColor(item.stats.avgScore)}`}>
+                          {item.stats.avgScore}%
+                        </span>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-4 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                          <div className="flex-1 h-3 sm:h-4 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${
                                 isStrict ? 'bg-red-500' : isLenient ? 'bg-green-500' : 'bg-purple-500'
@@ -1416,12 +1492,12 @@ const QAActiveOverview = () => {
                               style={{ width: `${item.stats.avgScore}%` }}
                             />
                           </div>
-                          <span className={`text-sm font-semibold w-12 ${getScoreColor(item.stats.avgScore)}`}>
+                          <span className={`hidden sm:inline text-sm font-semibold w-12 ${getScoreColor(item.stats.avgScore)}`}>
                             {item.stats.avgScore}%
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-neutral-500 w-32">
+                      <div className="flex items-center gap-2 text-[10px] sm:text-xs text-neutral-500 sm:w-32">
                         <span>{item.stats.ticketsGraded} graded</span>
                         {isStrict && <span className="text-red-500">(Strict)</span>}
                         {isLenient && <span className="text-green-500">(Lenient)</span>}
@@ -1435,24 +1511,27 @@ const QAActiveOverview = () => {
 
           {/* Stale Tickets Warning */}
           {staleTickets && staleTickets.totalStale > 0 && (
-            <div className="bg-white dark:bg-neutral-900 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Stale Tickets Warning ({staleTickets.totalStale} tickets older than {staleTickets.threshold} days)
+            <div className="bg-white dark:bg-neutral-900 border border-amber-200 dark:border-amber-800 rounded-xl p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-amber-700 dark:text-amber-400 mb-3 sm:mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Stale Tickets Warning ({staleTickets.totalStale} tickets older than {staleTickets.threshold} days)</span>
+                <span className="sm:hidden">Stale ({staleTickets.totalStale} tickets)</span>
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {staleTickets.byGrader?.map((graderData, index) => (
-                  <div key={graderData.grader?._id || `grader-${index}`} className="border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <div key={graderData.grader?._id || `grader-${index}`} className="border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-neutral-900 dark:text-white">{graderData.grader?.name}</span>
-                      <span className="text-sm text-amber-600">{graderData.tickets.length} stale tickets</span>
+                      <span className="font-medium text-sm sm:text-base text-neutral-900 dark:text-white">{graderData.grader?.name}</span>
+                      <span className="text-xs sm:text-sm text-amber-600">{graderData.tickets.length} stale</span>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5 sm:space-y-1">
                       {graderData.tickets.slice(0, 5).map((ticket, ticketIndex) => (
-                        <div key={ticket._id || `ticket-${ticketIndex}`} className="flex items-center gap-2 text-sm">
-                          <span className="font-mono text-neutral-500">{ticket.ticketId}</span>
+                        <div key={ticket._id || `ticket-${ticketIndex}`} className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-xs sm:text-sm">
+                          <div className="flex items-center justify-between sm:contents">
+                            <span className="font-mono text-neutral-500">{ticket.ticketId}</span>
+                            <span className="text-amber-600 sm:order-last">{ticket.daysOld}d</span>
+                          </div>
                           <span className="text-neutral-600 dark:text-neutral-400 truncate flex-1">{ticket.agent?.name}</span>
-                          <span className="text-amber-600">{ticket.daysOld} days old</span>
                         </div>
                       ))}
                       {graderData.tickets.length > 5 && (
@@ -1541,9 +1620,9 @@ const QAActiveOverview = () => {
         <button
           ref={buttonRef}
           onClick={handleOpen}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-xl text-neutral-500 hover:border-purple-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all"
+          className="w-full flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg sm:rounded-xl text-xs sm:text-sm text-neutral-500 hover:border-purple-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Add Agent</span>
         </button>
 
@@ -1554,21 +1633,21 @@ const QAActiveOverview = () => {
             style={{
               top: dropdownPosition.top,
               left: dropdownPosition.left,
-              width: dropdownPosition.width,
+              width: Math.max(dropdownPosition.width, 200),
               maxHeight: '250px'
             }}
           >
             {/* Search Input */}
             <div className="p-2 border-b border-neutral-200 dark:border-neutral-700 sticky top-0 bg-white dark:bg-neutral-900">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search agents..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   autoFocus
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full pl-8 sm:pl-9 pr-3 py-2 text-xs sm:text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
@@ -1576,7 +1655,7 @@ const QAActiveOverview = () => {
             {/* Agent List */}
             <div className="max-h-48 overflow-y-auto">
               {filteredAgents.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-neutral-500 text-center">
+                <div className="px-3 sm:px-4 py-3 text-xs sm:text-sm text-neutral-500 text-center">
                   {searchTerm ? 'No agents found' : 'No available agents'}
                 </div>
               ) : (
@@ -1584,14 +1663,14 @@ const QAActiveOverview = () => {
                   <button
                     key={agent._id}
                     onClick={() => handleSelect(agent)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                    className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                      <User className="w-4 h-4 text-neutral-500" />
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
+                      <User className="w-3 h-3 sm:w-4 sm:h-4 text-neutral-500" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">{agent.name}</p>
-                      {agent.team && <p className="text-xs text-neutral-500 truncate">{agent.team}</p>}
+                      <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white truncate">{agent.name}</p>
+                      {agent.team && <p className="text-[10px] sm:text-xs text-neutral-500 truncate">{agent.team}</p>}
                     </div>
                   </button>
                 ))
@@ -1664,20 +1743,24 @@ const QAActiveOverview = () => {
         ) : weekSetup ? (
           <>
             {/* Header Actions */}
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-purple-500" />
+                  <h3 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
                     Week Setup
                   </h3>
-                  <p className="text-sm text-neutral-500 mt-1">Configure agent assignments for this week. Changes are saved only when you click "Save Changes".</p>
+                  <p className="text-xs sm:text-sm text-neutral-500 mt-1">
+                    <span className="hidden sm:inline">Configure agent assignments for this week. Changes are saved only when you click "Save Changes".</span>
+                    <span className="sm:hidden">Configure agent assignments. Save when done.</span>
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3">
                   {/* Excel Import Button */}
-                  <label className="flex items-center gap-2 px-4 py-2.5 text-sm border border-green-200 dark:border-green-700 text-green-700 dark:text-green-400 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer">
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Import Excel
+                  <label className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-green-200 dark:border-green-700 text-green-700 dark:text-green-400 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer">
+                    <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Import Excel</span>
+                    <span className="sm:hidden">Import</span>
                     <input
                       type="file"
                       accept=".xlsx,.xls"
@@ -1688,35 +1771,36 @@ const QAActiveOverview = () => {
                   <button
                     onClick={handleCopyLastWeek}
                     disabled={actionLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm border border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                    className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                   >
-                    <Copy className="w-4 h-4" />
-                    Copy Last Week
+                    <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Copy Last Week</span>
+                    <span className="sm:hidden">Copy</span>
                   </button>
                   <button
                     onClick={() => { setWeekSetupChanges({}); fetchWeekSetup(); }}
                     disabled={actionLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm border border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                    className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                   >
-                    <RotateCcw className="w-4 h-4" />
+                    <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Reset
                   </button>
                   <button
                     onClick={handleSaveWeekSetup}
                     disabled={actionLoading || Object.keys(weekSetupChanges).length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 text-sm bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
+                    className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
                   >
-                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Save Changes
+                    {actionLoading ? <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" /> : <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                    Save
                   </button>
                 </div>
               </div>
 
               {/* Changes indicator */}
               {Object.keys(weekSetupChanges).length > 0 && (
-                <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                  <span className="text-sm text-amber-700 dark:text-amber-400">You have unsaved changes</span>
+                <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-400">Unsaved changes</span>
                 </div>
               )}
             </div>
@@ -1740,55 +1824,55 @@ const QAActiveOverview = () => {
                     }`}
                   >
                     {/* Card Header */}
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 px-3 sm:px-5 py-3 sm:py-4 border-b border-neutral-200 dark:border-neutral-800">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
-                            <User className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400" />
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-neutral-900 dark:text-white">{graderSetup.grader?.name}</h4>
-                            <p className="text-xs text-neutral-500">{graderSetup.grader?.email}</p>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-sm sm:text-base text-neutral-900 dark:text-white truncate">{graderSetup.grader?.name}</h4>
+                            <p className="text-[10px] sm:text-xs text-neutral-500 truncate">{graderSetup.grader?.email}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className={`text-2xl font-bold ${totalAgents > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-neutral-400'}`}>
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <span className={`text-xl sm:text-2xl font-bold ${totalAgents > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-neutral-400'}`}>
                             {totalAgents}
                           </span>
-                          <p className="text-xs text-neutral-500">agents</p>
+                          <p className="text-[10px] sm:text-xs text-neutral-500">agents</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Card Body - Agent List */}
-                    <div className="p-4">
-                      <div className="space-y-2 mb-4 max-h-80 overflow-y-auto">
+                    <div className="p-3 sm:p-4">
+                      <div className="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4 max-h-60 sm:max-h-80 overflow-y-auto">
                         {/* Current agents */}
                         {currentAgents.map((agent, agentIndex) => (
                           <div
                             key={agent._id || `agent-${agentIndex}`}
-                            className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl group hover:bg-neutral-100 dark:hover:bg-neutral-750 transition-colors"
+                            className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg sm:rounded-xl group hover:bg-neutral-100 dark:hover:bg-neutral-750 transition-colors"
                           >
-                            <div className="w-8 h-8 rounded-full bg-white dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 shadow-sm">
-                              <User className="w-4 h-4 text-neutral-500" />
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                              <User className="w-3 h-3 sm:w-4 sm:h-4 text-neutral-500" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-neutral-900 dark:text-white truncate block">{agent.name}</span>
-                              {agent.team && <span className="text-xs text-neutral-500">{agent.team}</span>}
+                              <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-white truncate block">{agent.name}</span>
+                              {agent.team && <span className="text-[10px] sm:text-xs text-neutral-500">{agent.team}</span>}
                             </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <div className="flex items-center gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                               <button
                                 onClick={() => openEditAgentDialog(agent)}
-                                className="p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
+                                className="p-1 sm:p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
                                 title="Edit agent"
                               >
-                                <Pencil className="w-4 h-4" />
+                                <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                               <button
                                 onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id)}
-                                className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
+                                className="p-1 sm:p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           </div>
@@ -1798,28 +1882,28 @@ const QAActiveOverview = () => {
                         {addedAgents.map((agent, agentIndex) => (
                           <div
                             key={agent._id || `added-${agentIndex}`}
-                            className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl group"
+                            className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg sm:rounded-xl group"
                           >
-                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
-                              <Plus className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
+                              <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-green-700 dark:text-green-400 truncate block">{agent.name}</span>
-                              <span className="text-xs text-green-600 dark:text-green-500">New assignment</span>
+                              <span className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-400 truncate block">{agent.name}</span>
+                              <span className="text-[10px] sm:text-xs text-green-600 dark:text-green-500">New</span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-0.5 sm:gap-1">
                               <button
                                 onClick={() => openEditAgentDialog(agent)}
-                                className="p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
+                                className="p-1 sm:p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
                                 title="Edit agent"
                               >
-                                <Pencil className="w-4 h-4" />
+                                <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                               <button
                                 onClick={() => handleRemoveAgent(graderSetup.grader._id, agent._id, true)}
-                                className="p-1.5 text-green-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                                className="p-1 sm:p-1.5 text-green-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           </div>
@@ -1827,9 +1911,9 @@ const QAActiveOverview = () => {
 
                         {/* Empty state */}
                         {currentAgents.length === 0 && addedAgents.length === 0 && (
-                          <div className="py-6 text-center">
-                            <Users className="w-10 h-10 mx-auto text-neutral-300 dark:text-neutral-600 mb-2" />
-                            <p className="text-sm text-neutral-500">No agents assigned</p>
+                          <div className="py-4 sm:py-6 text-center">
+                            <Users className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-neutral-300 dark:text-neutral-600 mb-2" />
+                            <p className="text-xs sm:text-sm text-neutral-500">No agents assigned</p>
                           </div>
                         )}
                       </div>
@@ -1941,21 +2025,21 @@ const QAActiveOverview = () => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-neutral-900 shadow-2xl z-[9999] flex flex-col"
+            className="fixed right-0 top-0 h-full w-full sm:max-w-xl bg-white dark:bg-neutral-900 shadow-2xl z-[9999] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-6 py-4">
+            <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-4 sm:px-6 py-3 sm:py-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-xl flex items-center justify-center">
-                    <Ticket className="w-5 h-5" />
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Ticket className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-                      {viewTicketDialog.ticket?.ticketId}
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2 flex-wrap">
+                      <span className="truncate">{viewTicketDialog.ticket?.ticketId}</span>
                       {viewTicketDialog.ticket?.qualityScorePercent !== null && (
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${
+                        <span className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-xs sm:text-sm font-medium flex-shrink-0 ${
                           viewTicketDialog.ticket.qualityScorePercent >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
                           viewTicketDialog.ticket.qualityScorePercent >= 80 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
                           viewTicketDialog.ticket.qualityScorePercent >= 70 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
@@ -1965,49 +2049,49 @@ const QAActiveOverview = () => {
                         </span>
                       )}
                     </h2>
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                    <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 truncate">
                       {viewTicketDialog.ticket?.agent?.name} • {viewTicketDialog.ticket?.agent?.position}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                   {viewTicketDialog.ticket?.ticketId && (
                     <button
                       type="button"
                       onClick={() => window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${viewTicketDialog.ticket.ticketId}`, '_blank')}
-                      className="p-2 text-neutral-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 text-neutral-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                       title="Open in Intercom"
                     >
-                      <ExternalLink className="w-5 h-5" />
+                      <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => setViewTicketDialog({ open: false, ticket: null })}
-                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-1.5 sm:p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-neutral-500" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-500" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               {viewTicketDialog.ticket && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Meta Info */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="text-xs text-neutral-500 uppercase">Grader</label>
-                      <p className="font-medium text-neutral-900 dark:text-white">{viewTicketDialog.ticket.createdBy?.name || 'Unknown'}</p>
+                      <label className="text-[10px] sm:text-xs text-neutral-500 uppercase">Grader</label>
+                      <p className="font-medium text-sm sm:text-base text-neutral-900 dark:text-white">{viewTicketDialog.ticket.createdBy?.name || 'Unknown'}</p>
                     </div>
                     <div>
-                      <label className="text-xs text-neutral-500 uppercase">Date</label>
-                      <p className="text-neutral-900 dark:text-white">{formatDate(viewTicketDialog.ticket.dateEntered)}</p>
+                      <label className="text-[10px] sm:text-xs text-neutral-500 uppercase">Date</label>
+                      <p className="text-sm sm:text-base text-neutral-900 dark:text-white">{formatDate(viewTicketDialog.ticket.dateEntered)}</p>
                     </div>
                     <div>
-                      <label className="text-xs text-neutral-500 uppercase">Status</label>
+                      <label className="text-[10px] sm:text-xs text-neutral-500 uppercase">Status</label>
                       <div className="mt-1">{getStatusBadge(viewTicketDialog.ticket.status)}</div>
                     </div>
                   </div>
@@ -2015,13 +2099,13 @@ const QAActiveOverview = () => {
                   {/* Categories */}
                   {viewTicketDialog.ticket.categories && viewTicketDialog.ticket.categories.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Tag className="w-4 h-4 text-neutral-400" />
-                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Categories</h3>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                        <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
+                        <h3 className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300">Categories</h3>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
                         {viewTicketDialog.ticket.categories.map(cat => (
-                          <Badge key={cat} variant="secondary" className="text-xs">
+                          <Badge key={cat} variant="secondary" className="text-[10px] sm:text-xs">
                             {cat}
                           </Badge>
                         ))}
@@ -2032,12 +2116,12 @@ const QAActiveOverview = () => {
                   {/* Notes */}
                   {viewTicketDialog.ticket.notes && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Eye className="w-4 h-4 text-neutral-400" />
-                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Notes</h3>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
+                        <h3 className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300">Notes</h3>
                       </div>
-                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-neutral-200 dark:border-neutral-700">
-                        <TicketContentDisplay content={viewTicketDialog.ticket.notes} className="text-sm" />
+                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700">
+                        <TicketContentDisplay content={viewTicketDialog.ticket.notes} className="text-xs sm:text-sm" />
                       </div>
                     </div>
                   )}
@@ -2045,12 +2129,12 @@ const QAActiveOverview = () => {
                   {/* Feedback */}
                   {viewTicketDialog.ticket.feedback && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <MessageSquare className="w-4 h-4 text-neutral-400" />
-                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Feedback</h3>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                        <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
+                        <h3 className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300">Feedback</h3>
                       </div>
-                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                        <TicketContentDisplay content={viewTicketDialog.ticket.feedback} className="text-sm" />
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-blue-200 dark:border-blue-800">
+                        <TicketContentDisplay content={viewTicketDialog.ticket.feedback} className="text-xs sm:text-sm" />
                       </div>
                     </div>
                   )}
@@ -2058,13 +2142,13 @@ const QAActiveOverview = () => {
                   {/* Scorecard */}
                   {viewTicketDialog.ticket.scorecardValues && Object.keys(viewTicketDialog.ticket.scorecardValues).length > 0 && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <BarChart3 className="w-4 h-4 text-neutral-400" />
-                        <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Scorecard</h3>
+                      <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
+                        <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
+                        <h3 className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300">Scorecard</h3>
                         {viewTicketDialog.ticket.scorecardVariant && (
                           <Badge
                             variant="outline"
-                            className={`text-[10px] ${
+                            className={`text-[8px] sm:text-[10px] ${
                               viewTicketDialog.ticket.scorecardVariant === 'mentions'
                                 ? 'border-purple-400 text-purple-600 dark:text-purple-400'
                                 : 'border-blue-400 text-blue-600 dark:text-blue-400'
@@ -2074,17 +2158,17 @@ const QAActiveOverview = () => {
                           </Badge>
                         )}
                       </div>
-                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-neutral-200 dark:border-neutral-700">
+                      <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700">
                         {/* Scorecard Position Header */}
                         {viewTicketDialog.ticket.agent?.position && (
-                          <div className="mb-3 pb-3 border-b border-neutral-200 dark:border-neutral-700">
-                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                          <div className="mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-700">
+                            <span className="text-[10px] sm:text-xs font-medium text-neutral-500 uppercase tracking-wider">
                               {viewTicketDialog.ticket.agent.position}
                             </span>
                           </div>
                         )}
                         {/* Scorecard Values */}
-                        <div className="space-y-2.5">
+                        <div className="space-y-2 sm:space-y-2.5">
                           {(() => {
                             const position = viewTicketDialog.ticket.agent?.position;
                             const variant = viewTicketDialog.ticket.scorecardVariant;
@@ -2118,9 +2202,9 @@ const QAActiveOverview = () => {
                                 : '-';
 
                               return (
-                                <div key={key} className="flex items-center justify-between">
-                                  <span className="text-sm text-neutral-600 dark:text-neutral-400">{label}</span>
-                                  <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${getBgClass(value)} ${getTextClass(value)}`}>
+                                <div key={key} className="flex items-center justify-between gap-2">
+                                  <span className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{label}</span>
+                                  <span className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium flex-shrink-0 ${getBgClass(value)} ${getTextClass(value)}`}>
                                     {displayLabel}
                                   </span>
                                 </div>
@@ -2136,9 +2220,10 @@ const QAActiveOverview = () => {
             </div>
 
             {/* Footer */}
-            <div className="flex-shrink-0 border-t border-neutral-200 dark:border-neutral-800 px-6 py-3 bg-neutral-50 dark:bg-neutral-800/50">
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
-                Press <kbd className="px-1.5 py-0.5 bg-neutral-200 dark:bg-neutral-700 rounded text-[10px]">ESC</kbd> to close
+            <div className="flex-shrink-0 border-t border-neutral-200 dark:border-neutral-800 px-4 sm:px-6 py-2.5 sm:py-3 bg-neutral-50 dark:bg-neutral-800/50">
+              <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 text-center">
+                <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 bg-neutral-200 dark:bg-neutral-700 rounded text-[10px]">ESC</kbd> to close</span>
+                <span className="sm:hidden">Tap outside to close</span>
               </p>
             </div>
           </motion.div>

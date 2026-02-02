@@ -89,44 +89,44 @@ const ReviewTicketDialog = ({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="bg-white dark:bg-neutral-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-white dark:bg-neutral-900 sm:rounded-xl shadow-2xl w-full sm:max-w-4xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Review Ticket: {ticket.ticketId}
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    Review: {ticket.ticketId}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-neutral-400">
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 hidden sm:block">
                     {mode === 'edit' ? 'Edit and approve or deny this ticket' : 'View ticket details'}
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors flex-shrink-0"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Additional Note - Always at top */}
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -315,40 +315,42 @@ const ReviewTicketDialog = ({
             </div>
 
             {/* Footer with Actions */}
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-neutral-800 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-neutral-400">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 dark:border-neutral-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-neutral-400 order-2 sm:order-1">
                 {hasChanges && (
-                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
+                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 text-xs sm:text-sm">
+                    <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Unsaved changes
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" onClick={onClose} disabled={saving}>
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 order-1 sm:order-2">
+                <Button variant="ghost" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">
                   Cancel
                 </Button>
                 {mode === 'edit' && hasChanges && (
-                  <Button variant="glass" onClick={handleSave} disabled={saving}>
-                    <Save className="w-4 h-4 mr-1.5" />
-                    Save
+                  <Button variant="glass" onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none">
+                    <Save className="w-4 h-4 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Save</span>
                   </Button>
                 )}
                 <Button
                   variant="danger"
                   onClick={handleDeny}
                   disabled={saving}
+                  className="flex-1 sm:flex-none"
                 >
-                  <XCircle className="w-4 h-4 mr-1.5" />
-                  Deny
+                  <XCircle className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Deny</span>
                 </Button>
                 <Button
                   variant="success"
                   onClick={handleApprove}
                   disabled={saving}
+                  className="flex-1 sm:flex-none"
                 >
-                  <CheckCircle className="w-4 h-4 mr-1.5" />
-                  Approve
+                  <CheckCircle className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Approve</span>
                 </Button>
               </div>
             </div>

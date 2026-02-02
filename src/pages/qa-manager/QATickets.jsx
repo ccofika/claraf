@@ -112,12 +112,12 @@ const QATickets = () => {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tickets</h2>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">Review and grade support tickets</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {tickets.length > 0 && (
             <Button
               size="sm"
@@ -126,13 +126,13 @@ const QATickets = () => {
               disabled={archivingAll}
               className="text-amber-600 dark:text-amber-400"
             >
-              <Archive className="w-4 h-4 mr-1.5" />
-              {archivingAll ? 'Archiving...' : 'Archive All'}
+              <Archive className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">{archivingAll ? 'Archiving...' : 'Archive All'}</span>
             </Button>
           )}
           <Button size="sm" variant="glass" onClick={() => setManageMacrosDialog({ open: true })}>
-            <Hash className="w-4 h-4 mr-1.5" />
-            Macros
+            <Hash className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Macros</span>
           </Button>
           <Button
             size="sm"
@@ -140,29 +140,29 @@ const QATickets = () => {
             onClick={() => setSendMacroDialog({ open: true })}
             className="text-blue-600 dark:text-blue-400"
           >
-            <Send className="w-4 h-4 mr-1.5" />
-            Send
+            <Send className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Send</span>
           </Button>
           <Button size="sm" variant="glass" onClick={() => openTicketDialog('create')}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Ticket
+            <Plus className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">New Ticket</span>
           </Button>
         </div>
       </div>
 
       {/* Bulk Actions */}
       {selectedTickets.length > 0 && (
-        <div className="bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-lg px-4 py-3 flex items-center justify-between">
+        <div className="bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-lg px-3 sm:px-4 py-2 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <span className="text-sm text-gray-700 dark:text-neutral-300">{selectedTickets.length} ticket(s) selected</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="ghost" onClick={() => setSelectedTickets([])}>
               Clear
             </Button>
 
             {/* Archive Button */}
             <Button size="sm" variant="glass" onClick={handleBulkArchive}>
-              <Archive className="w-4 h-4 mr-1.5" />
-              Archive
+              <Archive className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Archive</span>
             </Button>
 
             {/* Status Dropdown */}
@@ -173,8 +173,9 @@ const QATickets = () => {
                 onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
                 className="text-blue-600 dark:text-blue-400"
               >
-                Change Status
-                <ChevronDown className={`w-4 h-4 ml-1.5 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+                <span className="hidden sm:inline">Change Status</span>
+                <span className="sm:hidden">Status</span>
+                <ChevronDown className={`w-4 h-4 ml-1 sm:ml-1.5 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
               </Button>
 
               <AnimatePresence>
@@ -217,8 +218,8 @@ const QATickets = () => {
               onClick={handleBulkDeleteTickets}
               className="text-red-600 dark:text-red-400"
             >
-              <Trash2 className="w-4 h-4 mr-1.5" />
-              Delete
+              <Trash2 className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Delete</span>
             </Button>
           </div>
         </div>
@@ -236,17 +237,17 @@ const QATickets = () => {
               key={macroTicket._id}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="relative bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-400 dark:border-blue-500 rounded-lg p-4 shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+              className="relative bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-400 dark:border-blue-500 rounded-lg p-3 sm:p-4 shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:shadow-[0_0_20px_rgba(59,130,246,0.4)]"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-3 sm:gap-6">
                   <div>
                     <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Ticket ID</p>
-                    <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">{macroTicket.ticketId}</p>
+                    <p className="text-sm font-mono font-medium text-gray-900 dark:text-white truncate">{macroTicket.ticketId}</p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Agent</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{macroTicket.agent?.name}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{macroTicket.agent?.name}</p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Date</p>
@@ -256,12 +257,12 @@ const QATickets = () => {
                   </div>
                   <div>
                     <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">From</p>
-                    <p className="text-sm text-gray-700 dark:text-neutral-300">
+                    <p className="text-sm text-gray-700 dark:text-neutral-300 truncate">
                       {macroTicket.sentBy?.name || macroTicket.sentBy?.email}
                     </p>
                   </div>
                   {macroTicket.notes && (
-                    <div className="max-w-xs">
+                    <div className="col-span-2 sm:max-w-xs">
                       <p className="text-xs text-blue-600 dark:text-blue-400 mb-0.5">Notes</p>
                       <p className="text-sm text-gray-700 dark:text-neutral-300 truncate">
                         <span dangerouslySetInnerHTML={{ __html: macroTicket.notes.substring(0, 100) + (macroTicket.notes.length > 100 ? '...' : '') }} />
@@ -307,8 +308,8 @@ const QATickets = () => {
                     onClick={() => handleAcceptMacroTicket(macroTicket._id)}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    <Check className="w-4 h-4 mr-1" />
-                    Accept
+                    <Check className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Accept</span>
                   </Button>
                   <Button
                     size="sm"
@@ -316,8 +317,8 @@ const QATickets = () => {
                     onClick={() => setDeclineConfirmDialog({ open: true, macroTicket })}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
-                    <XCircle className="w-4 h-4 mr-1" />
-                    Decline
+                    <XCircle className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Decline</span>
                   </Button>
                 </div>
               </div>
@@ -353,7 +354,118 @@ const QATickets = () => {
       ) : (
         <div className="py-4 -my-4 px-2 -mx-2 overflow-visible">
           <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg overflow-visible">
-            <table className="w-full">
+            {/* Mobile Card View */}
+            <div className="block md:hidden">
+              {/* Mobile header with select all */}
+              <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950 flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedTickets.length === tickets.length && tickets.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedTickets(tickets.map(t => t._id));
+                    } else {
+                      setSelectedTickets([]);
+                    }
+                  }}
+                  className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer"
+                />
+                <span className="text-xs text-gray-500 dark:text-neutral-400">Select all</span>
+              </div>
+              {/* Mobile cards */}
+              <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                {sortedTickets.map((ticket, index) => {
+                  const ticketValidationError = validationErrors.invalidTickets[ticket._id];
+                  const hasValidationError = validationErrors.validationMode && ticketValidationError;
+
+                  return (
+                    <div
+                      key={ticket._id}
+                      className={`p-3 ${
+                        hasValidationError
+                          ? 'bg-red-50 dark:bg-red-900/20'
+                          : focusedTicketIndex === index
+                          ? 'bg-blue-50 dark:bg-blue-900/20'
+                          : ''
+                      }`}
+                      onClick={() => {
+                        setFocusedTicketIndex(index);
+                        handleViewTicket(ticket);
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedTickets.includes(ticket._id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.checked) {
+                              setSelectedTickets([...selectedTickets, ticket._id]);
+                            } else {
+                              setSelectedTickets(selectedTickets.filter(id => id !== ticket._id));
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              {ticket.agent?.name || ticket.agentName || 'Unknown'}
+                            </span>
+                            <QualityScoreBadge score={ticket.qualityScorePercent} />
+                          </div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-mono text-gray-500 dark:text-neutral-400">
+                              #{ticket.ticketId || ticket._id.slice(-6)}
+                            </span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500 dark:text-neutral-400">
+                              {new Date(ticket.dateEntered || ticket.createdAt || ticket.reviewDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <StatusBadge status={ticket.status} />
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${ticket.ticketId}`, '_blank');
+                                }}
+                                className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditTicket(ticket);
+                                }}
+                                className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchiveTicket(ticket._id);
+                                }}
+                                className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded transition-colors"
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Desktop Table View */}
+            <table className="w-full hidden md:table">
               <thead className="bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800 rounded-t-lg">
                 <tr>
                   <th className="px-4 py-2.5 w-8 rounded-tl-lg">

@@ -342,33 +342,34 @@ const QACoaching = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <GraduationCap className="w-7 h-7 text-purple-500" />
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3">
+            <GraduationCap className="w-6 h-6 sm:w-7 sm:h-7 text-purple-500" />
             Coaching Sesije
           </h1>
-          <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-neutral-400 mt-1">
             Upravljaj coaching sesijama za agente
           </p>
         </div>
 
         <button
           onClick={() => setShowNewCoachingModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
         >
           <Plus className="w-4 h-4" />
-          Nova Coaching Sesija
+          <span className="hidden xs:inline">Nova Coaching Sesija</span>
+          <span className="xs:hidden">Nova Sesija</span>
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 p-4 bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800">
         {/* Agent Filter */}
-        <div className="relative">
+        <div className="relative flex-1 sm:flex-none">
           <button
             onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm hover:border-gray-300 dark:hover:border-neutral-600 transition-colors min-w-[180px]"
+            className="w-full sm:w-auto flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm hover:border-gray-300 dark:hover:border-neutral-600 transition-colors sm:min-w-[180px]"
           >
             <Filter className="w-4 h-4 text-gray-400" />
             <span className={filterAgent ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>
@@ -402,10 +403,10 @@ const QACoaching = () => {
         </div>
 
         {/* Status Filter */}
-        <div className="relative">
+        <div className="relative flex-1 sm:flex-none">
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm hover:border-gray-300 dark:hover:border-neutral-600 transition-colors min-w-[140px]"
+            className="w-full sm:w-auto flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm hover:border-gray-300 dark:hover:border-neutral-600 transition-colors sm:min-w-[140px]"
           >
             <span className={filterStatus ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>
               {filterStatus === 'new' ? 'Novo' : filterStatus === 'in_progress' ? 'U toku' : filterStatus === 'completed' ? 'Zavrseno' : 'Svi statusi'}
@@ -436,7 +437,7 @@ const QACoaching = () => {
           )}
         </div>
 
-        <div className="text-sm text-gray-500 dark:text-neutral-400 ml-auto">
+        <div className="text-xs sm:text-sm text-gray-500 dark:text-neutral-400 sm:ml-auto text-center sm:text-right">
           {sessions.length} sesija
         </div>
       </div>
@@ -546,7 +547,7 @@ const QACoaching = () => {
               )}
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-neutral-800 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-neutral-800 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => handleOpenShareModal(session, e)}
                   className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-300 rounded-lg transition-colors"

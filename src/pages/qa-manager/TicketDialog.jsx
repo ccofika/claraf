@@ -407,12 +407,12 @@ const TicketDialog = ({
     <>
       <Dialog open={ticketDialog.open} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
-          <DialogHeader className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
+          <DialogHeader className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+              <DialogTitle className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
                 {ticketDialog.mode === 'create' ? 'Create Ticket' : isReviewMode ? 'Review Ticket' : 'Edit Ticket'}
               </DialogTitle>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 {ticketDialog.mode === 'edit' && (
                   <>
                     <button
@@ -457,9 +457,9 @@ const TicketDialog = ({
             </div>
           </DialogHeader>
 
-          <form ref={formRef} onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
-            <div className="w-3/5 flex flex-col border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+            <div className="w-full lg:w-3/5 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-neutral-800 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-5">
                 {/* Review Mode: Additional Note */}
                 {isReviewMode && (
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
@@ -514,7 +514,7 @@ const TicketDialog = ({
                   );
                 })()}
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div className="relative" ref={agentDropdownRef}>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
                     <div className="relative">
@@ -632,7 +632,7 @@ const TicketDialog = ({
                   />
                 )}
 
-                <div className={`grid gap-4 ${isReviewMode ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                <div className={`grid gap-3 sm:gap-4 ${isReviewMode ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
                   {!isReviewMode && (
                     <div>
                       <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
@@ -894,7 +894,7 @@ const TicketDialog = ({
               </div>
             </div>
 
-            <div className="w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative">
+            <div className="w-full lg:w-2/5 flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden relative min-h-[250px] lg:min-h-0">
               <div
                 className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
                 style={{
@@ -903,55 +903,55 @@ const TicketDialog = ({
                 }}
               />
 
-              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
-                <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+              <div className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm relative z-10">
+                <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-neutral-800 rounded-lg overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('ai')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'ai'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI Similar
+                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden xs:inline">AI</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('related')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'related'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Users className="w-3.5 h-3.5" />
-                    Related
+                    <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden xs:inline">Related</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('macros')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'macros'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    Suggested
+                    <Lightbulb className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden xs:inline">Suggest</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('archive')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md transition-all ${
+                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'archive'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
                     }`}
                   >
-                    <Archive className="w-3.5 h-3.5" />
-                    Archive
+                    <Archive className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden xs:inline">Archive</span>
                   </button>
                 </div>
               </div>

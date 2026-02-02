@@ -299,7 +299,7 @@ const QAAllAgents = () => {
     }
   };
 
-  // Pagination component
+  // Pagination component (Desktop)
   const Pagination = () => (
     <div className="flex items-center justify-between px-6 py-3 border-t border-neutral-200 dark:border-neutral-800">
       <div className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -326,6 +326,36 @@ const QAAllAgents = () => {
           className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
+        </motion.button>
+      </div>
+    </div>
+  );
+
+  // Mobile Pagination component
+  const MobilePagination = () => (
+    <div className="flex flex-col items-center gap-3 py-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4">
+      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+        {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+      </div>
+      <div className="flex items-center gap-3">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => handlePageChange(pagination.page - 1)}
+          disabled={pagination.page <= 1}
+          className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed border border-neutral-200 dark:border-neutral-700"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </motion.button>
+        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 min-w-[80px] text-center">
+          {pagination.page} / {pagination.pages}
+        </span>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => handlePageChange(pagination.page + 1)}
+          disabled={pagination.page >= pagination.pages}
+          className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed border border-neutral-200 dark:border-neutral-700"
+        >
+          <ChevronRight className="w-5 h-5" />
         </motion.button>
       </div>
     </div>
@@ -377,22 +407,22 @@ const QAAllAgents = () => {
       className="space-y-4"
     >
       {/* Header */}
-      <motion.div variants={staggerItem} className="flex items-center justify-between">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">All Agents</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">All Agents</h2>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Manage all agents in the system ({pagination.total} total)
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* AI Analysis button */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleRunAnalysis}
             disabled={analyzing}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {analyzing ? (
               <motion.div
@@ -404,7 +434,8 @@ const QAAllAgents = () => {
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            {analyzing ? 'Analyzing...' : 'Run AI Analysis'}
+            <span className="hidden xs:inline">{analyzing ? 'Analyzing...' : 'Run AI Analysis'}</span>
+            <span className="xs:hidden">{analyzing ? '...' : 'Analyze'}</span>
           </motion.button>
 
           {/* Merge button - visible when 2 agents selected */}
@@ -417,10 +448,11 @@ const QAAllAgents = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={openMergeDialog}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors text-sm"
             >
               <GitMerge className="w-4 h-4" />
-              Merge Selected ({selectedAgents.length})
+              <span className="hidden xs:inline">Merge Selected ({selectedAgents.length})</span>
+              <span className="xs:hidden">Merge</span>
             </motion.button>
           )}
           </AnimatePresence>
@@ -429,9 +461,9 @@ const QAAllAgents = () => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-sm text-neutral-500 dark:text-neutral-400"
+              className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400"
             >
-              Select one more agent to merge
+              Select one more to merge
             </motion.div>
           )}
         </div>
@@ -449,7 +481,7 @@ const QAAllAgents = () => {
         />
       </motion.div>
 
-      {/* Table */}
+      {/* Agents List */}
       <motion.div variants={staggerItem}>
       {loading ? (
         <LoadingSkeleton />
@@ -468,86 +500,154 @@ const QAAllAgents = () => {
           </div>
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden"
-        >
-          <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-200 dark:border-neutral-800">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase w-10">
-                  {/* Checkbox column */}
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Position</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Team</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Tickets</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-              {agents.map((agent, idx) => {
-                const isSelected = selectedAgents.some(a => a._id === agent._id);
-                const canSelect = selectedAgents.length < 2 || isSelected;
+        <>
+          {/* Mobile Cards */}
+          <div className="block md:hidden space-y-3">
+            {agents.map((agent, idx) => {
+              const isSelected = selectedAgents.some(a => a._id === agent._id);
+              const canSelect = selectedAgents.length < 2 || isSelected;
 
-                return (
-                  <motion.tr
-                    key={agent._id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: duration.fast, delay: idx * 0.02 }}
-                    className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}
-                  >
-                    <td className="px-4 py-4">
+              return (
+                <motion.div
+                  key={agent._id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: duration.fast, delay: idx * 0.02 }}
+                  className={`bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 ${isSelected ? 'ring-2 ring-purple-500' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => toggleAgentSelection(agent)}
+                      disabled={!canSelect}
+                      className={`p-0.5 rounded transition-colors mt-1 ${canSelect ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700' : 'opacity-50 cursor-not-allowed'}`}
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-purple-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-neutral-400" />
+                      )}
+                    </motion.button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm font-medium text-neutral-900 dark:text-white truncate">{agent.name}</span>
+                        <span className="text-xs font-medium text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                          {agent.ticketCount || 0} tickets
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span>{agent.position || 'No position'}</span>
+                        <span>•</span>
+                        <span>{agent.team || 'No team'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setEditDialog({ open: true, agent: { ...agent } })}
+                      className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                    >
+                      <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                    </motion.button>
+                    {agent.ticketCount === 0 && (
                       <motion.button
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => toggleAgentSelection(agent)}
-                        disabled={!canSelect}
-                        className={`p-0.5 rounded transition-colors ${canSelect ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700' : 'opacity-50 cursor-not-allowed'}`}
+                        onClick={() => setDeleteDialog({ open: true, agent })}
+                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                       >
-                        {isSelected ? (
-                          <CheckSquare className="w-5 h-5 text-purple-600" />
-                        ) : (
-                          <Square className="w-5 h-5 text-neutral-400" />
-                        )}
+                        <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                       </motion.button>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-neutral-900 dark:text-white">{agent.name}</td>
-                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.position || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.team || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.ticketCount || 0}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+            <MobilePagination />
+          </div>
+
+          {/* Desktop Table */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="hidden md:block bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden"
+          >
+            <table className="w-full">
+              <thead className="bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-200 dark:border-neutral-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase w-10">
+                    {/* Checkbox column */}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Position</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Team</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Tickets</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                {agents.map((agent, idx) => {
+                  const isSelected = selectedAgents.some(a => a._id === agent._id);
+                  const canSelect = selectedAgents.length < 2 || isSelected;
+
+                  return (
+                    <motion.tr
+                      key={agent._id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: duration.fast, delay: idx * 0.02 }}
+                      className={`hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}
+                    >
+                      <td className="px-4 py-4">
                         <motion.button
-                          whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => setEditDialog({ open: true, agent: { ...agent } })}
-                          className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
-                          title="Edit"
+                          onClick={() => toggleAgentSelection(agent)}
+                          disabled={!canSelect}
+                          className={`p-0.5 rounded transition-colors ${canSelect ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700' : 'opacity-50 cursor-not-allowed'}`}
                         >
-                          <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-purple-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-neutral-400" />
+                          )}
                         </motion.button>
-                        {agent.ticketCount === 0 && (
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-neutral-900 dark:text-white">{agent.name}</td>
+                      <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.position || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.team || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">{agent.ticketCount || 0}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => setDeleteDialog({ open: true, agent })}
-                            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                            title="Delete"
+                            onClick={() => setEditDialog({ open: true, agent: { ...agent } })}
+                            className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                            title="Edit"
                           >
-                            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
                           </motion.button>
-                        )}
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <Pagination />
-        </motion.div>
+                          {agent.ticketCount === 0 && (
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => setDeleteDialog({ open: true, agent })}
+                              className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            </motion.button>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <Pagination />
+          </motion.div>
+        </>
       )}
       </motion.div>
 
@@ -651,15 +751,15 @@ const QAAllAgents = () => {
           setMergeDialog({ open: false });
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Merge Agents</DialogTitle>
           </DialogHeader>
 
           <div className="py-4 space-y-6">
             {/* Selected agents info */}
-            <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-3 sm:p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className={`p-3 rounded-lg border-2 ${mergeDestination === 'first' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
                   <div className="font-medium text-neutral-900 dark:text-white">{agent1?.name}</div>
                   <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -785,7 +885,7 @@ const QAAllAgents = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs text-neutral-500">Position</Label>
                     <div className="flex gap-2">
