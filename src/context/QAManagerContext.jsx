@@ -1332,9 +1332,12 @@ export const QAManagerProvider = ({ children }) => {
         if (assignmentRes.data.assignment) {
           hasExistingAssignment = true;
           existingAssignment = assignmentRes.data.assignment;
+          console.log('[GRADE] Found existing assignment:', existingAssignment.assignmentName, '(weekId:', existingAssignment.weekId, ', status:', existingAssignment.status, ')');
+        } else {
+          console.log('[GRADE] No existing assignment found for agent, will create new one');
         }
       } catch (err) {
-        console.log('No existing assignment found, will create new one');
+        console.warn('[GRADE] Error checking for existing assignment:', err.response?.status, err.message);
       }
 
       const csvResponse = await axios.post(

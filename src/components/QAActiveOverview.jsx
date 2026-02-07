@@ -97,6 +97,7 @@ const QAActiveOverview = () => {
   const [vacationDialog, setVacationDialog] = useState({ open: false, grader: null });
   const [agentHistoryDialog, setAgentHistoryDialog] = useState({ open: false, agent: null });
   const [excelImportDialog, setExcelImportDialog] = useState({ open: false, data: null, loading: false });
+  const [reassignGraderDialog, setReassignGraderDialog] = useState({ open: false, grader: null });
   const [editAgentDialog, setEditAgentDialog] = useState({ open: false, agent: null });
   const [editAgentForm, setEditAgentForm] = useState({ name: '', maestroName: '', position: '', team: '' });
   const [selectedGrader, setSelectedGrader] = useState('');
@@ -337,18 +338,22 @@ const QAActiveOverview = () => {
       setActionLoading(true);
 
       if (reassignDialog.single && reassignDialog.ticketIds.length === 1) {
-        await axios.put(
+        console.log(`[REASSIGN-TICKET] Reassigning ticket ${reassignDialog.ticketIds[0]} to grader ${selectedGrader}`);
+        const res = await axios.put(
           `${API_URL}/api/qa/tickets/${reassignDialog.ticketIds[0]}/reassign`,
           { newGraderId: selectedGrader },
           getAuthHeaders()
         );
+        console.log('[REASSIGN-TICKET] Response:', res.data);
         toast.success('Ticket reassigned successfully');
       } else {
-        await axios.post(
+        console.log(`[BULK-REASSIGN] Reassigning ${reassignDialog.ticketIds.length} tickets to grader ${selectedGrader}`);
+        const res = await axios.post(
           `${API_URL}/api/qa/tickets/bulk-reassign`,
           { ticketIds: reassignDialog.ticketIds, newGraderId: selectedGrader },
           getAuthHeaders()
         );
+        console.log('[BULK-REASSIGN] Response:', res.data);
         toast.success(`${reassignDialog.ticketIds.length} tickets reassigned successfully`);
       }
 
@@ -357,7 +362,7 @@ const QAActiveOverview = () => {
       setSelectedTickets([]);
       fetchData(true);
     } catch (err) {
-      console.error('Error reassigning tickets:', err);
+      console.error('[REASSIGN] Error:', err.response?.data || err);
       toast.error(err.response?.data?.message || 'Failed to reassign tickets');
     } finally {
       setActionLoading(false);
@@ -399,10 +404,13 @@ const QAActiveOverview = () => {
     try {
       setActionLoading(true);
 
-      await axios.post(
+      const agentId = reassignAgentDialog.agent.agentId || reassignAgentDialog.agent._id;
+      console.log(`[REASSIGN-AGENT] Reassigning agent "${reassignAgentDialog.agent.agentName}" (${agentId}) from ${reassignAgentDialog.fromGrader.name} to grader ${selectedGrader}`);
+
+      const res = await axios.post(
         `${API_URL}/api/qa/active-overview/reassign-agent`,
         {
-          agentId: reassignAgentDialog.agent._id,
+          agentId: agentId,
           fromGraderId: reassignAgentDialog.fromGrader._id,
           toGraderId: selectedGrader,
           moveTickets: true
@@ -410,12 +418,13 @@ const QAActiveOverview = () => {
         getAuthHeaders()
       );
 
-      toast.success(`Agent ${reassignAgentDialog.agent.agentName} reassigned successfully`);
+      console.log('[REASSIGN-AGENT] Response:', res.data);
+      toast.success(`Agent ${reassignAgentDialog.agent.agentName} reassigned successfully (${res.data.ticketsMoved} tickets moved)`);
       setReassignAgentDialog({ open: false, agent: null, fromGrader: null });
       setSelectedGrader('');
       fetchData(true);
     } catch (err) {
-      console.error('Error reassigning agent:', err);
+      console.error('[REASSIGN-AGENT] Error:', err.response?.data || err);
       toast.error(err.response?.data?.message || 'Failed to reassign agent');
     } finally {
       setActionLoading(false);
@@ -496,6 +505,48 @@ const QAActiveOverview = () => {
     } catch (err) {
       console.error('Error activating vacation mode:', err);
       toast.error(err.response?.data?.message || 'Failed to activate vacation mode');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReassignGraderTickets = async () => {
+    if (!selectedGrader) {
+      toast.error('Please select a grader');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      // Step 1: Create backup first
+      console.log('[REASSIGN-GRADER] Creating backup before reassignment...');
+      const backupRes = await axios.post(
+        `${API_URL}/api/qa/active-overview/backup-grader-tickets`,
+        { graderId: reassignGraderDialog.grader._id },
+        getAuthHeaders()
+      );
+      console.log('[REASSIGN-GRADER] Backup created:', backupRes.data);
+
+      // Step 2: Reassign all tickets
+      console.log('[REASSIGN-GRADER] Starting reassignment...');
+      const response = await axios.post(
+        `${API_URL}/api/qa/active-overview/reassign-grader-tickets`,
+        {
+          fromGraderId: reassignGraderDialog.grader._id,
+          toGraderId: selectedGrader
+        },
+        getAuthHeaders()
+      );
+
+      console.log('[REASSIGN-GRADER] Reassignment complete:', response.data);
+      toast.success(`${response.data.ticketsMoved} tickets reassigned from ${response.data.fromGrader} to ${response.data.toGrader}. ${response.data.agentsAutoAssigned} agents auto-assigned.`);
+      setReassignGraderDialog({ open: false, grader: null });
+      setSelectedGrader('');
+      fetchData(true);
+    } catch (err) {
+      console.error('[REASSIGN-GRADER] Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to reassign grader tickets');
     } finally {
       setActionLoading(false);
     }
@@ -1072,6 +1123,13 @@ const QAActiveOverview = () => {
 
                     {/* Quick Actions - visible on all sizes */}
                     <div className="flex items-center gap-1 sm:mr-4">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReassignGraderDialog({ open: true, grader: graderData.grader }); }}
+                        className="p-1 sm:p-1.5 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg"
+                        title="Reassign all tickets to another grader"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleArchiveForGrader(graderData.grader._id); }}
                         className="p-1 sm:p-1.5 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg"
@@ -2379,6 +2437,52 @@ const QAActiveOverview = () => {
             <button onClick={handleVacationMode} disabled={actionLoading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
               {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               <Plane className="w-4 h-4" />Activate Vacation Mode
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign All Grader Tickets Dialog */}
+      <Dialog open={reassignGraderDialog.open} onOpenChange={(open) => !open && setReassignGraderDialog({ open: false, grader: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-purple-500" />
+              Reassign All Tickets: {reassignGraderDialog.grader?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <p className="text-sm text-purple-700 dark:text-purple-300">This will:</p>
+              <ul className="mt-2 space-y-1 text-sm text-purple-600 dark:text-purple-400">
+                <li>- Create a backup of all tickets first</li>
+                <li>- Move ALL non-archived tickets to the selected grader</li>
+                <li>- Auto-assign all agents to the new grader</li>
+              </ul>
+            </div>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">Select a QA grader to reassign all tickets to:</p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {(data.qaGraderList || []).filter(g => g._id !== reassignGraderDialog.grader?._id).map(grader => (
+                <label key={grader._id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedGrader === grader._id ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'}`}>
+                  <input type="radio" name="graderAll" value={grader._id} checked={selectedGrader === grader._id} onChange={(e) => setSelectedGrader(e.target.value)} className="w-4 h-4 text-purple-600" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                      <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-neutral-900 dark:text-white">{grader.name}</p>
+                      <p className="text-xs text-neutral-500">{grader.email}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <button onClick={() => { setReassignGraderDialog({ open: false, grader: null }); setSelectedGrader(''); }} disabled={actionLoading} className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg">Cancel</button>
+            <button onClick={handleReassignGraderTickets} disabled={!selectedGrader || actionLoading} className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
+              {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              <ArrowRight className="w-4 h-4" />Reassign All
             </button>
           </DialogFooter>
         </DialogContent>
