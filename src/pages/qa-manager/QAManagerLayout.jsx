@@ -32,6 +32,9 @@ import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from
 import TicketDialog from './TicketDialog';
 import { useAuth } from '../../context/AuthContext';
 
+// Hardcoded users with full QA access (by email)
+const HARDCODED_QA_ADMINS = ['vasilijevitorovic@mebit.io'];
+
 // Inner layout component that uses the context
 const QAManagerLayoutInner = () => {
   const navigate = useNavigate();
@@ -251,8 +254,8 @@ const QAManagerLayoutInner = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, filters.searchMode, navigate, openTicketDialog, handleExportSelectedTickets, setFilters, fetchDashboardStats, fetchAgents, fetchTickets]);
 
-  // Check if user is admin or reviewer (based on role)
-  const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
+  // Check if user is admin or reviewer (based on role or hardcoded email)
+  const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin' || HARDCODED_QA_ADMINS.includes(user?.email);
   const { isReviewer, reviewPendingCount } = useQAManager();
 
   return (
@@ -1446,7 +1449,7 @@ const ViewTicketDialog = ({
   if (!baseTicket) return null;
 
   const isCreator = ticket.createdBy === user?._id || ticket.createdBy?._id === user?._id;
-  const isAdminForEdit = user?.role === 'admin' || user?.role === 'qa-admin';
+  const isAdminForEdit = user?.role === 'admin' || user?.role === 'qa-admin' || HARDCODED_QA_ADMINS.includes(user?.email);
   const canEdit = !ticket.isArchived || isCreator || isAdminForEdit;
 
   return (

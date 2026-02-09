@@ -41,6 +41,9 @@ import SendTicketModal from '../components/SendTicketModal';
 import BugReportButton from '../components/BugReportButton';
 import BugReportsAdmin from '../components/BugReportsAdmin';
 
+// Hardcoded users with full QA access (by email)
+const HARDCODED_QA_ADMINS = ['vasilijevitorovic@mebit.io'];
+
 // Minimal Button Component (moved outside to prevent re-renders)
 const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, disabled, type = 'button' }) => {
   const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
@@ -77,7 +80,7 @@ const QAManager = () => {
 
   // Role-based access for admin tabs
   // qa-admin and admin roles can see admin pages (All Agents, Statistics, Active Overview, Bugs)
-  const isQAAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
+  const isQAAdmin = user?.role === 'admin' || user?.role === 'qa-admin' || HARDCODED_QA_ADMINS.includes(user?.email);
 
   // State
   const [loading, setLoading] = useState(true);

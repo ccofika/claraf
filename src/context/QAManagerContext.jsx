@@ -13,6 +13,9 @@ const QA_ADMIN_ROLES = ['admin', 'qa-admin'];
 // Roles that can access the Review feature
 const REVIEWER_ROLES = ['admin', 'qa-admin'];
 
+// Hardcoded users with full QA access (by email)
+const HARDCODED_QA_ADMINS = ['vasilijevitorovic@mebit.io'];
+
 export const useQAManager = () => {
   const context = useContext(QAManagerContext);
   if (!context) {
@@ -27,11 +30,11 @@ export const QAManagerProvider = ({ children }) => {
   const location = useLocation();
   const API_URL = process.env.REACT_APP_API_URL;
 
-  // Check if current user is a QA admin (admin or qa-admin role)
-  const isQAAdmin = QA_ADMIN_ROLES.includes(user?.role);
+  // Check if current user is a QA admin (admin or qa-admin role, or hardcoded email)
+  const isQAAdmin = QA_ADMIN_ROLES.includes(user?.role) || HARDCODED_QA_ADMINS.includes(user?.email);
 
-  // Check if current user is a reviewer (can access Review feature)
-  const isReviewer = REVIEWER_ROLES.includes(user?.role);
+  // Check if current user is a reviewer (can access Review feature, or hardcoded email)
+  const isReviewer = REVIEWER_ROLES.includes(user?.role) || HARDCODED_QA_ADMINS.includes(user?.email);
 
   // ============================================
   // HELPER: Get active tab from URL path
