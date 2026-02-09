@@ -319,22 +319,27 @@ const TicketRichTextEditor = ({
   }, [enableMacros, getTextBeforeCursor, macroTrigger.active]);
 
   // Check if macro has extra data (categories or scorecard)
-  // New structure: scorecardData[position][variant] = { key: value }
+  // New structure: goodScorecardData[position][variant] = { key: value }, badScorecardData[position][variant] = { key: value }
   const macroHasExtraData = useCallback((macro) => {
     const hasCategories = macro.categories && macro.categories.length > 0;
-    const scorecardDataForPosition = agentPosition && macro.scorecardData?.[agentPosition];
-    const hasScorecardValues = scorecardDataForPosition && (
-      // Check if any variant has values
-      Object.keys(scorecardDataForPosition).some(variantKey => {
-        const values = scorecardDataForPosition[variantKey];
+
+    // Check both good and bad scorecard data
+    const checkScorecardData = (scorecardData) => {
+      const dataForPosition = agentPosition && scorecardData?.[agentPosition];
+      return dataForPosition && Object.keys(dataForPosition).some(variantKey => {
+        const values = dataForPosition[variantKey];
         return values && typeof values === 'object' && Object.keys(values).length > 0;
-      })
-    );
-    return hasCategories || hasScorecardValues;
+      });
+    };
+
+    const hasGoodScorecardValues = checkScorecardData(macro.goodScorecardData);
+    const hasBadScorecardValues = checkScorecardData(macro.badScorecardData);
+
+    return hasCategories || hasGoodScorecardValues || hasBadScorecardValues;
   }, [agentPosition]);
 
   // Insert macro feedback into editor (shared logic)
-  const insertMacroFeedback = useCallback((macro, triggerText) => {
+  const insertMacroFeedback = useCallback((macro, triggerText, feedbackType = 'good') => {
     if (!editorRef.current) return;
 
     // Get current HTML content
@@ -348,8 +353,11 @@ const TicketRichTextEditor = ({
       }
     }
 
+    // Get the correct feedback based on type (good/bad)
+    const macroFeedback = feedbackType === 'bad' ? macro.badFeedback : macro.goodFeedback;
+
     // Append macro content
-    const newHtml = currentHtml + macro.feedback;
+    const newHtml = currentHtml + (macroFeedback || '');
 
     // Update DOM directly - the useEffect won't update innerHTML while editor is focused
     editorRef.current.innerHTML = newHtml;
@@ -387,12 +395,12 @@ const TicketRichTextEditor = ({
         triggerText
       });
     } else {
-      // No extra data - insert directly
-      insertMacroFeedback(macro, triggerText);
+      // No extra data - insert directly with default 'good' feedback type
+      insertMacroFeedback(macro, triggerText, 'good');
 
       // Notify parent with default options
       if (onMacroApply) {
-        onMacroApply(macro, { applyCategories: false, applyScorecard: false });
+        onMacroApply(macro, { applyCategories: false, applyScorecard: false, feedbackType: 'good' });
       }
     }
   }, [getTextBeforeCursor, macroHasExtraData, insertMacroFeedback, onMacroApply]);
@@ -402,8 +410,9 @@ const TicketRichTextEditor = ({
     const { macro, triggerText } = macroConfirmModal;
     if (!macro) return;
 
-    // Insert the feedback
-    insertMacroFeedback(macro, triggerText);
+    // Insert the feedback with the selected type (good/bad)
+    const feedbackType = options.feedbackType || 'good';
+    insertMacroFeedback(macro, triggerText, feedbackType);
 
     // Notify parent with chosen options
     if (onMacroApply) {

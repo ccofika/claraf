@@ -991,9 +991,9 @@ const QAManagerLayoutInner = () => {
       <ChooseMacroModal
         open={chooseMacroDialog.open}
         onOpenChange={(open) => setChooseMacroDialog({ ...chooseMacroDialog, open })}
-        onSelectMacro={(macro) => {
+        onSelectMacro={(macro, options = {}) => {
           if (chooseMacroDialog.onSelect) {
-            chooseMacroDialog.onSelect(macro);
+            chooseMacroDialog.onSelect(macro, options);
           }
           setChooseMacroDialog({ open: false, onSelect: null });
         }}

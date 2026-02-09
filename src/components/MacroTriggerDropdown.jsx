@@ -166,7 +166,9 @@ const MacroTriggerDropdown = ({
           </div>
           {results.map((macro, index) => {
             const hasCategories = macro.categories && macro.categories.length > 0;
-            const hasScorecard = macro.scorecardData && Object.keys(macro.scorecardData).length > 0;
+            const hasGoodScorecard = macro.goodScorecardData && Object.keys(macro.goodScorecardData).length > 0;
+            const hasBadScorecard = macro.badScorecardData && Object.keys(macro.badScorecardData).length > 0;
+            const hasScorecard = hasGoodScorecard || hasBadScorecard;
 
             return (
               <button

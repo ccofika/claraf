@@ -26,12 +26,17 @@ const SaveAsMacroModal = ({
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
-    feedback: '',
+    goodFeedback: '',
+    badFeedback: '',
     categories: [],
-    scorecardData: {},
+    goodScorecardData: {},
+    badScorecardData: {},
     isPublic: false,
     sharedWith: []
   });
+
+  // Track which feedback version is being edited (good or bad)
+  const [editingVersion, setEditingVersion] = useState('good');
 
   // QA Graders for sharing
   const [qaGraders, setQaGraders] = useState([]);
@@ -103,14 +108,18 @@ const SaveAsMacroModal = ({
     if (open) {
       const position = agentPosition && hasScorecard(agentPosition) ? agentPosition : 'Junior Scorecard';
       setSelectedScorecardPosition(position);
+      // Initial data goes to the "good" version
       setFormData({
         title: '',
-        feedback: initialFeedback || '',
+        goodFeedback: initialFeedback || '',
+        badFeedback: '',
         categories: initialCategories || [],
-        scorecardData: convertInitialScorecardData(initialScorecardData) || {},
+        goodScorecardData: convertInitialScorecardData(initialScorecardData) || {},
+        badScorecardData: {},
         isPublic: false,
         sharedWith: []
       });
+      setEditingVersion('good');
       setCategorySearch('');
       setShowCategoryDropdown(false);
       setShareSearch('');
@@ -296,28 +305,32 @@ const SaveAsMacroModal = ({
     return grader?.name || 'Unknown';
   };
 
+  // Get the current scorecard data based on editing version (good/bad)
+  const currentScorecardData = editingVersion === 'good' ? formData.goodScorecardData : formData.badScorecardData;
+  const scorecardDataKey = editingVersion === 'good' ? 'goodScorecardData' : 'badScorecardData';
+
   // Get values for a specific position and variant
   const getValuesForVariant = (position, variantKey) => {
-    return formData.scorecardData[position]?.[variantKey] || {};
+    return currentScorecardData[position]?.[variantKey] || {};
   };
 
   // Update scorecard values for a specific position and variant
   const updateScorecardValues = (position, variantKey, values) => {
     setFormData(prev => ({
       ...prev,
-      scorecardData: {
-        ...prev.scorecardData,
+      [scorecardDataKey]: {
+        ...prev[scorecardDataKey],
         [position]: {
-          ...prev.scorecardData[position],
+          ...prev[scorecardDataKey][position],
           [variantKey]: values
         }
       }
     }));
   };
 
-  // Check if a position has any scorecard values
+  // Check if a position has any scorecard values (for current editing version)
   const positionHasValues = (position) => {
-    const data = formData.scorecardData[position];
+    const data = currentScorecardData[position];
     if (!data) return false;
     return Object.keys(data).some(variantKey => {
       const values = data[variantKey];
@@ -333,7 +346,7 @@ const SaveAsMacroModal = ({
 
   // Copy matching values from another scorecard position
   const copyFromScorecard = (sourcePosition) => {
-    const sourceData = formData.scorecardData[sourcePosition];
+    const sourceData = currentScorecardData[sourcePosition];
     if (!sourceData) return;
 
     // Get the config for the target position
@@ -362,8 +375,8 @@ const SaveAsMacroModal = ({
 
     setFormData(prev => ({
       ...prev,
-      scorecardData: {
-        ...prev.scorecardData,
+      [scorecardDataKey]: {
+        ...prev[scorecardDataKey],
         [selectedScorecardPosition]: newPositionData
       }
     }));
@@ -377,8 +390,12 @@ const SaveAsMacroModal = ({
       toast.error('Title is required');
       return;
     }
-    if (!formData.feedback.trim()) {
-      toast.error('Feedback content is required');
+    if (!formData.goodFeedback.trim()) {
+      toast.error('Good feedback content is required');
+      return;
+    }
+    if (!formData.badFeedback.trim()) {
+      toast.error('Bad feedback content is required');
       return;
     }
 
@@ -386,9 +403,11 @@ const SaveAsMacroModal = ({
     try {
       const result = await createMacro({
         title: formData.title,
-        feedback: formData.feedback,
+        goodFeedback: formData.goodFeedback,
+        badFeedback: formData.badFeedback,
         categories: formData.categories,
-        scorecardData: formData.scorecardData,
+        goodScorecardData: formData.goodScorecardData,
+        badScorecardData: formData.badScorecardData,
         isPublic: formData.isPublic,
         sharedWith: formData.sharedWith
       });
@@ -451,20 +470,54 @@ const SaveAsMacroModal = ({
               </p>
             </motion.div>
 
-            {/* Feedback Content */}
+            {/* Feedback Content with Good/Bad Selector */}
             <motion.div variants={staggerItem} className="flex-1">
-              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                Feedback Content <span className="text-red-500">*</span>
-              </Label>
-              <TicketRichTextEditor
-                value={formData.feedback}
-                onChange={(html) => setFormData(prev => ({ ...prev, feedback: html }))}
-                placeholder="Enter the feedback template content..."
-                rows={10}
-                className="min-h-[200px] max-h-[45vh] overflow-y-auto"
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-xs text-gray-600 dark:text-neutral-400">
+                  Feedback Content <span className="text-red-500">*</span>
+                </Label>
+                {/* Good/Bad Version Selector */}
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-neutral-800 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingVersion('good')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      editingVersion === 'good'
+                        ? 'bg-green-500 text-white'
+                        : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    Good
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingVersion('bad')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      editingVersion === 'bad'
+                        ? 'bg-red-500 text-white'
+                        : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    Bad
+                  </button>
+                </div>
+              </div>
+              <div className={`rounded-lg ${editingVersion === 'good' ? 'ring-2 ring-green-200 dark:ring-green-800' : 'ring-2 ring-red-200 dark:ring-red-800'}`}>
+                <TicketRichTextEditor
+                  value={editingVersion === 'good' ? formData.goodFeedback : formData.badFeedback}
+                  onChange={(html) => setFormData(prev => ({
+                    ...prev,
+                    [editingVersion === 'good' ? 'goodFeedback' : 'badFeedback']: html
+                  }))}
+                  placeholder={`Enter the ${editingVersion === 'good' ? 'GOOD' : 'BAD'} feedback template content...`}
+                  rows={10}
+                  className="min-h-[200px] max-h-[45vh] overflow-y-auto"
+                />
+              </div>
               <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-                You can edit the content before saving.
+                {editingVersion === 'good'
+                  ? 'This feedback will be used when the ticket is marked as GOOD.'
+                  : 'This feedback will be used when the ticket is marked as BAD.'}
               </p>
             </motion.div>
           </motion.div>

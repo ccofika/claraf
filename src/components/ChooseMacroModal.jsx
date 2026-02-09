@@ -34,6 +34,7 @@ const ChooseMacroModal = ({
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedFeedbackType, setSelectedFeedbackType] = useState('good'); // 'good' or 'bad'
 
   // Check if current user is admin (admin or qa-admin role)
   const isAdmin = MACRO_ADMIN_ROLES.includes(user?.role);
@@ -50,8 +51,11 @@ const ChooseMacroModal = ({
   const availableVariants = scorecardConfig?.variants || [];
 
   // Check if macro has extra data (defined early for use in useEffect)
-  // New structure: scorecardData[position][variant] = { key: value }
-  const scorecardDataForPosition = agentPosition && selectedMacro?.scorecardData?.[agentPosition];
+  // New structure: goodScorecardData/badScorecardData[position][variant] = { key: value }
+  const currentScorecardData = selectedFeedbackType === 'good'
+    ? selectedMacro?.goodScorecardData
+    : selectedMacro?.badScorecardData;
+  const scorecardDataForPosition = agentPosition && currentScorecardData?.[agentPosition];
   const hasScorecardValues = scorecardDataForPosition && (
     // Check if any variant has values
     Object.keys(scorecardDataForPosition).some(variantKey => {
@@ -68,6 +72,7 @@ const ChooseMacroModal = ({
       setSearchTerm('');
       setSearchResults([]);
       setSelectedVariant(null);
+      setSelectedFeedbackType('good');
       // Reset admin state
       setSelectedCreator(null);
       setShowCreatorDropdown(false);
@@ -149,7 +154,11 @@ const ChooseMacroModal = ({
   // Handle select - feedback only
   const handleSelectFeedbackOnly = () => {
     if (selectedMacro && onSelectMacro) {
-      onSelectMacro(selectedMacro, { applyCategories: false, applyScorecard: false });
+      onSelectMacro(selectedMacro, {
+        applyCategories: false,
+        applyScorecard: false,
+        feedbackType: selectedFeedbackType // Pass the selected feedback type (good/bad)
+      });
       onOpenChange(false);
     }
   };
@@ -160,32 +169,42 @@ const ChooseMacroModal = ({
       onSelectMacro(selectedMacro, {
         applyCategories: true,
         applyScorecard: true,
-        scorecardVariant: selectedVariant // Pass the selected variant
+        scorecardVariant: selectedVariant, // Pass the selected variant
+        feedbackType: selectedFeedbackType, // Pass the selected feedback type (good/bad)
+        scorecardData: currentScorecardData // Pass the correct scorecard data
       });
       onOpenChange(false);
     }
   };
 
   // Handle double click to select immediately (feedback + all data if exists)
+  // Double-click defaults to 'good' feedback type
   const handleDoubleClick = (macro) => {
     if (onSelectMacro) {
       const macroHasCategories = macro.categories && macro.categories.length > 0;
-      const macroHasScorecard = agentPosition && macro.scorecardData?.[agentPosition] &&
-        Object.keys(macro.scorecardData[agentPosition].values || {}).length > 0;
+      // Check good scorecard data since double-click defaults to good
+      const goodScorecardForPosition = macro.goodScorecardData?.[agentPosition];
+      const macroHasScorecard = agentPosition && goodScorecardForPosition &&
+        Object.keys(goodScorecardForPosition).some(vk => {
+          const vals = goodScorecardForPosition[vk];
+          return vals && typeof vals === 'object' && Object.keys(vals).length > 0;
+        });
 
       // Determine variant for double-click
       let variant = null;
       if (macroHasScorecard && needsVariantSelection) {
         variant = currentScorecardVariant ||
-          macro.scorecardData?.[agentPosition]?.variant ||
           (availableVariants.length > 0 ? availableVariants[0].key : null);
       }
 
       // If macro has extra data, apply all. Otherwise just feedback.
+      // Double-click defaults to 'good' feedback
       onSelectMacro(macro, {
         applyCategories: macroHasCategories,
         applyScorecard: macroHasScorecard,
-        scorecardVariant: variant
+        scorecardVariant: variant,
+        feedbackType: 'good', // Default to good on double-click
+        scorecardData: macro.goodScorecardData
       });
       onOpenChange(false);
     }
@@ -304,8 +323,11 @@ const ChooseMacroModal = ({
                 <motion.div variants={staggerContainer} initial="initial" animate="animate">
                   {displayMacros.map((macro) => {
                     const macroHasCategories = macro.categories && macro.categories.length > 0;
-                    const macroHasScorecard = agentPosition && macro.scorecardData?.[agentPosition] &&
-                      Object.keys(macro.scorecardData[agentPosition].values || {}).length > 0;
+                    const hasGoodScorecard = agentPosition && macro.goodScorecardData?.[agentPosition] &&
+                      Object.keys(macro.goodScorecardData[agentPosition] || {}).length > 0;
+                    const hasBadScorecard = agentPosition && macro.badScorecardData?.[agentPosition] &&
+                      Object.keys(macro.badScorecardData[agentPosition] || {}).length > 0;
+                    const macroHasScorecard = hasGoodScorecard || hasBadScorecard;
 
                     return (
                       <motion.button
@@ -389,15 +411,46 @@ const ChooseMacroModal = ({
                     </p>
                   </div>
 
-                  {/* Feedback Preview */}
+                  {/* Feedback Preview with Good/Bad Selector */}
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      Feedback Content
-                    </p>
-                    <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-200 dark:border-neutral-800 p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" />
+                        Feedback Content
+                      </p>
+                      {/* Good/Bad Selector */}
+                      <div className="flex items-center gap-1 bg-gray-100 dark:bg-neutral-800 rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFeedbackType('good')}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                            selectedFeedbackType === 'good'
+                              ? 'bg-green-500 text-white'
+                              : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                          }`}
+                        >
+                          Good
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFeedbackType('bad')}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                            selectedFeedbackType === 'bad'
+                              ? 'bg-red-500 text-white'
+                              : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                          }`}
+                        >
+                          Bad
+                        </button>
+                      </div>
+                    </div>
+                    <div className={`bg-gray-50 dark:bg-neutral-950 rounded-lg border p-3 ${
+                      selectedFeedbackType === 'good'
+                        ? 'border-green-200 dark:border-green-800'
+                        : 'border-red-200 dark:border-red-800'
+                    }`}>
                       <TicketContentDisplay
-                        content={selectedMacro.feedback}
+                        content={selectedFeedbackType === 'good' ? selectedMacro.goodFeedback : selectedMacro.badFeedback}
                         className="text-sm text-gray-700 dark:text-neutral-300"
                       />
                     </div>

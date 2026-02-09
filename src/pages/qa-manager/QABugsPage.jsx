@@ -9,6 +9,7 @@ const QABugsPage = () => {
     <BugReportsAdmin
       getAuthHeaders={getAuthHeaders}
       userEmail={user?.email}
+      userRole={user?.role}
     />
   );
 };

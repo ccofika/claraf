@@ -816,7 +816,7 @@ const TicketDialog = ({
                     agentPosition={agentPosition}
                     currentScorecardVariant={formData.scorecardVariant}
                     onMacroApply={(macro, options = {}) => {
-                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good', scorecardData = null } = options;
 
                       // Build updates object
                       const updates = {};
@@ -827,9 +827,10 @@ const TicketDialog = ({
                       }
 
                       // Apply scorecard if requested and matches agent position
-                      // New structure: scorecardData[position][variant] = { key: value }
-                      if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
-                        const positionData = macro.scorecardData[agentPosition];
+                      // Use scorecardData from options (correct good/bad version) or fallback to macro fields
+                      const scorecardSource = scorecardData || (feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData);
+                      if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+                        const positionData = scorecardSource[agentPosition];
                         // Use the variant from options (selected by user) or default to first available
                         const targetVariant = scorecardVariant || Object.keys(positionData)[0];
                         const values = positionData[targetVariant];
@@ -1009,13 +1010,16 @@ const TicketDialog = ({
                     agentPosition={agentPosition}
                     currentScorecardVariant={formData.scorecardVariant}
                     onSelectMacro={(macro, options = {}) => {
-                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good' } = options;
+
+                      // Get the correct feedback based on selected type (good/bad)
+                      const macroFeedback = feedbackType === 'bad' ? macro.badFeedback : macro.goodFeedback;
 
                       // Always apply feedback
                       const currentFeedback = formData.feedback || '';
                       const separator = currentFeedback.trim() ? '\n\n' : '';
                       const updates = {
-                        feedback: currentFeedback + separator + macro.feedback
+                        feedback: currentFeedback + separator + macroFeedback
                       };
 
                       // Apply categories if requested
@@ -1024,8 +1028,10 @@ const TicketDialog = ({
                       }
 
                       // Apply scorecard if requested and matches agent position
-                      if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
-                        const positionData = macro.scorecardData[agentPosition];
+                      // Use correct good/bad scorecard data
+                      const scorecardSource = feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData;
+                      if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+                        const positionData = scorecardSource[agentPosition];
                         const targetVariant = scorecardVariant || Object.keys(positionData)[0];
                         const values = positionData[targetVariant];
                         if (values && typeof values === 'object' && Object.keys(values).length > 0) {
@@ -1089,13 +1095,16 @@ const TicketDialog = ({
         agentPosition={agentPosition}
         currentScorecardVariant={formData.scorecardVariant}
         onSelectMacro={(macro, options = {}) => {
-          const { applyCategories = false, applyScorecard = false, scorecardVariant = null } = options;
+          const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good', scorecardData = null } = options;
+
+          // Get the correct feedback based on selected type (good/bad)
+          const macroFeedback = feedbackType === 'bad' ? macro.badFeedback : macro.goodFeedback;
 
           // Always apply feedback
           const currentFeedback = formData.feedback || '';
           const separator = currentFeedback.trim() ? '\n\n' : '';
           const updates = {
-            feedback: currentFeedback + separator + macro.feedback
+            feedback: currentFeedback + separator + macroFeedback
           };
 
           // Apply categories if requested
@@ -1104,9 +1113,10 @@ const TicketDialog = ({
           }
 
           // Apply scorecard if requested and matches agent position
-          // New structure: scorecardData[position][variant] = { key: value }
-          if (applyScorecard && agentPosition && macro.scorecardData?.[agentPosition]) {
-            const positionData = macro.scorecardData[agentPosition];
+          // Use scorecardData from options (correct good/bad version) or fallback to macro fields
+          const scorecardSource = scorecardData || (feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData);
+          if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+            const positionData = scorecardSource[agentPosition];
             // Use the variant from options (selected by user) or default to first available
             const targetVariant = scorecardVariant || Object.keys(positionData)[0];
             const values = positionData[targetVariant];

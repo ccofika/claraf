@@ -55,12 +55,17 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   // Form state for editing/creating
   const [formData, setFormData] = useState({
     title: '',
-    feedback: '',
+    goodFeedback: '',
+    badFeedback: '',
     categories: [],
-    scorecardData: {},
+    goodScorecardData: {},
+    badScorecardData: {},
     isPublic: false,
     sharedWith: []
   });
+
+  // Track which feedback version is being edited (good or bad)
+  const [editingVersion, setEditingVersion] = useState('good');
 
   // QA Graders for sharing
   const [qaGraders, setQaGraders] = useState([]);
@@ -123,8 +128,9 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
       fetchQAGraders().then(graders => setQaGraders(graders || []));
       setSelectedMacro(null);
       setIsCreating(false);
-      setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
+      setFormData({ title: '', goodFeedback: '', badFeedback: '', categories: [], goodScorecardData: {}, badScorecardData: {}, isPublic: false, sharedWith: [] });
       setSelectedScorecardPosition('Junior Scorecard');
+      setEditingVersion('good');
       setShareSearch('');
       setShowShareDropdown(false);
       // Reset admin state
@@ -178,17 +184,21 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
       const sharedWithIds = (selectedMacro.sharedWith || []).map(s => s.userId || s);
       setFormData({
         title: selectedMacro.title,
-        feedback: selectedMacro.feedback,
+        goodFeedback: selectedMacro.goodFeedback || '',
+        badFeedback: selectedMacro.badFeedback || '',
         categories: selectedMacro.categories || [],
-        scorecardData: selectedMacro.scorecardData || {},
+        goodScorecardData: selectedMacro.goodScorecardData || {},
+        badScorecardData: selectedMacro.badScorecardData || {},
         isPublic: selectedMacro.isPublic || false,
         sharedWith: sharedWithIds
       });
       setIsCreating(false);
+      setEditingVersion('good');
       loadUsedInTickets(selectedMacro._id);
       // Set initial scorecard position to first one that has data, or Junior
-      const positionsWithData = SCORECARD_POSITIONS.filter(pos => selectedMacro.scorecardData?.[pos]);
-      setSelectedScorecardPosition(positionsWithData[0] || 'Junior Scorecard');
+      const goodPositions = SCORECARD_POSITIONS.filter(pos => selectedMacro.goodScorecardData?.[pos]);
+      const badPositions = SCORECARD_POSITIONS.filter(pos => selectedMacro.badScorecardData?.[pos]);
+      setSelectedScorecardPosition(goodPositions[0] || badPositions[0] || 'Junior Scorecard');
       setShareSearch('');
       setShowShareDropdown(false);
     }
@@ -360,28 +370,32 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const currentScorecardConfig = getScorecardConfig(selectedScorecardPosition);
   const needsVariantForPosition = requiresVariantSelection(selectedScorecardPosition);
 
+  // Get the current scorecard data based on editing version (good/bad)
+  const currentScorecardData = editingVersion === 'good' ? formData.goodScorecardData : formData.badScorecardData;
+  const scorecardDataKey = editingVersion === 'good' ? 'goodScorecardData' : 'badScorecardData';
+
   // Helper to get values for a specific variant
   const getValuesForVariant = (position, variantKey) => {
-    return formData.scorecardData[position]?.[variantKey] || {};
+    return currentScorecardData[position]?.[variantKey] || {};
   };
 
   // Update scorecard values for a specific variant
   const updateScorecardValues = (position, variantKey, values) => {
     setFormData(prev => ({
       ...prev,
-      scorecardData: {
-        ...prev.scorecardData,
+      [scorecardDataKey]: {
+        ...prev[scorecardDataKey],
         [position]: {
-          ...prev.scorecardData[position],
+          ...prev[scorecardDataKey][position],
           [variantKey]: values
         }
       }
     }));
   };
 
-  // Check if position has any scorecard values saved
+  // Check if position has any scorecard values saved (for current editing version)
   const positionHasValues = (position) => {
-    const data = formData.scorecardData[position];
+    const data = currentScorecardData[position];
     if (!data) return false;
     return Object.keys(data).some(variantKey => {
       const values = data[variantKey];
@@ -397,7 +411,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
 
   // Copy matching values from another scorecard
   const copyFromScorecard = (sourcePosition) => {
-    const sourceData = formData.scorecardData[sourcePosition];
+    const sourceData = currentScorecardData[sourcePosition];
     if (!sourceData) return;
 
     // Get the config for the target position
@@ -426,8 +440,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
 
     setFormData(prev => ({
       ...prev,
-      scorecardData: {
-        ...prev.scorecardData,
+      [scorecardDataKey]: {
+        ...prev[scorecardDataKey],
         [selectedScorecardPosition]: newPositionData
       }
     }));
@@ -463,9 +477,10 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const handleCreateNew = () => {
     setSelectedMacro(null);
     setIsCreating(true);
-    setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
+    setFormData({ title: '', goodFeedback: '', badFeedback: '', categories: [], goodScorecardData: {}, badScorecardData: {}, isPublic: false, sharedWith: [] });
     setUsedInTickets({ tickets: [], total: 0, hasMore: false });
     setSelectedScorecardPosition('Junior Scorecard');
+    setEditingVersion('good');
     setShareSearch('');
     setShowShareDropdown(false);
   };
@@ -478,8 +493,12 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
         toast.error('Title is required');
         return;
       }
-      if (!formData.feedback.trim()) {
-        toast.error('Feedback content is required');
+      if (!formData.goodFeedback.trim()) {
+        toast.error('Good feedback content is required');
+        return;
+      }
+      if (!formData.badFeedback.trim()) {
+        toast.error('Bad feedback content is required');
         return;
       }
     }
@@ -494,9 +513,11 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
       // Include content if can edit (owner or admin)
       if (canEdit) {
         dataToSave.title = formData.title;
-        dataToSave.feedback = formData.feedback;
+        dataToSave.goodFeedback = formData.goodFeedback;
+        dataToSave.badFeedback = formData.badFeedback;
         dataToSave.categories = formData.categories;
-        dataToSave.scorecardData = formData.scorecardData;
+        dataToSave.goodScorecardData = formData.goodScorecardData;
+        dataToSave.badScorecardData = formData.badScorecardData;
       }
 
       if (isCreating) {
@@ -534,7 +555,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
     if (result.success) {
       toast.success('Macro deleted successfully');
       setSelectedMacro(null);
-      setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
+      setFormData({ title: '', goodFeedback: '', badFeedback: '', categories: [], goodScorecardData: {}, badScorecardData: {}, isPublic: false, sharedWith: [] });
     } else {
       toast.error(result.error);
     }
@@ -835,7 +856,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         {macro.isOwner ? (
                           <>
                             Used {macro.usageCount || 0} times
-                            {(macro.categories?.length > 0 || Object.keys(macro.scorecardData || {}).length > 0) && (
+                            {(macro.categories?.length > 0 || Object.keys(macro.goodScorecardData || {}).length > 0 || Object.keys(macro.badScorecardData || {}).length > 0) && (
                               <span className="ml-2 text-blue-500">+data</span>
                             )}
                           </>
@@ -920,19 +941,56 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         )}
                       </div>
 
-                      {/* Feedback Content */}
+                      {/* Feedback Content with Good/Bad Selector */}
                       <div>
-                        <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">
-                          Feedback Content {canEdit && <span className="text-red-500">*</span>}
-                        </Label>
-                        <TicketRichTextEditor
-                          value={formData.feedback}
-                          onChange={(html) => setFormData({ ...formData, feedback: html })}
-                          placeholder="Enter the feedback template content..."
-                          rows={10}
-                          className="min-h-[200px]"
-                          disabled={!canEdit}
-                        />
+                        <div className="flex items-center justify-between mb-1.5">
+                          <Label className="text-xs text-gray-600 dark:text-neutral-400">
+                            Feedback Content {canEdit && <span className="text-red-500">*</span>}
+                          </Label>
+                          {/* Good/Bad Version Selector */}
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-neutral-800 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditingVersion('good')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                editingVersion === 'good'
+                                  ? 'bg-green-500 text-white'
+                                  : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              Good
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingVersion('bad')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                editingVersion === 'bad'
+                                  ? 'bg-red-500 text-white'
+                                  : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              Bad
+                            </button>
+                          </div>
+                        </div>
+                        <div className={`rounded-lg ${editingVersion === 'good' ? 'ring-2 ring-green-200 dark:ring-green-800' : 'ring-2 ring-red-200 dark:ring-red-800'}`}>
+                          <TicketRichTextEditor
+                            value={editingVersion === 'good' ? formData.goodFeedback : formData.badFeedback}
+                            onChange={(html) => setFormData({
+                              ...formData,
+                              [editingVersion === 'good' ? 'goodFeedback' : 'badFeedback']: html
+                            })}
+                            placeholder={`Enter the ${editingVersion === 'good' ? 'GOOD' : 'BAD'} feedback template content...`}
+                            rows={10}
+                            className="min-h-[200px]"
+                            disabled={!canEdit}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                          {editingVersion === 'good'
+                            ? 'This feedback will be used when the ticket is marked as GOOD.'
+                            : 'This feedback will be used when the ticket is marked as BAD.'}
+                        </p>
                       </div>
 
                       {/* Used In Tickets - Only show for existing macros */}
@@ -1296,7 +1354,7 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
                         onClick={() => {
                           if (isCreating) {
                             setIsCreating(false);
-                            setFormData({ title: '', feedback: '', categories: [], scorecardData: {}, isPublic: false, sharedWith: [] });
+                            setFormData({ title: '', goodFeedback: '', badFeedback: '', categories: [], goodScorecardData: {}, badScorecardData: {}, isPublic: false, sharedWith: [] });
                           } else {
                             setSelectedMacro(null);
                           }

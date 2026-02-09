@@ -24,6 +24,7 @@ const MacroSuggestionsPanel = ({
   const [hasFetched, setHasFetched] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [expandedMacroId, setExpandedMacroId] = useState(null);
+  const [selectedFeedbackTypes, setSelectedFeedbackTypes] = useState({}); // Track feedback type per macro
 
   // Strip HTML helper
   const stripHtml = (html) => {
@@ -90,15 +91,16 @@ const MacroSuggestionsPanel = ({
     fetchSuggestions();
   }, [categories, fetchMacroSuggestions]);
 
-  const handleSelectMacro = (macro) => {
+  const handleSelectMacro = (macro, feedbackType = 'good') => {
     if (onSelectMacro) {
       onSelectMacro(macro, {
         applyCategories: false,
         applyScorecard: true,
-        scorecardVariant: currentScorecardVariant
+        scorecardVariant: currentScorecardVariant,
+        feedbackType: feedbackType
       });
       setCopiedId(macro._id);
-      toast.success('Macro applied');
+      toast.success(`${feedbackType === 'good' ? 'Good' : 'Bad'} macro applied`);
       setTimeout(() => setCopiedId(null), 2000);
     }
   };
@@ -118,6 +120,7 @@ const MacroSuggestionsPanel = ({
     const isExpanded = expandedMacroId === macro._id;
     const isCopied = copiedId === macro._id;
     const usageText = getUsageText(macro);
+    const feedbackType = selectedFeedbackTypes[macro._id] || 'good';
 
     return (
       <motion.div
@@ -132,20 +135,37 @@ const MacroSuggestionsPanel = ({
               <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {macro.title}
               </h4>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelectMacro(macro);
-                }}
-                className={`flex-shrink-0 p-1.5 rounded-md transition-all ${
-                  isCopied
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                    : 'bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400'
-                }`}
-              >
-                {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+              {/* Good/Bad buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectMacro(macro, 'good');
+                  }}
+                  className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded-md transition-all ${
+                    isCopied && feedbackType === 'good'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                  }`}
+                >
+                  Good
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectMacro(macro, 'bad');
+                  }}
+                  className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded-md transition-all ${
+                    isCopied && feedbackType === 'bad'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                  }`}
+                >
+                  Bad
+                </button>
+              </div>
             </div>
 
             {macro.categories && macro.categories.length > 0 && (
@@ -175,23 +195,56 @@ const MacroSuggestionsPanel = ({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <p className="text-xs text-gray-600 dark:text-neutral-400 mt-2 pt-2 border-t border-gray-100 dark:border-neutral-700">
-                    {stripHtml(macro.feedback)}
-                  </p>
+                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-700">
+                    {/* Preview selector */}
+                    <div className="flex items-center gap-1 mb-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFeedbackTypes(prev => ({ ...prev, [macro._id]: 'good' }));
+                        }}
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                          feedbackType === 'good'
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        Good Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFeedbackTypes(prev => ({ ...prev, [macro._id]: 'bad' }));
+                        }}
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                          feedbackType === 'bad'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        Bad Preview
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-neutral-400">
+                      {stripHtml(feedbackType === 'good' ? macro.goodFeedback : macro.badFeedback)}
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {!isExpanded && (
               <p className="text-xs text-gray-500 dark:text-neutral-500 mt-1 line-clamp-2">
-                {truncateText(macro.feedback, 80)}
+                {truncateText(macro.goodFeedback, 80)}
               </p>
             )}
           </div>
         </div>
 
         {usageText && (
-          <div className="absolute top-2 right-10 text-[10px] text-gray-400 dark:text-neutral-500">
+          <div className="absolute top-2 right-24 text-[10px] text-gray-400 dark:text-neutral-500">
             {usageText}
           </div>
         )}

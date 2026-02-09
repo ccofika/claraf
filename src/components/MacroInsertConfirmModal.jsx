@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Hash, Tag, ListChecks, MessageSquare, Check, X, ChevronDown } from 'lucide-react';
 import { TicketContentDisplay } from './TicketRichTextEditor';
@@ -13,21 +13,30 @@ const MacroInsertConfirmModal = ({
   onConfirm
 }) => {
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [feedbackType, setFeedbackType] = useState('good');
+  const prevOpenRef = useRef(false);
 
   // Get scorecard config for the position
   const scorecardConfig = agentPosition ? getScorecardConfig(agentPosition) : null;
   const needsVariantSelection = agentPosition && requiresVariantSelection(agentPosition);
   const availableVariants = scorecardConfig?.variants || [];
 
-  // Reset selected variant when modal opens
+  // Get current scorecard data based on feedback type
+  const currentScorecardData = feedbackType === 'bad' ? macro?.badScorecardData : macro?.goodScorecardData;
+
+  // Reset selected variant and feedback type ONLY when modal opens (not on every render)
   useEffect(() => {
-    if (open) {
+    // Only reset when modal transitions from closed to open
+    if (open && !prevOpenRef.current) {
+      // Reset feedback type to good
+      setFeedbackType('good');
+
       // If ticket already has a variant selected, use that
       if (currentScorecardVariant) {
         setSelectedVariant(currentScorecardVariant);
-      } else if (macro?.scorecardData?.[agentPosition]?.variant) {
+      } else if (macro?.goodScorecardData?.[agentPosition]?.variant) {
         // Otherwise use the variant from the macro
-        setSelectedVariant(macro.scorecardData[agentPosition].variant);
+        setSelectedVariant(macro.goodScorecardData[agentPosition].variant);
       } else if (availableVariants.length > 0) {
         // Default to first variant if none selected
         setSelectedVariant(availableVariants[0].key);
@@ -35,13 +44,17 @@ const MacroInsertConfirmModal = ({
         setSelectedVariant(null);
       }
     }
+    prevOpenRef.current = open;
   }, [open, currentScorecardVariant, macro, agentPosition, availableVariants]);
 
   if (!macro) return null;
 
+  // Get current feedback based on type
+  const currentFeedback = feedbackType === 'bad' ? macro.badFeedback : macro.goodFeedback;
+
   const hasCategories = macro.categories && macro.categories.length > 0;
   // New structure: scorecardData[position][variant] = { key: value }
-  const scorecardDataForPosition = agentPosition && macro.scorecardData?.[agentPosition];
+  const scorecardDataForPosition = agentPosition && currentScorecardData?.[agentPosition];
   const hasScorecardValues = scorecardDataForPosition && (
     // Check if any variant has values
     Object.keys(scorecardDataForPosition).some(variantKey => {
@@ -51,7 +64,7 @@ const MacroInsertConfirmModal = ({
   );
 
   const handleFeedbackOnly = () => {
-    onConfirm({ applyCategories: false, applyScorecard: false });
+    onConfirm({ applyCategories: false, applyScorecard: false, feedbackType, scorecardData: currentScorecardData });
     onOpenChange(false);
   };
 
@@ -59,7 +72,9 @@ const MacroInsertConfirmModal = ({
     onConfirm({
       applyCategories: true,
       applyScorecard: true,
-      scorecardVariant: selectedVariant // Pass the selected variant
+      scorecardVariant: selectedVariant, // Pass the selected variant
+      feedbackType,
+      scorecardData: currentScorecardData
     });
     onOpenChange(false);
   };
@@ -90,15 +105,46 @@ const MacroInsertConfirmModal = ({
             This macro contains additional data. How would you like to insert it?
           </p>
 
+          {/* Good/Bad Toggle */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
+              Macro Version
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFeedbackType('good')}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  feedbackType === 'good'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-2 border-green-500'
+                    : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 border border-gray-200 dark:border-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                }`}
+              >
+                ✓ Good
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedbackType('bad')}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  feedbackType === 'bad'
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-2 border-red-500'
+                    : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 border border-gray-200 dark:border-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                }`}
+              >
+                ✗ Bad
+              </button>
+            </div>
+          </div>
+
           {/* Feedback Preview */}
           <div>
             <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
               <MessageSquare className="w-3 h-3" />
-              Feedback Content
+              Feedback Content ({feedbackType === 'good' ? 'Good' : 'Bad'} Version)
             </p>
             <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg border border-gray-200 dark:border-neutral-800 p-3 max-h-32 overflow-y-auto">
               <TicketContentDisplay
-                content={macro.feedback}
+                content={currentFeedback || '(No feedback for this version)'}
                 className="text-sm text-gray-700 dark:text-neutral-300"
               />
             </div>
@@ -132,7 +178,7 @@ const MacroInsertConfirmModal = ({
             <div>
               <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-1 flex items-center gap-1">
                 <ListChecks className="w-3 h-3" />
-                Scorecard Values for {agentPosition}
+                Scorecard Values for {agentPosition} ({feedbackType === 'good' ? 'Good' : 'Bad'} Version)
               </p>
 
               {/* Variant Selection for positions that require it */}

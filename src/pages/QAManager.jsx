@@ -3596,9 +3596,41 @@ const QAManager = () => {
                     rows={5}
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
                     enableMacros={true}
-                    onMacroSelect={(macro) => {
-                      // Record usage when macro selected via # trigger
-                      // Use local recordUsage to avoid triggering QAManager re-render
+                    agentPosition={agentPosition}
+                    currentScorecardVariant={formData.scorecardVariant}
+                    onMacroApply={(macro, options = {}) => {
+                      const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good', scorecardData = null } = options;
+
+                      // Build updates object
+                      const updates = {};
+
+                      // Apply categories if requested
+                      if (applyCategories && macro.categories && macro.categories.length > 0) {
+                        updates.categories = macro.categories;
+                      }
+
+                      // Apply scorecard if requested and matches agent position
+                      // Use scorecardData from options (correct good/bad version) or fallback to macro fields
+                      const scorecardSource = scorecardData || (feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData);
+                      if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+                        const positionData = scorecardSource[agentPosition];
+                        // Use the variant from options (selected by user) or default to first available
+                        const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+                        const values = positionData[targetVariant];
+                        if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+                          updates.scorecardValues = values;
+                          if (targetVariant) {
+                            updates.scorecardVariant = targetVariant;
+                          }
+                        }
+                      }
+
+                      // Apply updates if any
+                      if (Object.keys(updates).length > 0) {
+                        setFormData(prev => ({ ...prev, ...updates }));
+                      }
+
+                      // Record usage
                       if (ticketDialog.data?._id) {
                         recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
                       }
@@ -3692,13 +3724,44 @@ const QAManager = () => {
       <ChooseMacroModal
         open={showChooseMacroModal}
         onOpenChange={setShowChooseMacroModal}
-        onSelectMacro={(macro) => {
+        agentPosition={agentPosition}
+        currentScorecardVariant={formData.scorecardVariant}
+        onSelectMacro={(macro, options = {}) => {
+          const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good', scorecardData = null } = options;
+
+          // Get the correct feedback based on selected type (good/bad)
+          const macroFeedback = feedbackType === 'bad' ? macro.badFeedback : macro.goodFeedback;
+
+          // Always apply feedback
           const currentFeedback = formData.feedback || '';
           const separator = currentFeedback.trim() ? '\n\n' : '';
-          setFormData(prev => ({
-            ...prev,
-            feedback: currentFeedback + separator + macro.feedback
-          }));
+          const updates = {
+            feedback: currentFeedback + separator + macroFeedback
+          };
+
+          // Apply categories if requested
+          if (applyCategories && macro.categories && macro.categories.length > 0) {
+            updates.categories = macro.categories;
+          }
+
+          // Apply scorecard if requested and matches agent position
+          // Use scorecardData from options (correct good/bad version) or fallback to macro fields
+          const scorecardSource = scorecardData || (feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData);
+          if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+            const positionData = scorecardSource[agentPosition];
+            // Use the variant from options (selected by user) or default to first available
+            const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+            const values = positionData[targetVariant];
+            if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+              updates.scorecardValues = values;
+              if (targetVariant) {
+                updates.scorecardVariant = targetVariant;
+              }
+            }
+          }
+
+          setFormData(prev => ({ ...prev, ...updates }));
+
           if (ticketDialog.data?._id) {
             recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
           }
@@ -4436,9 +4499,9 @@ const QAManager = () => {
       <ChooseMacroModal
         open={chooseMacroDialog.open}
         onOpenChange={(open) => setChooseMacroDialog({ ...chooseMacroDialog, open })}
-        onSelectMacro={(macro) => {
+        onSelectMacro={(macro, options = {}) => {
           if (chooseMacroDialog.onSelect) {
-            chooseMacroDialog.onSelect(macro);
+            chooseMacroDialog.onSelect(macro, options);
           }
           setChooseMacroDialog({ open: false, onSelect: null });
         }}
