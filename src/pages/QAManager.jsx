@@ -75,6 +75,10 @@ const QAManager = () => {
   const API_URL = process.env.REACT_APP_API_URL;
   const [searchParams] = useSearchParams();
 
+  // Role-based access for admin tabs
+  // qa-admin and admin roles can see admin pages (All Agents, Statistics, Active Overview, Bugs)
+  const isQAAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
+
   // State
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -3851,11 +3855,9 @@ const QAManager = () => {
 
     // Check if user can edit this ticket
     // Non-archived tickets can always be edited
-    // Archived tickets can be edited by: creator, filipkozomara@mebit.io, or neven@mebit.io
-    const adminEmails = ['filipkozomara@mebit.io', 'neven@mebit.io'];
+    // Archived tickets can be edited by: creator or users with admin/qa-admin role
     const isCreator = ticket.createdBy === user?._id || ticket.createdBy?._id === user?._id;
-    const isAdmin = adminEmails.includes(user?.email);
-    const canEdit = !ticket.isArchived || isCreator || isAdmin;
+    const canEdit = !ticket.isArchived || isCreator || isQAAdmin;
 
     return (
       <Dialog open={viewDialog.open} onOpenChange={(open) => setViewDialog({ ...viewDialog, open })}>
@@ -4237,28 +4239,28 @@ const QAManager = () => {
                 <Upload className="w-4 h-4 inline mr-1.5" />
                 Import Tickets
               </TabsTrigger>
-              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+              {isQAAdmin && (
                 <TabsTrigger value="all-agents" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <UsersRound className="w-4 h-4 inline mr-1.5" />
-                  All Agents
+                  All Agents (Admin)
                 </TabsTrigger>
               )}
-              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+              {isQAAdmin && (
                 <TabsTrigger value="statistics" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <TrendingUp className="w-4 h-4 inline mr-1.5" />
-                  Statistics
+                  Statistics (Admin)
                 </TabsTrigger>
               )}
-              {['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email) && (
+              {isQAAdmin && (
                 <TabsTrigger value="active-overview" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <Target className="w-4 h-4 inline mr-1.5" />
-                  Active Overview
+                  Active Overview (Admin)
                 </TabsTrigger>
               )}
-              {user?.email === 'filipkozomara@mebit.io' && (
+              {isQAAdmin && (
                 <TabsTrigger value="bugs" className="text-sm whitespace-nowrap data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black dark:text-neutral-400">
                   <Bug className="w-4 h-4 inline mr-1.5" />
-                  Bugs
+                  Bugs (Admin)
                 </TabsTrigger>
               )}
             </TabsList>
