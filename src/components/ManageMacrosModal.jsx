@@ -14,8 +14,8 @@ import { getScorecardCategories, hasScorecard, getScorecardConfig, requiresVaria
 
 const SCORECARD_POSITIONS = ['Junior Scorecard', 'Medior Scorecard', 'Senior Scorecard'];
 
-// Admin emails that can view all macros
-const MACRO_ADMIN_EMAILS = ['filipkozomara@mebit.io', 'nevena@mebit.io'];
+// Admin roles that can view all macros
+const MACRO_ADMIN_ROLES = ['admin', 'qa-admin'];
 
 const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const { user } = useAuth();
@@ -38,8 +38,8 @@ const ManageMacrosModal = ({ open, onOpenChange, onViewTicket }) => {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
-  // Check if current user is admin
-  const isAdmin = MACRO_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+  // Check if current user is admin (admin or qa-admin role)
+  const isAdmin = MACRO_ADMIN_ROLES.includes(user?.role);
 
   const [selectedMacro, setSelectedMacro] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');

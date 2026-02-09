@@ -4290,7 +4290,7 @@ const QAManager = () => {
                 {activeTab === 'all-agents' && <QAAllAgents />}
                 {activeTab === 'statistics' && <StatisticsPage />}
                 {activeTab === 'active-overview' && <QAActiveOverview />}
-                {activeTab === 'bugs' && <BugReportsAdmin getAuthHeaders={getAuthHeaders} userEmail={user?.email} />}
+                {activeTab === 'bugs' && <BugReportsAdmin getAuthHeaders={getAuthHeaders} userEmail={user?.email} userRole={user?.role} />}
               </motion.div>
             </AnimatePresence>
           </Tabs>

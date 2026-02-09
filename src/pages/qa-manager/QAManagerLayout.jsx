@@ -251,9 +251,8 @@ const QAManagerLayoutInner = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, filters.searchMode, navigate, openTicketDialog, handleExportSelectedTickets, setFilters, fetchDashboardStats, fetchAgents, fetchTickets]);
 
-  // Check if user is admin or reviewer
-  const isAdmin = ['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email);
-  const isFilipAdmin = user?.email === 'filipkozomara@mebit.io';
+  // Check if user is admin or reviewer (based on role)
+  const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
   const { isReviewer, reviewPendingCount } = useQAManager();
 
   return (
@@ -373,7 +372,7 @@ const QAManagerLayoutInner = () => {
                     { value: 'statistics', label: 'Statistics', icon: TrendingUp },
                     { value: 'active-overview', label: 'Active Overview', icon: Target },
                   ] : []),
-                  ...(isFilipAdmin ? [
+                  ...(isAdmin ? [
                     { value: 'bugs', label: 'Bugs', icon: Bug },
                   ] : []),
                 ];
@@ -1314,7 +1313,7 @@ const QAManagerLayoutInner = () => {
                         { value: 'statistics', label: 'Statistics', icon: TrendingUp },
                         { value: 'active-overview', label: 'Active Overview', icon: Target },
                       ] : []),
-                      ...(isFilipAdmin ? [{ value: 'bugs', label: 'Bugs', icon: Bug }] : []),
+                      ...(isAdmin ? [{ value: 'bugs', label: 'Bugs', icon: Bug }] : []),
                     ];
 
                     return allTabs.map((tab) => (
@@ -1446,10 +1445,9 @@ const ViewTicketDialog = ({
 
   if (!baseTicket) return null;
 
-  const adminEmails = ['filipkozomara@mebit.io', 'neven@mebit.io'];
   const isCreator = ticket.createdBy === user?._id || ticket.createdBy?._id === user?._id;
-  const isAdmin = adminEmails.includes(user?.email);
-  const canEdit = !ticket.isArchived || isCreator || isAdmin;
+  const isAdminForEdit = user?.role === 'admin' || user?.role === 'qa-admin';
+  const canEdit = !ticket.isArchived || isCreator || isAdminForEdit;
 
   return (
     <Dialog open={viewDialog.open} onOpenChange={(open) => !open && handleClose()}>

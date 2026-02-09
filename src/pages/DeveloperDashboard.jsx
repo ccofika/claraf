@@ -481,8 +481,8 @@ const DeveloperDashboard = () => {
           </div>
         </div>
 
-        {/* User Management Section - Admin or Super Admin (filipkozomara@mebit.io) */}
-        {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'filipkozomara@mebit.io') && (
+        {/* User Management Section - Admin role only */}
+        {currentUser?.role === 'admin' && (
           <UserManagement />
         )}
 

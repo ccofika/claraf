@@ -9,8 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { staggerContainer, staggerItem, fadeInUp, fadeInRight, duration, easing } from '../utils/animations';
 import { getScorecardConfig, requiresVariantSelection } from '../data/scorecardConfig';
 
-// Admin emails that can view all macros
-const MACRO_ADMIN_EMAILS = ['filipkozomara@mebit.io', 'nevena@mebit.io'];
+// Admin roles that can view all macros
+const MACRO_ADMIN_ROLES = ['admin', 'qa-admin'];
 
 const ChooseMacroModal = ({
   open,
@@ -35,8 +35,8 @@ const ChooseMacroModal = ({
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
 
-  // Check if current user is admin
-  const isAdmin = MACRO_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+  // Check if current user is admin (admin or qa-admin role)
+  const isAdmin = MACRO_ADMIN_ROLES.includes(user?.role);
 
   // Admin state for viewing other users' macros
   const [adminGraders, setAdminGraders] = useState([]);

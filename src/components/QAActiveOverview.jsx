@@ -123,8 +123,8 @@ const QAActiveOverview = () => {
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
   }), []);
 
-  // Check if user is admin
-  const isAdmin = ['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email);
+  // Check if user is admin (admin or qa-admin role)
+  const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
 
   // Fetch main data
   const fetchData = useCallback(async (showRefreshing = false) => {

@@ -26,13 +26,9 @@ const API_URL = process.env.REACT_APP_API_URL;
 // Page configurations
 const getPageConfig = (user) => {
   const isDeveloperOrAdmin = user?.role === 'admin' || user?.role === 'developer';
-  const qaAllowedEmails = [
-    'filipkozomara@mebit.io',
-    'vasilijevitorovic@mebit.io',
-    'nevena@mebit.io',
-    'mladenjorganovic@mebit.io'
-  ];
-  const hasQAAccess = user?.email && qaAllowedEmails.includes(user.email);
+  // QA access based on role
+  const qaAllowedRoles = ['admin', 'qa-admin', 'qa', 'developer'];
+  const hasQAAccess = user?.role && qaAllowedRoles.includes(user.role);
 
   const pages = [
     {

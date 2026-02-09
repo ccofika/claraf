@@ -85,8 +85,8 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     const email = user?.email?.toLowerCase();
     const perms = user?.pagePermissions;
 
-    // SUPER ADMIN: filipkozomara@mebit.io always has full access
-    if (email === 'filipkozomara@mebit.io') {
+    // Admin role always has full access
+    if (role === 'admin') {
       return true;
     }
 

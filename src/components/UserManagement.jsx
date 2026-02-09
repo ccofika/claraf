@@ -24,11 +24,11 @@ const UserManagement = () => {
   };
 
   // Get permissions based on role (used when pagePermissions is empty)
-  const getRoleBasedPermissions = (role, email) => {
+  const getRoleBasedPermissions = (role) => {
     const defaults = {};
-    const isSuperAdmin = email?.toLowerCase() === 'filipkozomara@mebit.io';
-    const allowedPages = isSuperAdmin
-      ? Object.keys(pages) // Super admin gets all pages
+    // Admin role gets all pages
+    const allowedPages = role === 'admin'
+      ? Object.keys(pages)
       : (roleAccess[role] || roleAccess['user']);
 
     Object.keys(pages).forEach(pageKey => {
@@ -42,7 +42,7 @@ const UserManagement = () => {
           // For QA subpages, check qaAdminOnly
           const subConfig = pages[pageKey].subPages[subKey];
           let subEnabled = hasAccess;
-          if (subConfig.qaAdminOnly && !['qa-admin', 'admin'].includes(role) && !isSuperAdmin) {
+          if (subConfig.qaAdminOnly && !['qa-admin', 'admin'].includes(role)) {
             subEnabled = false;
           }
           defaults[pageKey].subPages[subKey] = subEnabled;
@@ -98,7 +98,7 @@ const UserManagement = () => {
       // This recalculates based on the new role
       setEditingPermissions(prev => ({
         ...prev,
-        [userId]: getRoleBasedPermissions(newRole, userEmail)
+        [userId]: getRoleBasedPermissions(newRole)
       }));
 
       toast.success(`Role updated to ${newRole}`);
@@ -127,7 +127,7 @@ const UserManagement = () => {
       if (savedPerms && Object.keys(savedPerms).length > 0) {
         userPerms = savedPerms;
       } else {
-        userPerms = getRoleBasedPermissions(userData.role, userData.email);
+        userPerms = getRoleBasedPermissions(userData.role);
       }
 
       setEditingPermissions(prev => ({

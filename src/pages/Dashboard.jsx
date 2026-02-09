@@ -58,15 +58,10 @@ const Dashboard = () => {
     }
   };
 
-  // Check if user has access to QA Manager
+  // Check if user has access to QA Manager (based on role)
   const hasQAAccess = () => {
-    const allowedEmails = [
-      'filipkozomara@mebit.io',
-      'vasilijevitorovic@mebit.io',
-      'nevena@mebit.io',
-      'mladenjorganovic@mebit.io'
-    ];
-    return user?.email && allowedEmails.includes(user.email);
+    const allowedRoles = ['admin', 'qa-admin', 'qa', 'developer'];
+    return user?.role && allowedRoles.includes(user.role);
   };
 
   return (

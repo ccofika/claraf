@@ -59,8 +59,8 @@ const QAAllAgents = () => {
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
   }), []);
 
-  // Check if user is admin
-  const isAdmin = ['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(user?.email);
+  // Check if user is admin (admin or qa-admin role)
+  const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin';
 
   // Get the two selected agents
   const agent1 = selectedAgents[0] || null;

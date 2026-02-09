@@ -4,13 +4,14 @@ import { Bug, Trash2, CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw, Che
 import axios from 'axios';
 import { toast } from 'sonner';
 
-const BugReportsAdmin = ({ getAuthHeaders, userEmail }) => {
+const BugReportsAdmin = ({ getAuthHeaders, userEmail, userRole }) => {
   const [bugReports, setBugReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL;
-  const isAdmin = userEmail === 'filipkozomara@mebit.io';
+  // Admin access based on role (admin or qa-admin)
+  const isAdmin = userRole === 'admin' || userRole === 'qa-admin';
 
   const fetchBugReports = async () => {
     if (!isAdmin) return;

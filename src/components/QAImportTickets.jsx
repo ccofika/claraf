@@ -29,9 +29,8 @@ const QAImportTickets = ({ agents, currentUser }) => {
   // Active submenu tab
   const [activeSubmenu, setActiveSubmenu] = useState('sessions');
 
-  // Check if user is Knowledge Base admin
-  const isKnowledgeAdmin = currentUser?.email &&
-    ['filipkozomara@mebit.io', 'nevena@mebit.io'].includes(currentUser.email);
+  // Check if user is Knowledge Base admin (admin or qa-admin role)
+  const isKnowledgeAdmin = currentUser?.role === 'admin' || currentUser?.role === 'qa-admin';
 
   // State
   const [sessions, setSessions] = useState([]);

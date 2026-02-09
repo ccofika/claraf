@@ -7,19 +7,11 @@ import { getScorecardValues } from '../data/scorecardConfig';
 
 const QAManagerContext = createContext();
 
-// QA Admin emails - these users have elevated permissions for archive management
-const QA_ADMIN_EMAILS = [
-  'filipkozomara@mebit.io',
-  'nevena@mebit.io'
-];
+// Roles that have QA admin permissions
+const QA_ADMIN_ROLES = ['admin', 'qa-admin'];
 
-// Reviewer emails - these users can access the Review feature
-const REVIEWER_EMAILS = [
-  'filipkozomara@mebit.io',
-  'nevena@mebit.io',
-  'majabasic@mebit.io',
-  'ana@mebit.io'
-];
+// Roles that can access the Review feature
+const REVIEWER_ROLES = ['admin', 'qa-admin'];
 
 export const useQAManager = () => {
   const context = useContext(QAManagerContext);
@@ -35,11 +27,11 @@ export const QAManagerProvider = ({ children }) => {
   const location = useLocation();
   const API_URL = process.env.REACT_APP_API_URL;
 
-  // Check if current user is a QA admin (Filip or Nevena)
-  const isQAAdmin = QA_ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+  // Check if current user is a QA admin (admin or qa-admin role)
+  const isQAAdmin = QA_ADMIN_ROLES.includes(user?.role);
 
   // Check if current user is a reviewer (can access Review feature)
-  const isReviewer = REVIEWER_EMAILS.includes(user?.email?.toLowerCase());
+  const isReviewer = REVIEWER_ROLES.includes(user?.role);
 
   // ============================================
   // HELPER: Get active tab from URL path
