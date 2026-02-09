@@ -3,8 +3,11 @@ import axios from 'axios';
 import { RefreshCw, Activity, Database, Users, FolderOpen, FileText, Server, Clock, HardDrive, AlertCircle } from 'lucide-react';
 import ActivityLogsSection from '../components/ActivityLogsSection';
 import SecurityDashboard from '../components/SecurityDashboard';
+import UserManagement from '../components/UserManagement';
+import { useAuth } from '../context/AuthContext';
 
 const DeveloperDashboard = () => {
+  const { user: currentUser } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [health, setHealth] = useState(null);
   const [dbStats, setDbStats] = useState(null);
@@ -477,6 +480,11 @@ const DeveloperDashboard = () => {
             </table>
           </div>
         </div>
+
+        {/* User Management Section - Admin or Super Admin (filipkozomara@mebit.io) */}
+        {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'filipkozomara@mebit.io') && (
+          <UserManagement />
+        )}
 
         {/* Security Dashboard Section */}
         <SecurityDashboard />

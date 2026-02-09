@@ -11,6 +11,36 @@ import {
 import { useKnowledgeBase } from '../../context/KnowledgeBaseContext';
 import { toast } from 'sonner';
 
+// Helper: Get the depth of the deepest descendant in a node's subtree
+const getSubtreeDepth = (node) => {
+  if (!node?.children || node.children.length === 0) return 0;
+  return 1 + Math.max(...node.children.map(getSubtreeDepth));
+};
+
+// Helper: Check if nodeId is a descendant of ancestorId in the tree
+const isNodeDescendant = (tree, nodeId, ancestorId) => {
+  const findNode = (nodes, id) => {
+    for (const n of nodes) {
+      if (n._id === id) return n;
+      if (n.children) {
+        const found = findNode(n.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  const checkDescendants = (node, targetId) => {
+    if (!node.children) return false;
+    for (const child of node.children) {
+      if (child._id === targetId) return true;
+      if (checkDescendants(child, targetId)) return true;
+    }
+    return false;
+  };
+  const ancestor = findNode(tree, ancestorId);
+  return ancestor ? checkDescendants(ancestor, nodeId) : false;
+};
+
 // Context Menu Portal Component
 const ContextMenu = ({ position, onClose, onEdit, onDelete, onAddSubPage, onMoveToRoot, isSection, hasParent }) => {
   const menuRef = useRef(null);
@@ -196,7 +226,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
   );
 };
 
-// Page Item Component
+// Page Item Component with position-based drop zones
 const PageItem = ({
   page,
   level = 0,
@@ -211,6 +241,9 @@ const PageItem = ({
   onDrop,
   draggingId,
   dropTargetId,
+  dropPosition,
+  maxInsideLevel,
+  maxBesideLevel,
   isAdmin,
   expandedNodes,
   toggleNode
@@ -219,28 +252,74 @@ const PageItem = ({
   const [menuPosition, setMenuPosition] = useState(null);
   const isActive = currentSlug === page.slug;
   const isDragging = draggingId === page._id;
-  const isDropTarget = dropTargetId === page._id;
+  const isDropAbove = dropTargetId === page._id && dropPosition === 'above';
+  const isDropInside = dropTargetId === page._id && dropPosition === 'inside';
+  const isDropBelow = dropTargetId === page._id && dropPosition === 'below';
   const hasChildren = page.children && page.children.length > 0;
   const isExpanded = expandedNodes.has(page._id);
+
+  const canInside = level <= maxInsideLevel;
+  const canBeside = level <= maxBesideLevel;
+
+  const handleDragOverLocal = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAdmin) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    let position;
+    if (canInside) {
+      // Three zones: top 25% = above, middle 50% = inside, bottom 25% = below
+      if (y < height * 0.25) position = 'above';
+      else if (y > height * 0.75) position = 'below';
+      else position = 'inside';
+    } else {
+      // Can't nest inside - split into above/below at 50%
+      position = y < height * 0.5 ? 'above' : 'below';
+    }
+
+    if ((position === 'above' || position === 'below') && !canBeside) return;
+
+    // Parent's handleDragOver uses refs to check dragging node (avoids React timing issues)
+    onDragOver(e, page, position);
+  };
 
   return (
     <div>
       <div
-        draggable={isAdmin}
-        onDragStart={(e) => isAdmin && onDragStart(e, page)}
-        onDragOver={(e) => isAdmin && onDragOver(e, page)}
-        onDragLeave={(e) => isAdmin && onDragLeave(e)}
-        onDrop={(e) => isAdmin && onDrop(e, page)}
-        className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all
+        draggable={isAdmin ? "true" : undefined}
+        onDragStart={(e) => { if (isAdmin) onDragStart(e, page); }}
+        onDragOver={handleDragOverLocal}
+        onDragLeave={(e) => { if (isAdmin) onDragLeave(e); }}
+        onDrop={(e) => { if (isAdmin) onDrop(e, page); }}
+        className={`group relative flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all
           ${isActive
             ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
             : 'hover:bg-gray-100 dark:hover:bg-neutral-800/50 text-gray-700 dark:text-neutral-300'
           }
           ${isDragging ? 'opacity-40' : ''}
-          ${isDropTarget ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}
+          ${isDropInside ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}
         `}
         style={{ paddingLeft: `${8 + level * 16}px` }}
       >
+        {/* Drop indicator: above */}
+        {isDropAbove && (
+          <div
+            className="absolute top-0 right-0 h-0.5 bg-blue-500 rounded-full pointer-events-none z-10"
+            style={{ left: `${8 + level * 16}px` }}
+          />
+        )}
+        {/* Drop indicator: below */}
+        {isDropBelow && (
+          <div
+            className="absolute bottom-0 right-0 h-0.5 bg-blue-500 rounded-full pointer-events-none z-10"
+            style={{ left: `${8 + level * 16}px` }}
+          />
+        )}
+
         {/* Drag Handle */}
         {isAdmin && (
           <div className="opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing flex-shrink-0 -ml-1">
@@ -339,6 +418,9 @@ const PageItem = ({
                 onDrop={onDrop}
                 draggingId={draggingId}
                 dropTargetId={dropTargetId}
+                dropPosition={dropPosition}
+                maxInsideLevel={maxInsideLevel}
+                maxBesideLevel={maxBesideLevel}
                 isAdmin={isAdmin}
                 expandedNodes={expandedNodes}
                 toggleNode={toggleNode}
@@ -363,8 +445,6 @@ const KBSidebar = () => {
     createPage,
     deletePage,
     reorderPage,
-    updatePageSection,
-    fetchPageTree,
     sections,
     setSections,
     addSection,
@@ -386,10 +466,20 @@ const KBSidebar = () => {
   const [newPageParent, setNewPageParent] = useState(null);
   const [creating, setCreating] = useState(false);
   const [draggingNode, setDraggingNode] = useState(null);
+  const draggingRef = useRef(null); // Ref for immediate access (avoids React batching delay)
+  const dropPositionRef = useRef(null);
   const [dropTargetId, setDropTargetId] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null); // 'above' | 'inside' | 'below'
   const [dropSectionId, setDropSectionId] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [showTags, setShowTags] = useState(false);
+
+  // Depth constraints for drag-and-drop (max 3 levels: root=0, sub=1, sub-sub=2)
+  const dragSubtreeDepth = useMemo(() => {
+    return draggingNode ? getSubtreeDepth(draggingNode) : 0;
+  }, [draggingNode]);
+  const maxInsideLevel = 1 - dragSubtreeDepth;  // target level must be <= this for "inside" drops
+  const maxBesideLevel = 2 - dragSubtreeDepth;  // target level must be <= this for "above"/"below" drops
 
   const currentSlug = location.pathname.replace('/knowledge-base/', '').replace('/knowledge-base', '');
 
@@ -504,7 +594,7 @@ const KBSidebar = () => {
 
   const handleMoveToRoot = async (pageId) => {
     try {
-      await reorderPage(pageId, 0, null);
+      await reorderPage(pageId, -1, null, null);
       toast.success('Moved to root');
     } catch (error) {
       toast.error('Failed to move');
@@ -530,61 +620,116 @@ const KBSidebar = () => {
     setShowCreateModal(true);
   };
 
-  // Drag handlers
+  // Drag helpers
+  const resetDragState = () => {
+    draggingRef.current = null;
+    dropPositionRef.current = null;
+    setDraggingNode(null);
+    setDropTargetId(null);
+    setDropPosition(null);
+    setDropSectionId(null);
+  };
+
+  // Drag handlers (use refs for immediate access, state for React re-renders/visuals)
   const handleDragStart = (e, node) => {
     if (!node || !isAdmin) return;
-    setDraggingNode(node);
+    draggingRef.current = node;
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', node._id);
+    // Delay state update so DOM doesn't change during dragstart (would cancel the drag)
+    requestAnimationFrame(() => {
+      setDraggingNode(node);
+    });
   };
 
-  const handleDragOver = (e, targetNode) => {
+  const handleDragOver = (e, targetNode, position) => {
     e.preventDefault();
-    if (!draggingNode || !isAdmin || draggingNode._id === targetNode._id) return;
+    const dragging = draggingRef.current;
+    if (!dragging || !isAdmin || dragging._id === targetNode._id) return;
+    // Prevent dropping on own descendants (would create cycle)
+    if (isNodeDescendant(pageTree, targetNode._id, dragging._id)) return;
+    dropPositionRef.current = position;
     setDropTargetId(targetNode._id);
+    setDropPosition(position);
   };
 
-  const handleDragLeave = () => setDropTargetId(null);
+  const handleDragLeave = () => {
+    setDropTargetId(null);
+    setDropPosition(null);
+  };
 
   const handleDrop = async (e, targetNode) => {
     e.preventDefault();
-    if (!draggingNode || !isAdmin || draggingNode._id === targetNode._id) {
-      setDraggingNode(null);
-      setDropTargetId(null);
+    e.stopPropagation();
+    const dragging = draggingRef.current;
+    const pos = dropPositionRef.current || 'inside'; // fallback to old behavior
+    if (!dragging || !isAdmin || dragging._id === targetNode._id) {
+      resetDragState();
+      return;
+    }
+    // Prevent dropping on own descendants
+    if (isNodeDescendant(pageTree, targetNode._id, dragging._id)) {
+      resetDragState();
       return;
     }
 
     try {
-      await reorderPage(draggingNode._id, 0, targetNode._id);
-      setExpandedNodes(prev => new Set([...prev, targetNode._id]));
+      let newParentPage, newOrder, newSectionId;
+
+      if (pos === 'inside') {
+        // Make it a child of the target
+        newParentPage = targetNode._id;
+        newOrder = -1; // append at end
+        newSectionId = null;
+        setExpandedNodes(prev => new Set([...prev, targetNode._id]));
+      } else {
+        // 'above' or 'below' — insert at same level as target
+        newParentPage = targetNode.parentPage || null;
+
+        // Adjust order for same-parent moves (remove-then-insert)
+        const dragParent = dragging.parentPage ? String(dragging.parentPage) : null;
+        const targetParent = targetNode.parentPage ? String(targetNode.parentPage) : null;
+        const sameParent = dragParent === targetParent;
+        const draggedBefore = sameParent && dragging.order < targetNode.order;
+
+        if (pos === 'above') {
+          newOrder = draggedBefore ? targetNode.order - 1 : targetNode.order;
+        } else {
+          newOrder = draggedBefore ? targetNode.order : targetNode.order + 1;
+        }
+
+        // Section handling: root-level pages inherit target's section
+        if (newParentPage) {
+          newSectionId = null; // sub-pages don't need section
+        } else {
+          newSectionId = targetNode.sectionId || null;
+        }
+      }
+
+      await reorderPage(dragging._id, newOrder, newParentPage, newSectionId);
       toast.success('Moved');
-      await fetchPageTree();
     } catch (error) {
       toast.error('Failed to move');
     }
 
-    setDraggingNode(null);
-    setDropTargetId(null);
+    resetDragState();
   };
 
-  const handleDragEnd = () => {
-    setDraggingNode(null);
-    setDropTargetId(null);
-    setDropSectionId(null);
-  };
+  const handleDragEnd = () => resetDragState();
 
   const handleDropOnSection = async (sectionId) => {
-    if (!draggingNode || !isAdmin) return;
+    const dragging = draggingRef.current;
+    if (!dragging || !isAdmin) return;
 
     try {
-      await updatePageSection(draggingNode._id, sectionId);
+      // Move to root level and assign section (also un-nests sub-pages)
+      await reorderPage(dragging._id, -1, null, sectionId);
       toast.success('Page moved to section');
     } catch (error) {
       toast.error('Failed to move page');
     }
 
-    setDraggingNode(null);
-    setDropTargetId(null);
-    setDropSectionId(null);
+    resetDragState();
   };
 
   // Sidebar content
@@ -628,20 +773,22 @@ const KBSidebar = () => {
             </button>
           </div>
 
-          {/* Search */}
+          {/* Search - opens floating search bar */}
           <div className="px-3 py-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-8 pr-3 py-2 text-[13px] bg-gray-50 dark:bg-neutral-900
-                  border border-gray-200 dark:border-neutral-800 rounded-lg
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('focus-kb-search'))}
+              className="w-full flex items-center gap-2 pl-2.5 pr-3 py-2 text-[13px]
+                bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800
+                rounded-lg text-gray-400 hover:text-gray-500 dark:hover:text-gray-300
+                hover:border-gray-300 dark:hover:border-neutral-700 transition-colors text-left"
+            >
+              <Search size={14} className="shrink-0" />
+              <span className="flex-1">Search...</span>
+              <kbd className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800
+                border border-gray-200 dark:border-neutral-700 rounded font-mono">
+                Ctrl+K
+              </kbd>
+            </button>
           </div>
 
           {/* Admin Actions */}
@@ -802,6 +949,13 @@ const KBSidebar = () => {
             >
               <Home size={18} className="mx-auto text-gray-600 dark:text-neutral-400" />
             </button>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('focus-kb-search'))}
+              className="w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+              title="Search (Ctrl+K)"
+            >
+              <Search size={18} className="mx-auto text-gray-600 dark:text-neutral-400" />
+            </button>
             {pageTree.slice(0, 8).map(node => (
               <button
                 key={node._id}
@@ -819,18 +973,20 @@ const KBSidebar = () => {
           </div>
         ) : (
           <>
-            {/* Root Drop Zone - drag pages here to move to root level */}
+            {/* Root Drop Zone - drag pages here to move to root level (no section) */}
             {isAdmin && draggingNode && (
               <div
                 onDragOver={(e) => { e.preventDefault(); setDropTargetId('__root__'); }}
-                onDragLeave={() => setDropTargetId(null)}
+                onDragLeave={() => { setDropTargetId(null); }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (draggingNode && draggingNode.parentPage) {
-                    handleMoveToRoot(draggingNode._id);
+                  const dragging = draggingRef.current;
+                  if (dragging) {
+                    reorderPage(dragging._id, -1, null, null)
+                      .then(() => toast.success('Moved to root'))
+                      .catch(() => toast.error('Failed to move'));
                   }
-                  setDraggingNode(null);
-                  setDropTargetId(null);
+                  resetDragState();
                 }}
                 className={`mb-2 px-3 py-2 rounded-lg border-2 border-dashed text-center text-[12px] transition-colors ${
                   dropTargetId === '__root__'
@@ -860,6 +1016,9 @@ const KBSidebar = () => {
                     onDrop={handleDrop}
                     draggingId={draggingNode?._id}
                     dropTargetId={dropTargetId}
+                    dropPosition={dropPosition}
+                    maxInsideLevel={maxInsideLevel}
+                    maxBesideLevel={maxBesideLevel}
                     isAdmin={isAdmin}
                     expandedNodes={expandedNodes}
                     toggleNode={toggleNode}
@@ -898,6 +1057,9 @@ const KBSidebar = () => {
                       onDrop={handleDrop}
                       draggingId={draggingNode?._id}
                       dropTargetId={dropTargetId}
+                      dropPosition={dropPosition}
+                      maxInsideLevel={maxInsideLevel}
+                      maxBesideLevel={maxBesideLevel}
                       isAdmin={isAdmin}
                       expandedNodes={expandedNodes}
                       toggleNode={toggleNode}
@@ -914,7 +1076,7 @@ const KBSidebar = () => {
 
             {filterTree.length === 0 && Object.keys(groupedPages.sections).length === 0 && (
               <div className="text-center py-8 text-[13px] text-gray-400 dark:text-neutral-500">
-                {searchQuery ? 'No pages found' : 'No pages yet'}
+                {selectedTag ? 'No pages found' : 'No pages yet'}
               </div>
             )}
           </>

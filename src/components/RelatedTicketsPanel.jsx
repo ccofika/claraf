@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Star, AlertCircle, Loader2, FileText, Hash } from 'lucide-react';
+import { Users, Star, AlertCircle, Loader2, FileText, Hash, ArrowLeft, Tag, MessageSquare, BarChart3, Copy, Check } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { Badge } from './ui/badge';
+import { SCORE_COLORS, SHORT_LABELS, getScorecardValues } from '../data/scorecardConfig';
 import { staggerContainer, staggerItem, fadeInUp, scaleIn, duration, easing } from '../utils/animations';
 
 // Helper to truncate text
@@ -51,7 +54,7 @@ const getScoreColor = (score) => {
   };
 };
 
-const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
+const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId, onCopyToTicket }) => {
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
 
@@ -59,6 +62,12 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Ticket detail state
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [fullTicketData, setFullTicketData] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
 
   // Category validation - must have at least one non-Other category
   const validCategories = (categories || []).filter(c => c && c !== 'Other');
@@ -110,6 +119,90 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
       setLoading(false);
     }
   }, [agentId, validCategories.join(','), currentTicketId, API_URL, user?.token, isCategoryEmpty]);
+
+  // Fetch ticket details
+  const fetchTicketDetails = useCallback(async (ticketId) => {
+    try {
+      setTicketLoading(true);
+      const response = await axios.get(
+        `${API_URL}/api/qa/tickets/${ticketId}`,
+        getAuthHeaders()
+      );
+      setFullTicketData(response.data);
+    } catch (err) {
+      console.error('Failed to fetch ticket:', err);
+      toast.error('Failed to load ticket details');
+    } finally {
+      setTicketLoading(false);
+    }
+  }, [API_URL, user?.token]);
+
+  // When selecting a ticket
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchTicketDetails(selectedTicket._id);
+    } else {
+      setFullTicketData(null);
+    }
+  }, [selectedTicket, fetchTicketDetails]);
+
+  // Copy functions
+  const handleCopyAll = () => {
+    if (!fullTicketData || !onCopyToTicket) return;
+    onCopyToTicket({
+      categories: fullTicketData.categories || [],
+      feedback: fullTicketData.feedback || '',
+      scorecardValues: fullTicketData.scorecardValues || {},
+      scorecardVariant: fullTicketData.scorecardVariant || null
+    });
+    setCopiedField('all');
+    toast.success('Categories, feedback & scorecard copied to ticket');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleCopyFeedback = () => {
+    if (!fullTicketData || !onCopyToTicket) return;
+    onCopyToTicket({ feedback: fullTicketData.feedback || '' });
+    setCopiedField('feedback');
+    toast.success('Feedback copied to ticket');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleCopyCategories = () => {
+    if (!fullTicketData || !onCopyToTicket) return;
+    onCopyToTicket({ categories: fullTicketData.categories || [] });
+    setCopiedField('categories');
+    toast.success('Categories copied to ticket');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleCopyScorecard = () => {
+    if (!fullTicketData || !onCopyToTicket) return;
+    onCopyToTicket({
+      scorecardValues: fullTicketData.scorecardValues || {},
+      scorecardVariant: fullTicketData.scorecardVariant || null
+    });
+    setCopiedField('scorecard');
+    toast.success('Scorecard copied to ticket');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  // Score helpers for detail view
+  const getDetailScoreColor = (score) => {
+    if (score === null || score === undefined) return 'text-gray-400';
+    if (score >= 90) return 'text-green-600 dark:text-green-400';
+    if (score >= 80) return 'text-blue-600 dark:text-blue-400';
+    if (score >= 70) return 'text-amber-600 dark:text-amber-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const getDetailScoreBgColor = (score) => {
+    if (score === null || score === undefined) return 'bg-gray-100 dark:bg-gray-800';
+    if (score >= 90) return 'bg-green-100 dark:bg-green-900/30';
+    if (score >= 80) return 'bg-blue-100 dark:bg-blue-900/30';
+    if (score >= 70) return 'bg-amber-100 dark:bg-amber-900/30';
+    return 'bg-red-100 dark:bg-red-900/30';
+  };
 
   // Auto-fetch when dependencies change
   useEffect(() => {
@@ -184,7 +277,222 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
 
   // Results view
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
+      {/* Ticket Detail View */}
+      <AnimatePresence>
+        {selectedTicket && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute inset-0 bg-white dark:bg-neutral-900 z-10 flex flex-col"
+          >
+            {/* Detail Header */}
+            <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/50">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicket(null)}
+                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to results
+                </button>
+                {onCopyToTicket && (
+                  <button
+                    type="button"
+                    onClick={handleCopyAll}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                      copiedField === 'all'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                    }`}
+                  >
+                    {copiedField === 'all' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    Copy All
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Detail Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {ticketLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                </div>
+              ) : fullTicketData ? (
+                <div className="space-y-4">
+                  {/* Ticket Info */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        {fullTicketData.ticketId}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-neutral-400">
+                        {fullTicketData.agent?.name} • {new Date(fullTicketData.dateEntered).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className={`px-2.5 py-1 rounded-lg text-sm font-bold ${getDetailScoreBgColor(fullTicketData.qualityScorePercent)} ${getDetailScoreColor(fullTicketData.qualityScorePercent)}`}>
+                      {fullTicketData.qualityScorePercent != null ? `${fullTicketData.qualityScorePercent}%` : '-'}
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  {fullTicketData.categories && fullTicketData.categories.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-gray-400" />
+                          <h4 className="text-xs font-medium text-gray-600 dark:text-neutral-400 uppercase">Categories</h4>
+                        </div>
+                        {onCopyToTicket && (
+                          <button
+                            type="button"
+                            onClick={handleCopyCategories}
+                            className={`p-1 rounded transition-all ${
+                              copiedField === 'categories'
+                                ? 'text-green-500'
+                                : 'text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300'
+                            }`}
+                          >
+                            {copiedField === 'categories' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {fullTicketData.categories.map(cat => (
+                          <span
+                            key={cat}
+                            className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Feedback */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400" />
+                        <h4 className="text-xs font-medium text-gray-600 dark:text-neutral-400 uppercase">Feedback</h4>
+                      </div>
+                      {onCopyToTicket && (
+                        <button
+                          type="button"
+                          onClick={handleCopyFeedback}
+                          className={`p-1 rounded transition-all ${
+                            copiedField === 'feedback'
+                              ? 'text-green-500'
+                              : 'text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300'
+                          }`}
+                        >
+                          {copiedField === 'feedback' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-gray-200 dark:border-neutral-700">
+                      {fullTicketData.feedback ? (
+                        <div
+                          className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-neutral-300 text-xs"
+                          dangerouslySetInnerHTML={{ __html: fullTicketData.feedback }}
+                        />
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-neutral-500 italic">No feedback</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scorecard */}
+                  {fullTicketData.scorecardValues && Object.keys(fullTicketData.scorecardValues).length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-gray-400" />
+                          <h4 className="text-xs font-medium text-gray-600 dark:text-neutral-400 uppercase">Scorecard</h4>
+                          {fullTicketData.scorecardVariant && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {fullTicketData.scorecardVariant}
+                            </Badge>
+                          )}
+                        </div>
+                        {onCopyToTicket && (
+                          <button
+                            type="button"
+                            onClick={handleCopyScorecard}
+                            className={`p-1 rounded transition-all ${
+                              copiedField === 'scorecard'
+                                ? 'text-green-500'
+                                : 'text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300'
+                            }`}
+                          >
+                            {copiedField === 'scorecard' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                      <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-gray-200 dark:border-neutral-700">
+                        <div className="space-y-1.5">
+                          {(() => {
+                            const position = fullTicketData.agent?.position;
+                            const variant = fullTicketData.scorecardVariant;
+                            const configValues = position ? getScorecardValues(position, variant) : [];
+                            const configMap = {};
+                            configValues.forEach(v => { configMap[v.key] = v; });
+
+                            return Object.entries(fullTicketData.scorecardValues).map(([key, value]) => {
+                              const configItem = configMap[key];
+                              const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                              const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
+                                ? SHORT_LABELS[value]
+                                : '-';
+
+                              const getBgClass = (idx) => {
+                                if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-neutral-700';
+                                switch (idx) {
+                                  case 0: return 'bg-green-500';
+                                  case 1: return 'bg-yellow-400';
+                                  case 2: return 'bg-amber-500';
+                                  case 3: return 'bg-red-500';
+                                  case 4: return 'bg-gray-400';
+                                  default: return 'bg-gray-100 dark:bg-neutral-700';
+                                }
+                              };
+
+                              const getTextClass = (idx) => {
+                                if (idx === null || idx === undefined) return 'text-gray-500';
+                                if (idx === 1) return 'text-gray-900';
+                                return 'text-white';
+                              };
+
+                              return (
+                                <div key={key} className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-600 dark:text-neutral-400">{label}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getBgClass(value)} ${getTextClass(value)}`}>
+                                    {displayLabel}
+                                  </span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-12 text-gray-500">
+                  Failed to load ticket
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-900/50">
         <div className="flex items-center gap-2">
@@ -213,9 +521,10 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
           return (
             <motion.div
               key={ticket._id}
-              className="group relative bg-white dark:bg-zinc-800/40 hover:bg-gray-50 dark:hover:bg-zinc-800/60 rounded-xl border border-gray-200 dark:border-zinc-700/50 hover:border-gray-300 dark:hover:border-zinc-600/50 transition-all duration-200 shadow-sm dark:shadow-none"
+              className="group relative bg-white dark:bg-zinc-800/40 hover:bg-gray-50 dark:hover:bg-zinc-800/60 rounded-xl border border-gray-200 dark:border-zinc-700/50 hover:border-gray-300 dark:hover:border-zinc-600/50 transition-all duration-200 shadow-sm dark:shadow-none cursor-pointer"
               variants={staggerItem}
               whileHover={{ y: -2, transition: { duration: duration.fast } }}
+              onClick={() => setSelectedTicket(ticket)}
             >
               {/* Top row - badges */}
               <div className="flex items-center gap-2 px-3 pt-3 pb-2">
@@ -235,6 +544,15 @@ const RelatedTicketsPanel = ({ agentId, categories = [], currentTicketId }) => {
                   {ticket.ticketId}
                 </div>
               </div>
+
+              {/* Date */}
+              {ticket.dateEntered && (
+                <div className="px-3 pb-1">
+                  <p className="text-[11px] text-gray-500 dark:text-zinc-500">
+                    {ticket.agent?.name ? `${ticket.agent.name} • ` : ''}{new Date(ticket.dateEntered).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
 
               {/* Notes preview */}
               {ticket.notes && (

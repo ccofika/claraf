@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Trash2, GripVertical, Type, Heading1, Heading2, Heading3,
   List, ListOrdered, ChevronRight, AlertCircle, Quote, Code,
-  Image as ImageIcon, Table, Minus, Settings,
+  Image as ImageIcon, Table, Minus, Settings, Pencil, Check,
   // New icons for new block types
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
   Music, FileType, Navigation, RefreshCw, Columns
@@ -12,6 +12,48 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import BlockRenderer from '../BlockRenderer';
+
+// Hook to calculate smart positioning for dropdowns/modals
+const useSmartPosition = (isOpen, triggerRef, menuHeight = 400) => {
+  const [position, setPosition] = useState({ direction: 'down', maxHeight: 400 });
+
+  useEffect(() => {
+    if (!isOpen || !triggerRef?.current) return;
+
+    const calculatePosition = () => {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const navBarHeight = 140; // Approximate height of navigation bars
+
+      const spaceAbove = triggerRect.top - navBarHeight;
+      const spaceBelow = viewportHeight - triggerRect.bottom - 20;
+
+      // Prefer going down if there's enough space
+      if (spaceBelow >= menuHeight || spaceBelow >= spaceAbove) {
+        setPosition({
+          direction: 'down',
+          maxHeight: Math.min(spaceBelow, menuHeight)
+        });
+      } else {
+        setPosition({
+          direction: 'up',
+          maxHeight: Math.min(spaceAbove, menuHeight)
+        });
+      }
+    };
+
+    calculatePosition();
+    window.addEventListener('scroll', calculatePosition, true);
+    window.addEventListener('resize', calculatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', calculatePosition, true);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isOpen, triggerRef, menuHeight]);
+
+  return position;
+};
 
 const blockTypeOptions = [
   // Basic
@@ -58,6 +100,9 @@ const SortableBlock = ({
   setShowAddMenu,
   addBlock
 }) => {
+  const addButtonRef = useRef(null);
+  const menuPosition = useSmartPosition(showAddMenu === index, addButtonRef, 350);
+
   const {
     attributes,
     listeners,
@@ -73,18 +118,65 @@ const SortableBlock = ({
     opacity: isDragging ? 0.5 : 1
   };
 
+  const isEditing = editingBlockId === block.id;
+
   return (
-    <div ref={setNodeRef} style={style} className="group relative mb-2">
+    <div ref={setNodeRef} style={style} className="group relative mb-3">
+      {/* Block Actions - Floating toolbar above block */}
+      <div className={`absolute -top-8 right-0 z-10 flex items-center gap-1 px-1.5 py-1
+        bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
+        rounded-lg shadow-sm transition-all duration-200
+        ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+
+        {hasDropdowns && (
+          <button
+            onClick={() => onOpenVariants(block)}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium
+              bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400
+              rounded hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+            title="Edit variants"
+          >
+            <Settings size={12} />
+            Variants
+          </button>
+        )}
+
+        <button
+          onClick={() => setEditingBlockId(isEditing ? null : block.id)}
+          className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors
+            ${isEditing
+              ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50'
+              : 'bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-600'
+            }`}
+          title={isEditing ? 'Done editing' : 'Edit block'}
+        >
+          {isEditing ? <Check size={12} /> : <Pencil size={12} />}
+          {isEditing ? 'Done' : 'Edit'}
+        </button>
+
+        <button
+          onClick={() => onDeleteBlock(block.id)}
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium
+            bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300
+            rounded hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30
+            dark:hover:text-red-400 transition-colors"
+          title="Delete block"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+
       {/* Block Controls - Left Side */}
-      <div className="absolute -left-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+      <div className="absolute -left-8 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
         <button
           {...attributes}
           {...listeners}
-          className="p-1 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+          className="p-1 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
           <GripVertical size={14} />
         </button>
         <button
+          ref={addButtonRef}
           onClick={() => setShowAddMenu(showAddMenu === index ? null : index)}
           className="p-1 text-gray-400 hover:text-blue-600"
         >
@@ -92,15 +184,17 @@ const SortableBlock = ({
         </button>
       </div>
 
-      {/* Add Block Menu */}
+      {/* Add Block Menu - Smart Positioned */}
       <AnimatePresence>
         {showAddMenu === index && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: menuPosition.direction === 'down' ? -10 : 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-neutral-900
-              border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg p-1 w-48"
+            exit={{ opacity: 0, y: menuPosition.direction === 'down' ? -10 : 10 }}
+            className={`absolute left-0 z-50 bg-white dark:bg-neutral-900
+              border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg p-1 w-48 overflow-y-auto
+              ${menuPosition.direction === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
+            style={{ maxHeight: menuPosition.maxHeight }}
           >
             {blockTypeOptions.map(opt => (
               <button
@@ -122,47 +216,17 @@ const SortableBlock = ({
       </AnimatePresence>
 
       {/* Block Content */}
-      <div className="relative bg-gray-50 dark:bg-neutral-900 rounded-lg p-3 border border-transparent
-        hover:border-gray-200 dark:hover:border-neutral-700 transition-colors">
+      <div className={`relative bg-gray-50 dark:bg-neutral-900 rounded-lg p-3 border transition-colors
+        ${isEditing
+          ? 'border-blue-300 dark:border-blue-700 ring-1 ring-blue-200 dark:ring-blue-800'
+          : 'border-transparent hover:border-gray-200 dark:hover:border-neutral-700'
+        }`}>
 
         <BlockRenderer
           block={block}
-          isEditing={editingBlockId === block.id}
+          isEditing={isEditing}
           onUpdate={(content) => onUpdateBlock(block.id, 'defaultContent', content)}
         />
-
-        {/* Block Actions - Right Side */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100
-          transition-opacity flex items-center gap-1">
-
-          {hasDropdowns && (
-            <button
-              onClick={() => onOpenVariants(block)}
-              className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30
-                text-purple-600 dark:text-purple-400 rounded hover:bg-purple-200
-                dark:hover:bg-purple-900/50"
-              title="Edit variants"
-            >
-              Variants
-            </button>
-          )}
-
-          <button
-            onClick={() => setEditingBlockId(editingBlockId === block.id ? null : block.id)}
-            className="p-1 text-gray-400 hover:text-blue-600"
-            title={editingBlockId === block.id ? 'Done editing' : 'Edit'}
-          >
-            {editingBlockId === block.id ? 'Done' : 'Edit'}
-          </button>
-
-          <button
-            onClick={() => onDeleteBlock(block.id)}
-            className="p-1 text-gray-400 hover:text-red-600"
-            title="Delete block"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -171,6 +235,11 @@ const SortableBlock = ({
 const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) => {
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(null);
+  const firstAddButtonRef = useRef(null);
+  const bottomAddButtonRef = useRef(null);
+
+  const firstMenuPosition = useSmartPosition(showAddMenu === -1, firstAddButtonRef, 400);
+  const bottomMenuPosition = useSmartPosition(showAddMenu === 'bottom', bottomAddButtonRef, 400);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -179,6 +248,17 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
       }
     })
   );
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showAddMenu !== null && !e.target.closest('.add-block-menu') && !e.target.closest('.add-block-trigger')) {
+        setShowAddMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAddMenu]);
 
   const addBlock = (type, afterIndex) => {
     // Default content based on block type
@@ -305,8 +385,9 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
       {blocks.length === 0 && (
         <div className="relative">
           <button
+            ref={firstAddButtonRef}
             onClick={() => setShowAddMenu(-1)}
-            className="w-full p-6 border-2 border-dashed border-gray-300 dark:border-neutral-700
+            className="add-block-trigger w-full p-6 border-2 border-dashed border-gray-300 dark:border-neutral-700
               rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
           >
             <Plus size={24} className="mx-auto mb-2" />
@@ -316,12 +397,14 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
           <AnimatePresence>
             {showAddMenu === -1 && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: firstMenuPosition.direction === 'down' ? -10 : 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50
+                exit={{ opacity: 0, y: firstMenuPosition.direction === 'down' ? -10 : 10 }}
+                className={`add-block-menu absolute left-1/2 -translate-x-1/2 z-50
                   bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
-                  rounded-lg shadow-lg p-2 w-56 grid grid-cols-2 gap-1"
+                  rounded-lg shadow-lg p-2 w-64 grid grid-cols-2 gap-1 overflow-y-auto
+                  ${firstMenuPosition.direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+                style={{ maxHeight: firstMenuPosition.maxHeight }}
               >
                 {blockTypeOptions.map(opt => (
                   <button
@@ -348,8 +431,9 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
       {blocks.length > 0 && (
         <div className="relative">
           <button
+            ref={bottomAddButtonRef}
             onClick={() => setShowAddMenu('bottom')}
-            className="w-full p-2 text-sm text-gray-500 hover:text-blue-600
+            className="add-block-trigger w-full p-2 text-sm text-gray-500 hover:text-blue-600
               hover:bg-gray-50 dark:hover:bg-neutral-900 rounded-lg transition-colors"
           >
             + Add block
@@ -358,12 +442,14 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
           <AnimatePresence>
             {showAddMenu === 'bottom' && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: bottomMenuPosition.direction === 'down' ? -10 : 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50
+                exit={{ opacity: 0, y: bottomMenuPosition.direction === 'down' ? -10 : 10 }}
+                className={`add-block-menu absolute left-1/2 -translate-x-1/2 z-50
                   bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
-                  rounded-lg shadow-lg p-2 w-56 grid grid-cols-2 gap-1"
+                  rounded-lg shadow-lg p-2 w-64 grid grid-cols-2 gap-1 overflow-y-auto
+                  ${bottomMenuPosition.direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+                style={{ maxHeight: bottomMenuPosition.maxHeight }}
               >
                 {blockTypeOptions.map(opt => (
                   <button

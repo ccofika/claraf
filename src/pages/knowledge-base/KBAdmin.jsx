@@ -633,8 +633,9 @@ const KBAdmin = () => {
   const handleSavePage = async (updates) => {
     if (!editingPage) return;
     await updatePage(editingPage._id, updates);
+    // Navigate to view mode of the page
     setEditingPage(null);
-    navigate('/knowledge-base/admin', { replace: true });
+    navigate(`/knowledge-base/${editingPage.slug}`, { replace: true });
   };
 
   const handleDeletePage = async (pageId) => {

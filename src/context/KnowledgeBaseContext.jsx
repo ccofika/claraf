@@ -266,13 +266,15 @@ export const KnowledgeBaseProvider = ({ children }) => {
     }
   }, [API_URL, fetchPageTree, currentPage, navigate]);
 
-  // Reorder a page
-  const reorderPage = useCallback(async (pageId, newOrder, newParentPage) => {
+  // Reorder a page (supports positional inserts and section assignment)
+  const reorderPage = useCallback(async (pageId, newOrder, newParentPage, sectionId) => {
     try {
       const token = localStorage.getItem('token');
+      const body = { newOrder, newParentPage };
+      if (sectionId !== undefined) body.sectionId = sectionId;
       await axios.put(
         `${API_URL}/api/knowledge-base/pages/${pageId}/reorder`,
-        { newOrder, newParentPage },
+        body,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await fetchPageTree();
@@ -608,6 +610,33 @@ export const KnowledgeBaseProvider = ({ children }) => {
     return data;
   }, [API_URL]);
 
+  // ==================== FUZZY SEARCH ====================
+
+  const fuzzySearch = useCallback(async (query, filters = {}) => {
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams({ q: query });
+    if (filters.tags) params.append('tags', filters.tags);
+    if (filters.limit) params.append('limit', filters.limit);
+
+    const response = await axios.get(`${API_URL}/api/knowledge-base/search/fuzzy?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  }, [API_URL]);
+
+  const recordSearchBoost = useCallback(async (query, pageId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/api/knowledge-base/search/boost`,
+        { query, pageId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch {
+      // Silent fail - boost tracking is not critical
+    }
+  }, [API_URL]);
+
   // ==================== SHARING & PERMISSIONS ====================
 
   const fetchPermissions = useCallback(async (pageId) => {
@@ -798,6 +827,8 @@ export const KnowledgeBaseProvider = ({ children }) => {
     // Search
     searchPages,
     searchSuggestions,
+    fuzzySearch,
+    recordSearchBoost,
 
     // Sharing & Permissions
     fetchPermissions,

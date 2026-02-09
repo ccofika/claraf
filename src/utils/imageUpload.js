@@ -67,6 +67,39 @@ export const uploadTicketImage = async (imageFile) => {
 };
 
 /**
+ * Upload image to Cloudinary knowledge-base folder via backend API
+ * @param {File|Blob} imageFile - The image file to upload
+ * @returns {Promise<Object>} Image data with URL and metadata
+ */
+export const uploadKnowledgeBaseImage = async (imageFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${process.env.REACT_APP_API_URL}/api/images/upload?folder=knowledge-base`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+
+    if (response.data.success) {
+      return response.data.image;
+    } else {
+      throw new Error('Upload failed');
+    }
+  } catch (error) {
+    console.error('Error uploading knowledge base image:', error);
+    throw error;
+  }
+};
+
+/**
  * Delete image from Cloudinary via backend API
  * @param {string} publicId - Cloudinary public ID
  * @returns {Promise<void>}

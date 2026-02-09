@@ -977,6 +977,30 @@ const TicketDialog = ({
                     agentId={formData.agent}
                     categories={formData.categories}
                     currentTicketId={ticketDialog.data?._id}
+                    onCopyToTicket={(data) => {
+                      const updates = {};
+
+                      if (data.feedback) {
+                        const currentFeedback = formData.feedback || '';
+                        const separator = currentFeedback.trim() ? '\n\n' : '';
+                        updates.feedback = currentFeedback + separator + data.feedback;
+                      }
+
+                      if (data.categories && data.categories.length > 0) {
+                        updates.categories = data.categories;
+                      }
+
+                      if (data.scorecardValues && Object.keys(data.scorecardValues).length > 0) {
+                        updates.scorecardValues = data.scorecardValues;
+                        if (data.scorecardVariant) {
+                          updates.scorecardVariant = data.scorecardVariant;
+                        }
+                      }
+
+                      if (Object.keys(updates).length > 0) {
+                        setFormData(prev => ({ ...prev, ...updates }));
+                      }
+                    }}
                   />
                 )}
                 {rightPanelMode === 'macros' && (

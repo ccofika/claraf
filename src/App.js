@@ -86,12 +86,12 @@ function App() {
                         <Route path="/terms-of-service" element={<TermsOfService />} />
                         <Route path="/active-issues" element={<ActiveIssues />} />
 
-                        {/* Protected routes with PageLayout wrapper */}
+                        {/* Tools routes - grouped under /tools */}
                         <Route
-                          path="/vip-calculator"
+                          path="/tools/vip-calculator"
                           element={
                             <PrivateRoute>
-                              <PageLayout activeSection="vip-calculator">
+                              <PageLayout activeSection="tools" currentTool="vip-calculator">
                                 <VIPProgressCalculator />
                               </PageLayout>
                             </PrivateRoute>
@@ -99,10 +99,10 @@ function App() {
                         />
 
                         <Route
-                          path="/hash-explorer"
+                          path="/tools/hash-explorer"
                           element={
                             <PrivateRoute>
-                              <PageLayout activeSection="hash-explorer">
+                              <PageLayout activeSection="tools" currentTool="hash-explorer">
                                 <HashExplorerFinder />
                               </PageLayout>
                             </PrivateRoute>
@@ -110,39 +110,50 @@ function App() {
                         />
 
                         <Route
-                          path="/quick-links"
+                          path="/tools/quick-links"
                           element={
                             <PrivateRoute>
-                              <PageLayout activeSection="quick-links">
+                              <PageLayout activeSection="tools" currentTool="quick-links">
                                 <QuickLinks />
                               </PageLayout>
                             </PrivateRoute>
                           }
                         />
 
-                        {/* Temporarily disabled - Google Sheets OAuth consent screen issue
                         <Route
-                          path="/affiliate-bonus-finder"
+                          path="/tools/kyc"
                           element={
                             <PrivateRoute>
-                              <PageLayout activeSection="affiliate-bonus-finder">
-                                <AffiliateBonusFinder />
-                              </PageLayout>
-                            </PrivateRoute>
-                          }
-                        />
-                        */}
-
-                        <Route
-                          path="/kyc"
-                          element={
-                            <PrivateRoute>
-                              <PageLayout activeSection="kyc">
+                              <PageLayout activeSection="tools" currentTool="kyc">
                                 <KYC />
                               </PageLayout>
                             </PrivateRoute>
                           }
                         />
+
+                        <Route
+                          path="/tools/countries-restrictions"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="tools" currentTool="countries-restrictions">
+                                <CountriesRestrictions />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
+
+                        {/* Redirect /tools to default tool */}
+                        <Route
+                          path="/tools"
+                          element={<Navigate to="/tools/vip-calculator" replace />}
+                        />
+
+                        {/* Backward compatibility redirects for old URLs */}
+                        <Route path="/vip-calculator" element={<Navigate to="/tools/vip-calculator" replace />} />
+                        <Route path="/hash-explorer" element={<Navigate to="/tools/hash-explorer" replace />} />
+                        <Route path="/quick-links" element={<Navigate to="/tools/quick-links" replace />} />
+                        <Route path="/kyc" element={<Navigate to="/tools/kyc" replace />} />
+                        <Route path="/countries-restrictions" element={<Navigate to="/tools/countries-restrictions" replace />} />
 
                         <Route
                           path="/developer-dashboard"
@@ -218,16 +229,6 @@ function App() {
                           }
                         />
 
-                        <Route
-                          path="/countries-restrictions"
-                          element={
-                            <PrivateRoute>
-                              <PageLayout activeSection="countries-restrictions">
-                                <CountriesRestrictions />
-                              </PageLayout>
-                            </PrivateRoute>
-                          }
-                        />
 
                         {/* Workspace route - ONLY for canvas */}
                         <Route

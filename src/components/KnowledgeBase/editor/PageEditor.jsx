@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner';
 import BlockEditor from './BlockEditor';
 import VariantEditor from './VariantEditor';
+import IconPicker from './IconPicker';
 
 const PageEditor = ({ page, onSave, onClose, onDelete }) => {
   const [title, setTitle] = useState(page?.title || '');
@@ -18,6 +19,7 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
   const [activeSection, setActiveSection] = useState('content');
   const [variantBlock, setVariantBlock] = useState(null);
   const [showDropdownEditor, setShowDropdownEditor] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   useEffect(() => {
     if (page) {
@@ -132,14 +134,16 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
             <X size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
+            <button
+              type="button"
+              onClick={() => setShowIconPicker(true)}
               className="w-10 h-10 text-2xl text-center bg-gray-100 dark:bg-neutral-800 rounded-lg
-                border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              maxLength={2}
-            />
+                border-2 border-transparent hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500
+                transition-colors cursor-pointer flex items-center justify-center"
+              title="Click to change icon"
+            >
+              {icon}
+            </button>
             <input
               type="text"
               value={title}
@@ -430,6 +434,14 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
           />
         )}
       </AnimatePresence>
+
+      {/* Icon Picker Modal */}
+      <IconPicker
+        isOpen={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        onSelect={(selectedIcon) => setIcon(selectedIcon)}
+        currentIcon={icon}
+      />
     </div>
   );
 };

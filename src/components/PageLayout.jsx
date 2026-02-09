@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import AppSidebar from './AppSidebar';
 import axios from 'axios';
 
-const PageLayout = ({ children, activeSection }) => {
+const PageLayout = ({ children, activeSection, currentTool }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState([]);
@@ -50,10 +50,18 @@ const PageLayout = ({ children, activeSection }) => {
       } else if (workspaces.length > 0) {
         navigate(`/workspace/${workspaces[0]._id}`);
       }
+    } else if (section === 'tools') {
+      // Navigate to tools - default to first tool or current tool
+      navigate('/tools/vip-calculator');
     } else {
       // Navigate to section's direct route
       navigate(`/${section}`);
     }
+  };
+
+  const handleToolClick = (toolId) => {
+    console.log('📍 PageLayout navigating to tool:', toolId);
+    navigate(`/tools/${toolId}`);
   };
 
   const handleWorkspaceClick = (workspaceId) => {
@@ -87,7 +95,9 @@ const PageLayout = ({ children, activeSection }) => {
         onBookmarkDelete={() => {}}
         onCollapsedChange={() => {}}
         onRefreshWorkspaces={() => {}}
-        viewMode="post-view"
+        viewMode={activeSection === 'tools' ? 'tools-view' : 'post-view'}
+        currentTool={currentTool}
+        onToolClick={handleToolClick}
       />
       <div className="flex-1 overflow-auto">
         {children}

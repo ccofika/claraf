@@ -34,6 +34,7 @@ import {
   Chat as ChatBubble,
   Analytics,
   Notebook,
+  ToolKit,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -77,13 +78,57 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
   const { logout, user } = useAuth();
   const [hasQAAccess, setHasQAAccess] = React.useState(false);
 
-  // Fetch QA access from API
+  // Helper function to check if user has permission for a page
+  // ROLE is PRIMARY, pagePermissions is for OVERRIDE only
+  const hasPagePermission = (pageId) => {
+    const role = user?.role;
+    const email = user?.email?.toLowerCase();
+    const perms = user?.pagePermissions;
+
+    // SUPER ADMIN: filipkozomara@mebit.io always has full access
+    if (email === 'filipkozomara@mebit.io') {
+      return true;
+    }
+
+    // Define access per role - PRIMARY SOURCE
+    const roleAccess = {
+      'user': ['workspaces', 'tools', 'chat', 'knowledge-base'],
+      'qa': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
+      'qa-admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
+      'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats'],
+      'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats']
+    };
+
+    // Get default pages for role
+    const rolePages = roleAccess[role] || roleAccess['user'];
+    const hasRoleAccess = rolePages.includes(pageId);
+
+    // Check for explicit override from admin (pagePermissions)
+    // Only check if perms exist and have explicit value for this page
+    if (perms && perms[pageId] && typeof perms[pageId].enabled === 'boolean') {
+      // Explicit override exists - use it
+      return perms[pageId].enabled;
+    }
+
+    // No override - use role-based access
+    return hasRoleAccess;
+  };
+
+  // Check QA access based on role or API
   React.useEffect(() => {
     const checkQAAccess = async () => {
       if (!user?.email) {
         setHasQAAccess(false);
         return;
       }
+
+      // QA roles have automatic access
+      if (user?.role === 'qa' || user?.role === 'qa-admin' || user?.role === 'admin') {
+        setHasQAAccess(true);
+        return;
+      }
+
+      // For other users, check via API
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(
@@ -97,50 +142,21 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
       }
     };
     checkQAAccess();
-  }, [user?.email]);
+  }, [user?.email, user?.role]);
 
-  const navItems = [
+  // Build navigation items based on permissions
+  const allNavItems = [
     { id: 'workspaces', icon: <Home size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Workspaces' },
-    { id: 'vip-calculator', icon: <Calculator size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'VIP Progress Calculator' },
-    { id: 'hash-explorer', icon: <SearchIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Hash Explorer Finder' },
-    { id: 'quick-links', icon: <LinkIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Quick Links' },
-    {
-      id: 'chat',
-      icon: <ChatBubble size={16} className="text-gray-900 dark:text-neutral-50" />,
-      label: 'Chat'
-    },
-    // Temporarily disabled - Google Sheets OAuth consent screen issue
-    // { id: 'affiliate-bonus-finder', icon: <Gift size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Affiliate Bonus Finder' },
-    { id: 'kyc', icon: <CheckmarkFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Management' },
-    { id: 'countries-restrictions', icon: <EarthFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Countries & Restrictions' },
+    { id: 'tools', icon: <ToolKit size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Tools' },
+    { id: 'chat', icon: <ChatBubble size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Chat' },
     { id: 'knowledge-base', icon: <Notebook size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Knowledge Base' },
+    { id: 'developer-dashboard', icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Developer Dashboard' },
+    { id: 'qa-manager', icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'QA Manager', isExternal: true },
+    { id: 'kyc-agent-stats', icon: <Analytics size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Agent Stats', isExternal: true },
   ];
 
-  // Add developer dashboard for admin/developer roles only
-  const isDeveloperOrAdmin = user?.role === 'admin' || user?.role === 'developer';
-  if (isDeveloperOrAdmin) {
-    navItems.push({
-      id: 'developer-dashboard',
-      icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />,
-      label: 'Developer Dashboard'
-    });
-  }
-
-  // Add QA Manager for users with QA access (checked via API)
-  if (hasQAAccess) {
-    navItems.push({
-      id: 'qa-manager',
-      icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />,
-      label: 'QA Manager',
-      isExternal: true // Flag to indicate this navigates externally
-    });
-    navItems.push({
-      id: 'kyc-agent-stats',
-      icon: <Analytics size={16} className="text-gray-900 dark:text-neutral-50" />,
-      label: 'KYC Agent Stats',
-      isExternal: true
-    });
-  }
+  // Filter navigation items based on role defaults and explicit permissions
+  const navItems = allNavItems.filter(item => hasPagePermission(item.id));
 
   const handleLogout = () => {
     logout();
@@ -156,6 +172,11 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     // Navigate to knowledge base
     if (item.id === 'knowledge-base') {
       navigate('/knowledge-base');
+      return;
+    }
+    // Navigate to tools - default to first tool
+    if (item.id === 'tools') {
+      navigate('/tools/vip-calculator');
       return;
     }
     // All items use section change now
@@ -926,6 +947,84 @@ function DetailSidebar({
   );
 }
 
+/* ------------------------------ Tools Sidebar ----------------------------- */
+function ToolsSidebar({ currentTool, onToolClick, onCollapsedChange }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  const toggleCollapse = () => setIsCollapsed((s) => !s);
+
+  // Notify parent when collapsed state changes
+  React.useEffect(() => {
+    if (onCollapsedChange) {
+      onCollapsedChange(isCollapsed);
+    }
+  }, [isCollapsed, onCollapsedChange]);
+
+  // Helper function to check if user has permission for a tool subpage
+  const hasToolPermission = (toolId) => {
+    // If no pagePermissions set, all tools are accessible by default
+    if (!user?.pagePermissions?.tools?.subPages) {
+      return true;
+    }
+
+    const subPagePerm = user.pagePermissions.tools.subPages[toolId];
+    // If not explicitly set, default to true
+    return subPagePerm !== false;
+  };
+
+  const allToolItems = [
+    { id: 'vip-calculator', icon: <Calculator size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'VIP Progress Calculator' },
+    { id: 'hash-explorer', icon: <SearchIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Hash Explorer Finder' },
+    { id: 'quick-links', icon: <LinkIcon size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Quick Links' },
+    { id: 'kyc', icon: <CheckmarkFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Management' },
+    { id: 'countries-restrictions', icon: <EarthFilled size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Countries & Restrictions' },
+  ];
+
+  // Filter tools based on permissions
+  const toolItems = allToolItems.filter(tool => hasToolPermission(tool.id));
+
+  return (
+    <aside
+      className={`bg-white dark:bg-black flex flex-col gap-4 items-start p-4 transition-all duration-500 h-screen border-r border-gray-200 dark:border-neutral-800 ${
+        isCollapsed ? 'w-16 min-w-16 !px-0 justify-center' : 'w-80'
+      }`}
+      style={{ transitionTimingFunction: softSpringEasing }}
+    >
+      <SectionTitle title="Tools" onToggleCollapse={toggleCollapse} isCollapsed={isCollapsed} />
+
+      <div
+        className={`flex flex-col w-full overflow-y-auto transition-all duration-500 ${
+          isCollapsed ? 'gap-2 items-center' : 'gap-1 items-start'
+        }`}
+        style={{ transitionTimingFunction: softSpringEasing }}
+      >
+        {toolItems.map((tool) => (
+          <div key={tool.id} className={`w-full ${isCollapsed ? 'flex justify-center' : ''}`}>
+            <div
+              className={`rounded-lg cursor-pointer transition-all duration-500 flex items-center relative ${
+                currentTool === tool.id ? 'bg-gray-200 dark:bg-neutral-800' : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+              } ${isCollapsed ? 'w-10 min-w-10 h-10 justify-center p-4' : 'w-full h-10 px-4 py-2'}`}
+              style={{ transitionTimingFunction: softSpringEasing }}
+              onClick={() => onToolClick(tool.id)}
+            >
+              <div className="flex items-center justify-center shrink-0">{tool.icon}</div>
+              <div
+                className={`flex-1 relative transition-opacity duration-500 overflow-hidden ${
+                  isCollapsed ? 'opacity-0 w-0' : 'opacity-100 ml-3'
+                }`}
+                style={{ transitionTimingFunction: softSpringEasing }}
+              >
+                <div className="text-sm text-gray-900 dark:text-neutral-50 truncate">{tool.label}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 export default function AppSidebar({
   currentWorkspace,
   workspaces,
@@ -942,15 +1041,20 @@ export default function AppSidebar({
   onSectionChange,
   onCollapsedChange,
   onRefreshWorkspaces,
-  viewMode
+  viewMode,
+  currentTool,
+  onToolClick
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Check if we're in tools section (activeSection is 'tools' or starts with tools route)
+  const isToolsSection = activeSection === 'tools' || activeSection?.startsWith?.('tools-');
 
   return (
     <>
       <div className="flex flex-row h-screen">
         <IconNavigation
-          activeSection={activeSection}
+          activeSection={isToolsSection ? 'tools' : activeSection}
           onSectionChange={onSectionChange}
           onOpenProfile={() => setIsProfileOpen(true)}
         />
@@ -973,7 +1077,15 @@ export default function AppSidebar({
             onRefreshWorkspaces={onRefreshWorkspaces}
           />
         )}
-        
+        {/* Show ToolsSidebar when in tools section */}
+        {isToolsSection && (viewMode === 'tools-view' || viewMode !== 'post-view') && (
+          <ToolsSidebar
+            currentTool={currentTool}
+            onToolClick={onToolClick}
+            onCollapsedChange={onCollapsedChange}
+          />
+        )}
+
       </div>
 
       <ProfileModal
