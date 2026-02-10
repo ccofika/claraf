@@ -4,26 +4,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import {
   X,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  FileText,
-  ChevronDown,
-  ChevronRight,
   Loader2,
   BarChart3,
-  Copy,
-  Check,
   Eye,
   MessageSquare,
   ClipboardList,
-  Calendar,
   Tag,
   ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from './ui/badge';
 import { SCORE_COLORS, SHORT_LABELS, getScorecardValues } from '../data/scorecardConfig';
+import AgentHistoryContent, { getScoreColor, getScoreBgColor } from './AgentHistoryContent';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -121,34 +113,6 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
   const expandAllWeeks = () => setExpandedWeeks(new Set([1, 2, 3]));
   const collapseAllWeeks = () => setExpandedWeeks(new Set());
 
-  const getScoreColor = (score) => {
-    if (score === null || score === undefined) return 'text-gray-400';
-    if (score >= 90) return 'text-green-600 dark:text-green-400';
-    if (score >= 80) return 'text-blue-600 dark:text-blue-400';
-    if (score >= 70) return 'text-amber-600 dark:text-amber-400';
-    return 'text-red-600 dark:text-red-400';
-  };
-
-  const getScoreBgColor = (score) => {
-    if (score === null || score === undefined) return 'bg-gray-100 dark:bg-gray-800';
-    if (score >= 90) return 'bg-green-100 dark:bg-green-900/30';
-    if (score >= 80) return 'bg-blue-100 dark:bg-blue-900/30';
-    if (score >= 70) return 'bg-amber-100 dark:bg-amber-900/30';
-    return 'bg-red-100 dark:bg-red-900/30';
-  };
-
-  const getTrendIcon = (trend) => {
-    if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-green-500" />;
-    if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-500" />;
-    return <Minus className="w-4 h-4 text-gray-400" />;
-  };
-
-  const getTrendLabel = (trend, value) => {
-    if (trend === 'improving') return `+${value}% vs previous`;
-    if (trend === 'declining') return `${value}% vs previous`;
-    return 'Stable';
-  };
-
   const handleCopyTicketId = async (ticketId, e) => {
     e.stopPropagation();
     try {
@@ -168,19 +132,6 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
   const closeTicketPreview = () => {
     setSelectedTicket(null);
     setFullTicketData(null);
-  };
-
-  // Strip HTML and decode entities
-  const stripHtml = (html) => {
-    if (!html) return '';
-    return html
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .trim();
   };
 
   if (!isOpen) return null;
@@ -338,7 +289,6 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
                             {/* Scorecard Values */}
                             <div className="space-y-2.5">
                               {(() => {
-                                // Get proper labels from scorecard config
                                 const position = fullTicketData.agent?.position;
                                 const variant = fullTicketData.scorecardVariant;
                                 const configValues = position ? getScorecardValues(position, variant) : [];
@@ -346,16 +296,12 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
                                 configValues.forEach(v => { configMap[v.key] = v; });
 
                                 return Object.entries(fullTicketData.scorecardValues).map(([key, value]) => {
-                                  // Get label from config or fallback to formatted key
                                   const configItem = configMap[key];
                                   const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-                                  // Get display value and colors using same format as ScorecardEditor
                                   const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
                                     ? SHORT_LABELS[value]
                                     : '-';
 
-                                  // Background colors matching SCORE_COLORS
                                   const getBgClass = (idx) => {
                                     if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-neutral-700';
                                     switch (idx) {
@@ -370,7 +316,7 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
 
                                   const getTextClass = (idx) => {
                                     if (idx === null || idx === undefined) return 'text-gray-500';
-                                    if (idx === 1) return 'text-gray-900'; // Yellow needs dark text
+                                    if (idx === 1) return 'text-gray-900';
                                     return 'text-white';
                                   };
 
@@ -458,243 +404,20 @@ const AgentHistoryPanel = ({ agentId, agentName, isOpen, onClose }) => {
               )}
             </div>
 
-            {/* Content */}
+            {/* Content - using shared AgentHistoryContent */}
             <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                </div>
-              ) : !data || data.summary.totalTickets === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                  <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
-                    <BarChart3 className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No History Available
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-xs">
-                    No archived tickets found for this agent in the last 3 weeks.
-                  </p>
-                </div>
-              ) : (
-                <div className="p-6 space-y-6">
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs text-gray-500 dark:text-neutral-400">Tickets</span>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {data.summary.totalTickets}
-                      </p>
-                    </div>
-
-                    <div className={`rounded-xl p-4 ${getScoreBgColor(data.summary.overallAvg)}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <BarChart3 className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs text-gray-500 dark:text-neutral-400">Avg Score</span>
-                      </div>
-                      <p className={`text-2xl font-bold ${getScoreColor(data.summary.overallAvg)}`}>
-                        {data.summary.overallAvg !== null ? `${data.summary.overallAvg}%` : '-'}
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        {getTrendIcon(data.summary.trend)}
-                        <span className="text-xs text-gray-500 dark:text-neutral-400">Trend</span>
-                      </div>
-                      <p className={`text-sm font-medium ${
-                        data.summary.trend === 'improving' ? 'text-green-600 dark:text-green-400' :
-                        data.summary.trend === 'declining' ? 'text-red-600 dark:text-red-400' :
-                        'text-gray-600 dark:text-neutral-400'
-                      }`}>
-                        {getTrendLabel(data.summary.trend, data.summary.trendValue)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Top Categories */}
-                  {data.summary.topCategories?.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-                        Most Common Categories
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {data.summary.topCategories.map((cat, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="secondary"
-                            className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                          >
-                            {cat.name} ({cat.count})
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Weekly Breakdown */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
-                      Weekly Breakdown
-                    </h4>
-
-                    {data.weeks.map((week) => {
-                      const isExpanded = expandedWeeks.has(week.weekNumber);
-
-                      return (
-                        <div
-                          key={week.weekNumber}
-                          className="border border-gray-200 dark:border-neutral-800 rounded-xl overflow-hidden"
-                        >
-                          {/* Week Header */}
-                          <button
-                            onClick={() => toggleWeek(week.weekNumber)}
-                            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-neutral-800/50 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`p-1 rounded transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-                                <ChevronRight className="w-4 h-4 text-gray-400" />
-                              </div>
-                              <div className="text-left">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {week.label}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-neutral-400">
-                                  {week.dateRange}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-xs text-gray-500 dark:text-neutral-400">
-                                  {week.ticketCount} tickets
-                                </p>
-                              </div>
-                              {week.avgScore !== null && (
-                                <div className={`px-2.5 py-1 rounded-lg text-sm font-medium ${getScoreBgColor(week.avgScore)} ${getScoreColor(week.avgScore)}`}>
-                                  {week.avgScore}%
-                                </div>
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Tickets List */}
-                          <AnimatePresence>
-                            {isExpanded && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                {week.tickets.length === 0 ? (
-                                  <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-neutral-400">
-                                    No tickets this week
-                                  </div>
-                                ) : (
-                                  <div className="divide-y divide-gray-100 dark:divide-neutral-800">
-                                    {week.tickets.map((ticket) => (
-                                      <div
-                                        key={ticket._id}
-                                        className={`px-4 py-4 transition-colors cursor-pointer ${
-                                          selectedTicket?._id === ticket._id
-                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500'
-                                            : 'hover:bg-gray-50 dark:hover:bg-neutral-800/30'
-                                        }`}
-                                        onClick={(e) => handleViewTicket(ticket, e)}
-                                      >
-                                        {/* Ticket Header */}
-                                        <div className="flex items-start justify-between gap-3 mb-2">
-                                          <div className="flex items-center gap-2">
-                                            <button
-                                              onClick={(e) => handleCopyTicketId(ticket.ticketId, e)}
-                                              className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                                              title="Click to copy"
-                                            >
-                                              #{ticket.ticketId}
-                                              {copiedId === ticket.ticketId ? (
-                                                <Check className="w-3 h-3 text-green-500" />
-                                              ) : (
-                                                <Copy className="w-3 h-3 opacity-50" />
-                                              )}
-                                            </button>
-                                            <span className="text-xs text-gray-400">•</span>
-                                            <span className="text-xs text-gray-500 dark:text-neutral-500">
-                                              {new Date(ticket.gradedDate).toLocaleDateString()}
-                                            </span>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <button
-                                              onClick={(e) => handleViewTicket(ticket, e)}
-                                              className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                            >
-                                              <Eye className="w-3 h-3" />
-                                              View
-                                            </button>
-                                            <div className={`px-2 py-1 rounded-lg text-xs font-medium ${getScoreBgColor(ticket.score)} ${getScoreColor(ticket.score)}`}>
-                                              {ticket.score !== null ? `${ticket.score}%` : '-'}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Categories */}
-                                        {ticket.categories?.length > 0 && (
-                                          <div className="flex flex-wrap gap-1 mb-2">
-                                            {ticket.categories.slice(0, 4).map((cat, idx) => (
-                                              <span
-                                                key={idx}
-                                                className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 rounded"
-                                              >
-                                                {cat.length > 25 ? cat.substring(0, 25) + '...' : cat}
-                                              </span>
-                                            ))}
-                                            {ticket.categories.length > 4 && (
-                                              <span className="text-[10px] text-gray-400">
-                                                +{ticket.categories.length - 4}
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-
-                                        {/* Feedback Preview - 3 lines */}
-                                        {ticket.feedbackPreview && (
-                                          <div className="mt-2">
-                                            <p className="text-xs text-gray-600 dark:text-neutral-400 line-clamp-3 leading-relaxed">
-                                              {stripHtml(ticket.feedbackPreview)}
-                                            </p>
-                                          </div>
-                                        )}
-
-                                        {/* Notes Preview if no feedback */}
-                                        {!ticket.feedbackPreview && ticket.notesPreview && (
-                                          <div className="mt-2">
-                                            <p className="text-xs text-gray-500 dark:text-neutral-500 line-clamp-2 leading-relaxed italic">
-                                              Notes: {stripHtml(ticket.notesPreview)}
-                                            </p>
-                                          </div>
-                                        )}
-
-                                        {/* Click hint */}
-                                        <p className="text-[10px] text-gray-400 dark:text-neutral-600 mt-2">
-                                          Click to preview full ticket →
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <AgentHistoryContent
+                data={data}
+                loading={loading}
+                expandedWeeks={expandedWeeks}
+                onToggleWeek={toggleWeek}
+                onExpandAll={expandAllWeeks}
+                onCollapseAll={collapseAllWeeks}
+                selectedTicketId={selectedTicket?._id}
+                onTicketSelect={handleViewTicket}
+                copiedId={copiedId}
+                onCopyId={handleCopyTicketId}
+              />
             </div>
 
             {/* Footer */}

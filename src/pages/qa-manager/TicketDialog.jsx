@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
   AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive,
-  CheckCircle, XCircle, Minus
+  CheckCircle, XCircle, Minus, History
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -20,6 +20,7 @@ import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/sco
 import { useMacros } from '../../hooks/useMacros';
 import { useMinimizedTicket } from '../../context/MinimizedTicketContext';
 import { Button } from './components';
+import ThrowbackDrawer from '../../components/ThrowbackDrawer';
 
 const TicketDialog = ({
   ticketDialog,
@@ -45,6 +46,7 @@ const TicketDialog = ({
   const { minimizeTicket, saveViaBeacon, startWarpAnimation, warpAnimation, minimizedTicket } = useMinimizedTicket();
   const [minimizeConfirmOpen, setMinimizeConfirmOpen] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState('ai');
+  const [throwbackOpen, setThrowbackOpen] = useState(false);
   const [formData, setFormDataLocal] = useState(() => ({ ...ticketFormDataRef.current }));
 
   const setFormData = useCallback((valueOrUpdater) => {
@@ -471,7 +473,7 @@ const TicketDialog = ({
   return (
     <>
       <Dialog open={ticketDialog.open} onOpenChange={(open) => !open && handleCloseDialog()}>
-        <DialogContent hideCloseButton className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
+        <DialogContent hideCloseButton onPointerDownOutside={(e) => { if (throwbackOpen) e.preventDefault(); }} onInteractOutside={(e) => { if (throwbackOpen) e.preventDefault(); }} className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col">
           <DialogHeader className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
@@ -511,6 +513,18 @@ const TicketDialog = ({
                     <ExternalLink className="w-4 h-4" />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setThrowbackOpen(prev => !prev)}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    throwbackOpen
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400'
+                  }`}
+                  title="Throwback"
+                >
+                  <History className="w-4 h-4" />
+                </button>
                 {!isReviewMode && (
                   <button
                     type="button"
@@ -1243,6 +1257,13 @@ const TicketDialog = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Throwback Drawer */}
+      <ThrowbackDrawer
+        open={throwbackOpen}
+        onClose={() => setThrowbackOpen(false)}
+        agents={agents}
+      />
     </>
   );
 };

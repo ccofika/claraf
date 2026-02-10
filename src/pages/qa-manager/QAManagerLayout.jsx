@@ -9,14 +9,15 @@ import {
   MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
   ChevronDown, Wand2, GraduationCap, Menu, Home, Calculator, Link2,
   CheckCircle, Globe, LayoutDashboard, Archive, UserCheck, LogOut,
-  BookOpen, LineChart, PieChart
+  BookOpen, LineChart, PieChart, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { QAManagerProvider, useQAManager } from '../../context/QAManagerContext';
 import { duration, easing } from '../../utils/animations';
-import QACommandPalette from '../../components/QACommandPalette';
+import ThrowbackPanel from '../../components/ThrowbackPanel';
+import ThrowbackDrawer from '../../components/ThrowbackDrawer';
 import QAShortcutsModal from '../../components/QAShortcutsModal';
 import ManageMacrosModal from '../../components/ManageMacrosModal';
 import ChooseMacroModal from '../../components/ChooseMacroModal';
@@ -113,7 +114,7 @@ const QAManagerLayoutInner = () => {
   } = useQAManager();
 
   // Local state for modals and UI
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [throwbackOpen, setThrowbackOpen] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [generateDropdownOpen, setGenerateDropdownOpen] = useState(false);
   const [generateDropdownPosition, setGenerateDropdownPosition] = useState({ top: 0, left: 0 });
@@ -245,10 +246,10 @@ const QAManagerLayoutInner = () => {
             }));
             toast.success(`Switched to ${filters.searchMode === 'ai' ? 'Text' : 'AI'} search`);
             return;
-          case 'k':
-          case 'K':
+          case 'b':
+          case 'B':
             e.preventDefault();
-            setShowCommandPalette(true);
+            setThrowbackOpen(prev => !prev);
             return;
         }
       }
@@ -708,17 +709,21 @@ const QAManagerLayoutInner = () => {
             }
           `}</style>
 
-          {/* Right: Quick Search */}
+          {/* Right: Throwback */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => setShowCommandPalette(true)}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 rounded-lg hover:border-gray-300 dark:hover:border-neutral-700 transition-colors whitespace-nowrap"
+            onClick={() => setThrowbackOpen(prev => !prev)}
+            className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm border rounded-lg transition-colors whitespace-nowrap ${
+              throwbackOpen
+                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
+                : 'text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800 hover:border-gray-300 dark:hover:border-neutral-700'
+            }`}
           >
-            <Search className="w-4 h-4" />
-            <span className="hidden sm:inline">Quick Search</span>
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Throwback</span>
             <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
-              Alt+K
+              Alt+B
             </kbd>
           </motion.button>
         </div>
@@ -768,22 +773,48 @@ const QAManagerLayoutInner = () => {
         </div>
       )}
 
-      {/* Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
-          <AnimatePresence mode="wait">
+      {/* Content - Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main content area */}
+        <motion.div
+          className="overflow-y-auto"
+          animate={{ width: throwbackOpen ? '70%' : '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          style={{ width: throwbackOpen ? '70%' : '100%' }}
+        >
+          <div className={`mx-auto px-3 sm:px-6 py-4 sm:py-6 ${throwbackOpen ? '' : 'max-w-7xl'}`}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: duration.normal, ease: easing.smooth }}
+              >
+                <ReviewNotificationBanner />
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* Throwback panel */}
+        <AnimatePresence>
+          {throwbackOpen && (
             <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: duration.normal, ease: easing.smooth }}
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: '30%', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="flex-shrink-0 border-l border-gray-200 dark:border-neutral-800 overflow-hidden"
             >
-              <ReviewNotificationBanner />
-              <Outlet />
+              <ThrowbackPanel
+                agents={agents}
+                onClose={() => setThrowbackOpen(false)}
+              />
             </motion.div>
-          </AnimatePresence>
-        </div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Global Dialogs */}
@@ -1114,16 +1145,7 @@ const QAManagerLayoutInner = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Command Palette */}
-      <QACommandPalette
-        isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-        onTicketSelect={(ticket) => {
-          openTicketDialog('edit', ticket);
-          setShowCommandPalette(false);
-        }}
-        currentFilters={filters}
-      />
+      {/* Command Palette removed - replaced by Throwback */}
 
       {/* Shortcuts Modal */}
       <QAShortcutsModal
@@ -1141,6 +1163,7 @@ const QAManagerLayoutInner = () => {
         getCurrentTicketIndex={getCurrentTicketIndex}
         navigateToTicket={navigateToTicket}
         routerNavigate={navigate}
+        agents={agents}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -1389,10 +1412,12 @@ const ViewTicketDialog = ({
   setSaveAsMacroDialog,
   getCurrentTicketIndex,
   navigateToTicket,
-  routerNavigate
+  routerNavigate,
+  agents
 }) => {
   const [rightPanelMode, setRightPanelMode] = useState('ai');
   const [fullTicketData, setFullTicketData] = useState(null);
+  const [throwbackOpen, setThrowbackOpen] = useState(false);
 
   const ticket = fullTicketData || viewDialog.ticket;
   const baseTicket = viewDialog.ticket;
@@ -1479,8 +1504,9 @@ const ViewTicketDialog = ({
   const canEdit = !ticket.isArchived || isCreator || isAdminForEdit;
 
   return (
+  <>
     <Dialog open={viewDialog.open} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent hideCloseButton overlayClassName="z-[60]" className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col z-[60]">
+      <DialogContent hideCloseButton overlayClassName="z-[60]" onPointerDownOutside={(e) => { if (throwbackOpen) e.preventDefault(); }} onInteractOutside={(e) => { if (throwbackOpen) e.preventDefault(); }} className="bg-white dark:bg-neutral-900 !max-w-none !w-screen !h-screen !max-h-screen !rounded-none p-0 gap-0 flex flex-col z-[60]">
         {/* Header */}
         <DialogHeader className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
           <div className="flex items-center justify-between">
@@ -1553,6 +1579,18 @@ const ViewTicketDialog = ({
                   <Edit className="w-4 h-4" />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setThrowbackOpen(prev => !prev)}
+                className={`p-1.5 rounded-md transition-colors ${
+                  throwbackOpen
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 dark:text-neutral-400'
+                }`}
+                title="Throwback"
+              >
+                <History className="w-4 h-4" />
+              </button>
               {ticket.ticketId && (
                 <button
                   type="button"
@@ -1824,6 +1862,14 @@ const ViewTicketDialog = ({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Throwback Drawer */}
+    <ThrowbackDrawer
+      open={throwbackOpen}
+      onClose={() => setThrowbackOpen(false)}
+      agents={agents}
+    />
+  </>
   );
 };
 
