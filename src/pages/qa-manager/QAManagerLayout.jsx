@@ -31,6 +31,7 @@ import { hasScorecard } from '../../data/scorecardConfig';
 import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from './components';
 import TicketDialog from './TicketDialog';
 import { useAuth } from '../../context/AuthContext';
+import { useMinimizedTicket } from '../../context/MinimizedTicketContext';
 
 // Hardcoded users with full QA access (by email)
 const HARDCODED_QA_ADMINS = ['vasilijevitorovic@mebit.io'];
@@ -108,6 +109,7 @@ const QAManagerLayoutInner = () => {
     handleUpdateReviewTicket,
     fetchReviewTickets,
     reviewTickets,
+    restoreFromMinimized,
   } = useQAManager();
 
   // Local state for modals and UI
@@ -160,6 +162,30 @@ const QAManagerLayoutInner = () => {
       setNewAssignmentName('');
     }
   };
+
+  // Restore minimized ticket when dock's "Back to Edit" is clicked
+  const { minimizedTicket, clearMinimizedTicket, restoreRequested, setRestoreRequested } = useMinimizedTicket();
+
+  useEffect(() => {
+    // Trigger on restoreRequested flag (live navigation) or ?restore=true (page refresh)
+    const params = new URLSearchParams(location.search);
+    const urlRestore = params.get('restore') === 'true';
+
+    if ((restoreRequested || urlRestore) && minimizedTicket && !loading) {
+      restoreFromMinimized(minimizedTicket);
+      clearMinimizedTicket();
+      setRestoreRequested(false);
+
+      // Clean up the URL if it has ?restore=true
+      if (urlRestore) {
+        params.delete('restore');
+        const cleanPath = params.toString()
+          ? `${location.pathname}?${params.toString()}`
+          : location.pathname;
+        navigate(cleanPath, { replace: true });
+      }
+    }
+  }, [restoreRequested, location.search, minimizedTicket, restoreFromMinimized, clearMinimizedTicket, setRestoreRequested, navigate, location.pathname, loading]);
 
   // Get active tab from URL
   const getActiveTab = () => {
@@ -1061,18 +1087,18 @@ const QAManagerLayoutInner = () => {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Nesačuvane promene
+              Unsaved changes
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600 dark:text-neutral-400 py-2">
-            Imate nesačuvane promene na ovom tiketu. Da li ste sigurni da želite da napustite bez čuvanja?
+            You have unsaved changes on this ticket. Are you sure you want to leave without saving?
           </p>
           <DialogFooter className="gap-2">
             <Button
               variant="ghost"
               onClick={() => setUnsavedChangesModal({ open: false, onConfirm: null })}
             >
-              Otkaži
+              Cancel
             </Button>
             <Button
               variant="glass"
@@ -1082,7 +1108,7 @@ const QAManagerLayoutInner = () => {
                 }
               }}
             >
-              Izađi
+              Leave
             </Button>
           </DialogFooter>
         </DialogContent>

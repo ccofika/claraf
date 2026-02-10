@@ -14,6 +14,9 @@ import { TemplatesNavigationProvider } from './context/TemplatesNavigationContex
 import WheelNavigationWrapper from './components/WheelNavigationWrapper';
 import WorkspaceNavigation from './components/WorkspaceNavigation';
 import TemplatesNavigation from './components/TemplatesNavigation';
+import { MinimizedTicketProvider } from './context/MinimizedTicketContext';
+import MinimizedTicketDock from './components/MinimizedTicketDock';
+import MinimizeWarpAnimation from './components/MinimizeWarpAnimation';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -72,9 +75,12 @@ function App() {
                     <CommandPaletteProvider>
                       <TextFormattingProvider>
                         <Router>
+                          <MinimizedTicketProvider>
                           <WheelNavigationWrapper />
                           <WorkspaceNavigation />
                           <TemplatesNavigation />
+                          <MinimizedTicketDock />
+                          <MinimizeWarpAnimation />
                         <Routes>
                         {/* Public routes */}
                         <Route path="/" element={<Navigate to="/login" />} />
@@ -264,6 +270,7 @@ function App() {
                         closeButton
                         theme="system"
                       />
+                          </MinimizedTicketProvider>
                     </Router>
                       </TextFormattingProvider>
                     </CommandPaletteProvider>

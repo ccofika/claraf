@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
   AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, Minus
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Input } from '../../components/ui/input';
 import { DatePicker } from '../../components/ui/date-picker';
@@ -18,6 +18,7 @@ import ChooseMacroModal from '../../components/ChooseMacroModal';
 import { hasScorecard, getScorecardCategories } from '../../data/scorecardConfig';
 import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/scorecardCalculations';
 import { useMacros } from '../../hooks/useMacros';
+import { useMinimizedTicket } from '../../context/MinimizedTicketContext';
 import { Button } from './components';
 
 const TicketDialog = ({
@@ -41,6 +42,8 @@ const TicketDialog = ({
   onDeny
 }) => {
   const formRef = useRef(null);
+  const { minimizeTicket, saveViaBeacon, startWarpAnimation, warpAnimation, minimizedTicket } = useMinimizedTicket();
+  const [minimizeConfirmOpen, setMinimizeConfirmOpen] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState('ai');
   const [formData, setFormDataLocal] = useState(() => ({ ...ticketFormDataRef.current }));
 
@@ -354,6 +357,68 @@ const TicketDialog = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [ticketDialog.open, ticketDialog.mode, ticketDialog.data, canGoPrev, canGoNext, navigateWithUnsavedCheck, routerNavigate]);
 
+  // Get agent name for dock display
+  const getAgentNameForDock = useCallback(() => {
+    if (!formData.agent) return '';
+    const agent = agents?.find(a => a._id === formData.agent);
+    return agent?.name || '';
+  }, [formData.agent, agents]);
+
+  // Core minimize logic (performs the actual minimize)
+  const doMinimize = useCallback(() => {
+    if (warpAnimation) return;
+
+    const data = {
+      ticketObjectId: ticketDialog.data?._id || null,
+      mode: ticketDialog.mode,
+      source: source,
+      agentName: getAgentNameForDock(),
+      formData: { ...formData }
+    };
+
+    // Start warp animation (phantom appears over dialog)
+    const isDark = document.documentElement.classList.contains('dark');
+    startWarpAnimation(isDark);
+
+    // Fire API call non-blocking for snappy animation
+    minimizeTicket(data);
+
+    // Close dialog instantly (phantom covers the close)
+    setTicketDialog({ ...ticketDialog, open: false });
+    if (routerNavigate) {
+      routerNavigate(basePath);
+    }
+  }, [ticketDialog, formData, source, minimizeTicket, setTicketDialog, routerNavigate, basePath, getAgentNameForDock, warpAnimation, startWarpAnimation]);
+
+  // Minimize with confirmation if dock already has a ticket
+  const handleMinimize = useCallback(() => {
+    if (warpAnimation) return;
+    if (minimizedTicket) {
+      setMinimizeConfirmOpen(true);
+    } else {
+      doMinimize();
+    }
+  }, [warpAnimation, minimizedTicket, doMinimize]);
+
+  // beforeunload: save ticket as minimized if dialog is open (both create and edit)
+  useEffect(() => {
+    if (!ticketDialog.open) return;
+
+    const handleBeforeUnload = () => {
+      const data = {
+        ticketObjectId: ticketDialog.data?._id || null,
+        mode: ticketDialog.mode,
+        source: ticketDialog.source || 'tickets',
+        agentName: getAgentNameForDock(),
+        formData: { ...ticketFormDataRef.current }
+      };
+      saveViaBeacon(data);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [ticketDialog.open, ticketDialog.mode, ticketDialog.data?._id, ticketDialog.source, getAgentNameForDock, saveViaBeacon, ticketFormDataRef]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (ticketDialog.mode === 'create') {
@@ -444,6 +509,16 @@ const TicketDialog = ({
                     title="Open in Intercom"
                   >
                     <ExternalLink className="w-4 h-4" />
+                  </button>
+                )}
+                {!isReviewMode && (
+                  <button
+                    type="button"
+                    onClick={handleMinimize}
+                    className="p-1.5 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 transition-colors"
+                    title="Minimize to dock"
+                  >
+                    <Minus className="w-4 h-4" />
                   </button>
                 )}
                 <button
@@ -1136,6 +1211,38 @@ const TicketDialog = ({
           setShowChooseMacroModal(false);
         }}
       />
+
+      {/* Minimize replace confirmation modal */}
+      <Dialog open={minimizeConfirmOpen} onOpenChange={setMinimizeConfirmOpen}>
+        <DialogContent className="bg-white dark:bg-neutral-900 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Existing minimized ticket
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-neutral-400 py-2">
+            You already have a minimized ticket in the dock. Replacing it will discard your previous progress. Do you want to continue?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setMinimizeConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="glass"
+              onClick={() => {
+                setMinimizeConfirmOpen(false);
+                doMinimize();
+              }}
+            >
+              Replace
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

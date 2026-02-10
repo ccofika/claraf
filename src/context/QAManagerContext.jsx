@@ -1594,6 +1594,36 @@ export const QAManagerProvider = ({ children }) => {
     setTicketDialog({ open: true, mode, data, source });
   }, []);
 
+  // Restore a minimized ticket into the dialog
+  const restoreFromMinimized = useCallback((minimizedData) => {
+    if (!minimizedData) return;
+
+    const { ticketObjectId, mode, source, formData } = minimizedData;
+
+    // Set the form data ref directly from the saved form state
+    ticketFormDataRef.current = {
+      agent: formData.agent || '',
+      ticketId: formData.ticketId || '',
+      status: formData.status || 'Selected',
+      dateEntered: formData.dateEntered || new Date().toISOString().split('T')[0],
+      notes: formData.notes || '',
+      feedback: formData.feedback || '',
+      qualityScorePercent: formData.qualityScorePercent !== undefined ? formData.qualityScorePercent : '',
+      categories: formData.categories || [],
+      scorecardVariant: formData.scorecardVariant || null,
+      scorecardValues: formData.scorecardValues || {},
+      additionalNote: formData.additionalNote || ''
+    };
+
+    // Find the ticket in the loaded tickets list for the dialog data
+    let ticketData = null;
+    if (mode === 'edit' && ticketObjectId) {
+      ticketData = tickets.find(t => t._id === ticketObjectId) || { _id: ticketObjectId };
+    }
+
+    setTicketDialog({ open: true, mode: mode || 'edit', data: ticketData, source: source || 'tickets' });
+  }, [tickets]);
+
   const getCurrentTicketIndex = useCallback((ticketId) => {
     if (!ticketId || !Array.isArray(tickets)) return -1;
     return tickets.findIndex(t => t._id === ticketId);
@@ -2069,6 +2099,7 @@ export const QAManagerProvider = ({ children }) => {
     // Navigation
     handleViewAgentTickets,
     openTicketDialog,
+    restoreFromMinimized,
     getCurrentTicketIndex,
     navigateToTicket,
     navigateWithUnsavedCheck,
