@@ -3701,9 +3701,9 @@ const QAManager = () => {
                     notes={formData.notes}
                     ticketId={ticketDialog.data?._id}
                     onCopyFeedback={(feedback) => {
-                      // Append to existing feedback
+                      // Append HTML to existing HTML feedback
                       const currentFeedback = formData.feedback || '';
-                      const separator = currentFeedback.trim() ? '\n\n' : '';
+                      const separator = currentFeedback.trim() ? '<br><br>' : '';
                       setFormData(prev => ({
                         ...prev,
                         feedback: currentFeedback + separator + feedback

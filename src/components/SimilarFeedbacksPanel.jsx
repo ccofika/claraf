@@ -13,11 +13,18 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback, categories = [
   const { user } = useAuth();
   const API_URL = process.env.REACT_APP_API_URL;
 
-  // Strip HTML helper
+  // Strip HTML helper - preserves line breaks
   const stripHtml = (html) => {
     if (!html) return '';
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent || '';
+    // Convert block-level elements and <br> to newlines before stripping
+    let text = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<\/li>/gi, '\n');
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    // Trim trailing whitespace/newlines and collapse 3+ consecutive newlines to 2
+    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
   };
 
   const [results, setResults] = useState([]);
@@ -90,14 +97,14 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback, categories = [
     }
   }, [notes, ticketId, categories, API_URL, user?.token]);
 
-  const handleCopy = async (feedback, id) => {
+  const handleCopy = async (plainFeedback, htmlFeedback, id) => {
     try {
-      // Copy to clipboard
-      await navigator.clipboard.writeText(feedback);
+      // Copy plain text to clipboard
+      await navigator.clipboard.writeText(plainFeedback);
 
-      // Call callback to append to existing feedback
+      // Append original HTML to the rich text editor
       if (onCopyFeedback) {
-        onCopyFeedback(feedback);
+        onCopyFeedback(htmlFeedback);
       }
 
       setCopiedId(id);
@@ -327,7 +334,7 @@ const SimilarFeedbacksPanel = ({ notes, ticketId, onCopyFeedback, categories = [
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleCopy(stripHtml(result.feedback), result._id);
+                  handleCopy(stripHtml(result.feedback), result.feedback, result._id);
                 }}
                 className={`absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 ${
                   isCopied
