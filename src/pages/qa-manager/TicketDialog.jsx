@@ -763,28 +763,163 @@ const TicketDialog = ({
                                 className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
                               />
                             </div>
-                            <div>
-                              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Categories</Label>
-                              <Input
-                                value={formData.categories.join(', ')}
-                                readOnly
-                                placeholder="Available in full mode"
-                                className="text-sm bg-gray-50 dark:bg-neutral-800 border-gray-200 dark:border-neutral-800"
-                              />
+                            <div ref={categoryDropdownRef} className="relative">
+                              <Label className={`text-xs mb-1.5 block ${
+                                formData.categories.length === 0 && rightPanelMode === 'related'
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : 'text-gray-600 dark:text-neutral-400'
+                              }`}>
+                                Categories
+                                {formData.categories.length === 0 && rightPanelMode === 'related' && (
+                                  <span className="text-red-500 ml-1">*</span>
+                                )}
+                              </Label>
+                              <div
+                                className={`flex flex-wrap items-center gap-1 px-2 py-1.5 text-sm rounded-lg bg-white dark:bg-neutral-900 cursor-text min-h-[38px] ${
+                                  formData.categories.length === 0 && rightPanelMode === 'related'
+                                    ? 'border-2 border-red-400 dark:border-red-500 ring-2 ring-red-200 dark:ring-red-500/20'
+                                    : 'border border-gray-200 dark:border-neutral-800'
+                                } ${showCategoryDropdown ? 'ring-2 ring-gray-900 dark:ring-gray-300' : ''}`}
+                                onClick={() => categoryInputRef.current?.focus()}
+                              >
+                                {formData.categories.map(cat => (
+                                  <span
+                                    key={cat}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full"
+                                  >
+                                    {cat}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFormData({ ...formData, categories: formData.categories.filter(c => c !== cat) });
+                                      }}
+                                      className="hover:text-blue-900 dark:hover:text-blue-300"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                                <input
+                                  ref={categoryInputRef}
+                                  type="text"
+                                  value={categorySearch}
+                                  onChange={(e) => {
+                                    setCategorySearch(e.target.value);
+                                    setShowCategoryDropdown(true);
+                                  }}
+                                  onFocus={() => setShowCategoryDropdown(true)}
+                                  onKeyDown={handleCategoryKeyDown}
+                                  placeholder={formData.categories.length === 0 ? "Search categories..." : ""}
+                                  className="flex-1 min-w-[100px] bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-500 text-sm"
+                                />
+                              </div>
+                              {showCategoryDropdown && (
+                                <div
+                                  ref={categoryListRef}
+                                  className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                                >
+                                  {filteredCategories.length > 0 ? (
+                                    filteredCategories.map((cat, index) => (
+                                      <button
+                                        key={cat}
+                                        type="button"
+                                        data-highlighted={categoryHighlightIndex === index}
+                                        onClick={() => {
+                                          setFormData({ ...formData, categories: [...formData.categories, cat] });
+                                          setCategorySearch('');
+                                          setCategoryHighlightIndex(0);
+                                          setTimeout(() => categoryInputRef.current?.focus(), 0);
+                                        }}
+                                        onMouseEnter={() => setCategoryHighlightIndex(index)}
+                                        className={`w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white transition-colors ${
+                                          categoryHighlightIndex === index
+                                            ? 'bg-blue-100 dark:bg-blue-900/30'
+                                            : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                                        }`}
+                                      >
+                                        {cat}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-neutral-500">
+                                      {categorySearch ? 'No categories found' : 'All categories selected'}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div>
-                            <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
-                              <MessageSquare className="w-3.5 h-3.5" />
-                              Feedback
-                            </Label>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <Label className="text-xs text-gray-600 dark:text-neutral-400 flex items-center gap-2">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                Feedback
+                              </Label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowChooseMacroModal(true)}
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                >
+                                  <Hash className="w-3 h-3" />
+                                  Choose Macro
+                                </button>
+                                {formData.feedback && formData.feedback.trim() && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSaveAsMacroDialog({
+                                    open: true,
+                                    feedback: formData.feedback,
+                                    categories: formData.categories || [],
+                                    scorecardData: agentPosition && formData.scorecardValues && Object.keys(formData.scorecardValues).length > 0
+                                      ? { [agentPosition]: { values: formData.scorecardValues, variant: formData.scorecardVariant || null } }
+                                      : {},
+                                    agentPosition
+                                  })}
+                                    className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                    Save as Macro
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                             <TicketRichTextEditor
                               value={formData.feedback}
                               onChange={(html) => setFormData({ ...formData, feedback: html })}
-                              placeholder="Feedback to agent"
-                              rows={3}
-                              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[100px]"
+                              placeholder="Feedback to agent after grading (type # to insert macro)"
+                              rows={5}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                              enableMacros={true}
+                              agentPosition={agentPosition}
+                              currentScorecardVariant={formData.scorecardVariant}
+                              onMacroApply={(macro, options = {}) => {
+                                const { applyCategories = false, applyScorecard = false, scorecardVariant = null, feedbackType = 'good', scorecardData = null } = options;
+                                const updates = {};
+                                if (applyCategories && macro.categories && macro.categories.length > 0) {
+                                  updates.categories = macro.categories;
+                                }
+                                const scorecardSource = scorecardData || (feedbackType === 'bad' ? macro.badScorecardData : macro.goodScorecardData);
+                                if (applyScorecard && agentPosition && scorecardSource?.[agentPosition]) {
+                                  const positionData = scorecardSource[agentPosition];
+                                  const targetVariant = scorecardVariant || Object.keys(positionData)[0];
+                                  const values = positionData[targetVariant];
+                                  if (values && typeof values === 'object' && Object.keys(values).length > 0) {
+                                    updates.scorecardValues = values;
+                                    if (targetVariant) {
+                                      updates.scorecardVariant = targetVariant;
+                                    }
+                                  }
+                                }
+                                if (Object.keys(updates).length > 0) {
+                                  setFormData(prev => ({ ...prev, ...updates }));
+                                }
+                                if (ticketDialog.data?._id) {
+                                  recordUsage(macro._id, ticketDialog.data._id, ticketDialog.data.ticketId);
+                                }
+                              }}
                             />
                           </div>
                         </motion.div>
