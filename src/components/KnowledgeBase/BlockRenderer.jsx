@@ -25,6 +25,7 @@ import PDFBlock from './blocks/PDFBlock';
 import BreadcrumbsBlock from './blocks/BreadcrumbsBlock';
 import SyncedBlock from './blocks/SyncedBlock';
 import ColumnsBlock from './blocks/ColumnsBlock';
+import CollapsibleHeadingBlock from './blocks/CollapsibleHeadingBlock';
 
 const blockComponents = {
   paragraph: ParagraphBlock,
@@ -52,7 +53,8 @@ const blockComponents = {
   pdf: PDFBlock,
   breadcrumbs: BreadcrumbsBlock,
   synced_block: SyncedBlock,
-  columns: ColumnsBlock
+  columns: ColumnsBlock,
+  collapsible_heading: CollapsibleHeadingBlock
 };
 
 const BlockRenderer = ({ block, isEditing = false, onUpdate }) => {

@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Table, Minus, Settings, Pencil, Check,
   // New icons for new block types
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
-  Music, FileType, Navigation, RefreshCw, Columns
+  Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -84,7 +84,8 @@ const blockTypeOptions = [
   { type: 'table_of_contents', label: 'Table of Contents', icon: ListTree, category: 'advanced' },
   { type: 'columns', label: 'Columns', icon: Columns, category: 'advanced' },
   { type: 'breadcrumbs', label: 'Breadcrumbs', icon: Navigation, category: 'advanced' },
-  { type: 'synced_block', label: 'Synced Block', icon: RefreshCw, category: 'advanced' }
+  { type: 'synced_block', label: 'Synced Block', icon: RefreshCw, category: 'advanced' },
+  { type: 'collapsible_heading', label: 'Collapsible Section', icon: ChevronsDownUp, category: 'advanced' }
 ];
 
 const SortableBlock = ({
@@ -301,6 +302,8 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
             { id: 'col1', width: 50, blocks: [] },
             { id: 'col2', width: 50, blocks: [] }
           ] };
+        case 'collapsible_heading':
+          return { title: '', blocks: [] };
         default:
           return '';
       }
