@@ -9,7 +9,7 @@ import {
   MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
   ChevronDown, Wand2, GraduationCap, Menu, Home, Calculator, Link2,
   CheckCircle, Globe, LayoutDashboard, Archive, UserCheck, LogOut,
-  BookOpen, LineChart, PieChart, History
+  BookOpen, LineChart, PieChart, History, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
@@ -33,6 +33,10 @@ import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from
 import TicketDialog from './TicketDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useMinimizedTicket } from '../../context/MinimizedTicketContext';
+import { useZenMove } from '../../context/ZenMoveContext';
+import ZenMoveAgentSelector from '../../components/ZenMoveAgentSelector';
+import ZenMoveProgressPanel from '../../components/ZenMoveProgressPanel';
+import ZenMoveSettingsPopover from '../../components/ZenMoveSettingsPopover';
 
 // Hardcoded users with full QA access (by email)
 const HARDCODED_QA_ADMINS = ['vasilijevitorovic@mebit.io'];
@@ -112,6 +116,18 @@ const QAManagerLayoutInner = () => {
     reviewTickets,
     restoreFromMinimized,
   } = useQAManager();
+
+  // ZenMove
+  const {
+    zenMoveActive,
+    toggleZenMove,
+    selectedAgentId,
+    setSelectedAgentId,
+    getAgentExtractionCount,
+    extractionTarget,
+    fetchExtractionCounts,
+    incrementExtractionCount,
+  } = useZenMove();
 
   // Local state for modals and UI
   const [throwbackOpen, setThrowbackOpen] = useState(false);
@@ -251,6 +267,11 @@ const QAManagerLayoutInner = () => {
             e.preventDefault();
             setThrowbackOpen(prev => !prev);
             return;
+          case 'z':
+          case 'Z':
+            e.preventDefault();
+            toggleZenMove();
+            return;
         }
       }
 
@@ -279,11 +300,22 @@ const QAManagerLayoutInner = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, filters.searchMode, navigate, openTicketDialog, handleExportSelectedTickets, setFilters, fetchDashboardStats, fetchAgents, fetchTickets]);
+  }, [activeTab, filters.searchMode, navigate, openTicketDialog, handleExportSelectedTickets, setFilters, fetchDashboardStats, fetchAgents, fetchTickets, toggleZenMove]);
 
   // Check if user is admin or reviewer (based on role or hardcoded email)
   const isAdmin = user?.role === 'admin' || user?.role === 'qa-admin' || HARDCODED_QA_ADMINS.includes(user?.email);
   const { isReviewer, reviewPendingCount } = useQAManager();
+  const isZenMoveSettingsUser = user?.email === 'filipkozomara@mebit.io';
+
+  // Auto-navigate to dashboard when ZenMove hides current tab
+  useEffect(() => {
+    if (zenMoveActive) {
+      const hiddenTabs = ['archive', 'review', 'analytics', 'summaries', 'coaching', 'all-agents', 'statistics', 'active-overview', 'bugs'];
+      if (hiddenTabs.includes(activeTab)) {
+        navigate('/qa-manager/dashboard');
+      }
+    }
+  }, [zenMoveActive, activeTab, navigate]);
 
   return (
     <motion.div
@@ -386,17 +418,19 @@ const QAManagerLayoutInner = () => {
                   { value: 'dashboard', label: 'Dashboard' },
                   { value: 'agents', label: 'Agents' },
                   { value: 'tickets', label: 'Tickets' },
-                  { value: 'archive', label: 'Archive' },
-                  ...(isReviewer ? [{ value: 'review', label: 'Review', badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
-                  { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+                  ...(!zenMoveActive ? [
+                    { value: 'archive', label: 'Archive' },
+                    ...(isReviewer ? [{ value: 'review', label: 'Review', badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
+                    { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+                  ] : []),
                 ];
 
-                const generateSubTabs = [
+                const generateSubTabs = zenMoveActive ? [] : [
                   { value: 'summaries', label: 'Summary', icon: FileText },
                   { value: 'coaching', label: 'Coaching', icon: GraduationCap },
                 ];
 
-                const adminTabs = [
+                const adminTabs = zenMoveActive ? [] : [
                   ...(isAdmin ? [
                     { value: 'all-agents', label: 'All Agents', icon: UsersRound },
                     { value: 'statistics', label: 'Statistics', icon: TrendingUp },
@@ -709,25 +743,107 @@ const QAManagerLayoutInner = () => {
             }
           `}</style>
 
-          {/* Right: Throwback */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setThrowbackOpen(prev => !prev)}
-            className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm border rounded-lg transition-colors whitespace-nowrap ${
-              throwbackOpen
-                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
-                : 'text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800 hover:border-gray-300 dark:hover:border-neutral-700'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span className="hidden sm:inline">Throwback</span>
-            <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
-              Alt+B
-            </kbd>
-          </motion.button>
+          {/* Right: ZenMove controls + Throwback */}
+          <div className="flex items-center gap-2">
+            {/* ZenMove toolbar - shown when active */}
+            {zenMoveActive && (
+              <div className="hidden sm:flex items-center gap-2">
+                <ZenMoveAgentSelector
+                  agents={agents}
+                  selectedAgentId={selectedAgentId}
+                  onSelectAgent={setSelectedAgentId}
+                />
+
+                {/* Compact extraction tracker for selected agent */}
+                {selectedAgentId && (() => {
+                  const count = getAgentExtractionCount(selectedAgentId);
+                  const progress = Math.min(count / extractionTarget, 1);
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-neutral-800 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-400"
+                          animate={{ width: `${progress * 100}%` }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-500 tabular-nums">
+                        {count}/{extractionTarget}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    if (selectedAgentId) {
+                      openTicketDialog('create', null, 'tickets', selectedAgentId);
+                    } else {
+                      openTicketDialog('create');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Create Ticket
+                </motion.button>
+              </div>
+            )}
+
+            {/* ZenMove Toggle */}
+            <div className="flex items-center gap-1">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={toggleZenMove}
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm border rounded-lg transition-colors whitespace-nowrap ${
+                  zenMoveActive
+                    ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 border-cyan-300 dark:border-cyan-800'
+                    : 'text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800 hover:border-gray-300 dark:hover:border-neutral-700'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                <span className="hidden sm:inline">ZenMove</span>
+                <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
+                  Alt+Z
+                </kbd>
+              </motion.button>
+              {zenMoveActive && isZenMoveSettingsUser && (
+                <ZenMoveSettingsPopover />
+              )}
+            </div>
+
+            {/* Throwback */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setThrowbackOpen(prev => !prev)}
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm border rounded-lg transition-colors whitespace-nowrap ${
+                throwbackOpen
+                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
+                  : 'text-gray-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800 hover:border-gray-300 dark:hover:border-neutral-700'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span className="hidden sm:inline">Throwback</span>
+              <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-neutral-800 rounded">
+                Alt+B
+              </kbd>
+            </motion.button>
+          </div>
         </div>
       </motion.div>
+
+      {/* ZenMove Progress Panel */}
+      <ZenMoveProgressPanel
+        agents={agents}
+        onCreateTicket={(agentId) => {
+          setSelectedAgentId(agentId);
+          openTicketDialog('create', null, 'tickets', agentId);
+        }}
+      />
 
       {/* Pending Macro Tickets Banner */}
       {pendingMacroTickets.length > 0 && (
@@ -1185,6 +1301,8 @@ const QAManagerLayoutInner = () => {
         hasUnsavedChangesRef={hasUnsavedChangesRef}
         handleCreateTicket={handleCreateTicket}
         handleUpdateTicket={ticketDialog.source === 'review' ? handleUpdateReviewTicket : handleUpdateTicket}
+        zenMode={zenMoveActive}
+        onZenModeTicketCreated={incrementExtractionCount}
         getCurrentTicketIndex={getCurrentTicketIndex}
         navigateWithUnsavedCheck={navigateWithUnsavedCheck}
         setUnsavedChangesModal={setUnsavedChangesModal}
@@ -1350,22 +1468,48 @@ const QAManagerLayoutInner = () => {
               {/* Navigation Items */}
               <div className="flex-1 overflow-y-auto py-2">
                 <nav className="space-y-1 px-2">
+                  {/* ZenMove mobile controls */}
+                  {zenMoveActive && (
+                    <div className="px-2 pb-2 space-y-2 border-b border-gray-200 dark:border-neutral-800 mb-2">
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <Zap className="w-4 h-4 text-cyan-500" />
+                        <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">ZenMove Active</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (selectedAgentId) {
+                            openTicketDialog('create', null, 'tickets', selectedAgentId);
+                          } else {
+                            openTicketDialog('create');
+                          }
+                          setShowQANavMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-cyan-600 text-white text-sm font-medium"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Create Ticket
+                      </button>
+                    </div>
+                  )}
                   {(() => {
+                    const zenHiddenTabs = ['archive', 'review', 'analytics', 'summaries', 'coaching', 'all-agents', 'statistics', 'active-overview', 'bugs'];
                     const allTabs = [
                       { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                       { value: 'agents', label: 'Agents', icon: Users },
                       { value: 'tickets', label: 'Tickets', icon: FileText },
-                      { value: 'archive', label: 'Archive', icon: Archive },
-                      ...(isReviewer ? [{ value: 'review', label: 'Review', icon: UserCheck, badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
-                      { value: 'analytics', label: 'Analytics', icon: BarChart3 },
-                      { value: 'summaries', label: 'AI Summary', icon: FileText },
-                      { value: 'coaching', label: 'Coaching', icon: GraduationCap },
-                      ...(isAdmin ? [
-                        { value: 'all-agents', label: 'All Agents', icon: UsersRound },
-                        { value: 'statistics', label: 'Statistics', icon: TrendingUp },
-                        { value: 'active-overview', label: 'Active Overview', icon: Target },
+                      ...(!zenMoveActive ? [
+                        { value: 'archive', label: 'Archive', icon: Archive },
+                        ...(isReviewer ? [{ value: 'review', label: 'Review', icon: UserCheck, badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
+                        { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+                        { value: 'summaries', label: 'AI Summary', icon: FileText },
+                        { value: 'coaching', label: 'Coaching', icon: GraduationCap },
+                        ...(isAdmin ? [
+                          { value: 'all-agents', label: 'All Agents', icon: UsersRound },
+                          { value: 'statistics', label: 'Statistics', icon: TrendingUp },
+                          { value: 'active-overview', label: 'Active Overview', icon: Target },
+                        ] : []),
+                        ...(isAdmin ? [{ value: 'bugs', label: 'Bugs', icon: Bug }] : []),
                       ] : []),
-                      ...(isAdmin ? [{ value: 'bugs', label: 'Bugs', icon: Bug }] : []),
                     ];
 
                     return allTabs.map((tab) => (

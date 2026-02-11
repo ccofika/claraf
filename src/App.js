@@ -15,6 +15,7 @@ import WheelNavigationWrapper from './components/WheelNavigationWrapper';
 import WorkspaceNavigation from './components/WorkspaceNavigation';
 import TemplatesNavigation from './components/TemplatesNavigation';
 import { MinimizedTicketProvider } from './context/MinimizedTicketContext';
+import { ZenMoveProvider } from './context/ZenMoveContext';
 import MinimizedTicketDock from './components/MinimizedTicketDock';
 import MinimizeWarpAnimation from './components/MinimizeWarpAnimation';
 import Login from './pages/Login';
@@ -76,6 +77,7 @@ function App() {
                       <TextFormattingProvider>
                         <Router>
                           <MinimizedTicketProvider>
+                          <ZenMoveProvider>
                           <WheelNavigationWrapper />
                           <WorkspaceNavigation />
                           <TemplatesNavigation />
@@ -270,6 +272,7 @@ function App() {
                         closeButton
                         theme="system"
                       />
+                          </ZenMoveProvider>
                           </MinimizedTicketProvider>
                     </Router>
                       </TextFormattingProvider>

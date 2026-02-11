@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText, MessageSquare, Hash, Save, X, ChevronLeft, ChevronRight,
   AlertTriangle, Sparkles, Users, ExternalLink, Search, Lightbulb, Archive,
-  CheckCircle, XCircle, Minus, History
+  CheckCircle, XCircle, Minus, History, ChevronDown
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
@@ -40,7 +41,10 @@ const TicketDialog = ({
   // Review mode props
   isReviewMode = false,
   onApprove,
-  onDeny
+  onDeny,
+  // ZenMove props
+  zenMode = false,
+  onZenModeTicketCreated
 }) => {
   const formRef = useRef(null);
   const { minimizeTicket, saveViaBeacon, startWarpAnimation, warpAnimation, minimizedTicket } = useMinimizedTicket();
@@ -65,6 +69,12 @@ const TicketDialog = ({
   const categoryListRef = useRef(null);
   const [showChooseMacroModal, setShowChooseMacroModal] = useState(false);
   const { recordUsage } = useMacros();
+
+  // ZenMove state
+  const [showGradingInZen, setShowGradingInZen] = useState(false);
+  const zenTicketIdRef = useRef(null);
+  const zenNotesRef = useRef(null);
+  const isZenCreate = zenMode && ticketDialog.mode === 'create';
 
   // Agent searchable dropdown state
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
@@ -421,10 +431,39 @@ const TicketDialog = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [ticketDialog.open, ticketDialog.mode, ticketDialog.data?._id, ticketDialog.source, getAgentNameForDock, saveViaBeacon, ticketFormDataRef]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (ticketDialog.mode === 'create') {
-      handleCreateTicket(formData);
+      if (isZenCreate) {
+        // ZenMove: create ticket, reset form, keep agent, stay open
+        try {
+          await handleCreateTicket(formData, { keepOpen: true });
+          const agentId = formData.agent;
+          if (onZenModeTicketCreated) onZenModeTicketCreated(agentId);
+          // Reset form but keep agent
+          const resetData = {
+            agent: agentId,
+            ticketId: '',
+            status: 'Selected',
+            qualityScorePercent: '',
+            notes: '',
+            feedback: '',
+            dateEntered: new Date().toISOString().split('T')[0],
+            categories: [],
+            scorecardVariant: null,
+            scorecardValues: {}
+          };
+          ticketFormDataRef.current = resetData;
+          setFormData(resetData);
+          setShowGradingInZen(false);
+          // Re-focus ticket ID input
+          setTimeout(() => zenTicketIdRef.current?.focus(), 100);
+        } catch (err) {
+          // Error handled by handleCreateTicket
+        }
+      } else {
+        handleCreateTicket(formData);
+      }
     } else {
       handleUpdateTicket(ticketDialog.data._id, formData);
     }
@@ -603,6 +642,158 @@ const TicketDialog = ({
                   );
                 })()}
 
+                {/* ZenMove Quick Create Layout */}
+                {isZenCreate ? (
+                  <>
+                    {/* Agent badge (read-only) */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 dark:text-neutral-400">Agent:</span>
+                      <span className="px-2.5 py-1 text-sm bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded-lg font-medium">
+                        {selectedAgent?.name || 'No agent selected'}
+                      </span>
+                      <input type="hidden" value={formData.agent} required />
+                    </div>
+
+                    {/* Ticket ID with Enter → Notes */}
+                    <div>
+                      <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Ticket ID <span className="text-red-600 dark:text-red-400">*</span></Label>
+                      <Input
+                        ref={zenTicketIdRef}
+                        autoFocus
+                        value={formData.ticketId}
+                        onChange={(e) => setFormData({ ...formData, ticketId: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && formData.ticketId.trim()) {
+                            e.preventDefault();
+                            // Focus the notes editor
+                            const notesEl = zenNotesRef.current;
+                            if (notesEl) {
+                              // TicketRichTextEditor uses contentEditable div
+                              const editable = notesEl.querySelector('[contenteditable="true"]');
+                              if (editable) editable.focus();
+                              else notesEl.focus();
+                            }
+                          }
+                        }}
+                        placeholder="Paste ticket ID and press Enter →"
+                        required
+                        className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
+                      />
+                    </div>
+
+                    {/* Notes - always visible */}
+                    <div ref={zenNotesRef}>
+                      <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5" />
+                        Notes
+                      </Label>
+                      <TicketRichTextEditor
+                        value={formData.notes}
+                        onChange={(html) => setFormData({ ...formData, notes: html })}
+                        placeholder="Quick notes / moment extraction"
+                        rows={5}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                      />
+                    </div>
+
+                    {/* Collapsible grading section */}
+                    <button
+                      type="button"
+                      onClick={() => setShowGradingInZen(prev => !prev)}
+                      className="text-xs text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300 flex items-center gap-1 transition-colors"
+                    >
+                      {showGradingInZen ? 'Hide' : 'Show'} Grading
+                      <ChevronDown className={`w-3 h-3 transition-transform ${showGradingInZen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    <AnimatePresence>
+                      {showGradingInZen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden space-y-4"
+                        >
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-gray-300 dark:border-neutral-700"></div>
+                            </div>
+                            <div className="relative flex justify-center">
+                              <span className="px-3 bg-white dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
+                                Grading Information
+                              </span>
+                            </div>
+                          </div>
+
+                          {agentHasScorecard && (
+                            <ScorecardEditor
+                              agentPosition={agentPosition}
+                              variant={formData.scorecardVariant}
+                              onVariantChange={(variant) => {
+                                setFormData({ ...formData, scorecardVariant: variant, scorecardValues: {} });
+                              }}
+                              values={formData.scorecardValues}
+                              onChange={(values) => setFormData({ ...formData, scorecardValues: values })}
+                              disabled={false}
+                            />
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                            <div>
+                              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
+                              <select
+                                value={formData.status}
+                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                              >
+                                <option value="Selected">Selected</option>
+                                <option value="Graded">Graded</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Quality Score (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={formData.qualityScorePercent}
+                                onChange={(e) => setFormData({ ...formData, qualityScorePercent: e.target.value })}
+                                placeholder="0-100"
+                                className="text-sm bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Categories</Label>
+                              <Input
+                                value={formData.categories.join(', ')}
+                                readOnly
+                                placeholder="Available in full mode"
+                                className="text-sm bg-gray-50 dark:bg-neutral-800 border-gray-200 dark:border-neutral-800"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 flex items-center gap-2">
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              Feedback
+                            </Label>
+                            <TicketRichTextEditor
+                              value={formData.feedback}
+                              onChange={(html) => setFormData({ ...formData, feedback: html })}
+                              placeholder="Feedback to agent"
+                              rows={3}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[100px]"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <>
+                {/* Standard form layout */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div className="relative" ref={agentDropdownRef}>
                     <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Agent <span className="text-red-600 dark:text-red-400">*</span></Label>
@@ -943,6 +1134,8 @@ const TicketDialog = ({
                     }}
                   />
                 </div>
+                  </>
+                )}
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-neutral-800">
                   <Button type="button" variant="ghost" onClick={handleCloseDialog}>

@@ -23,6 +23,8 @@ const QAShortcutsModal = ({ open, onClose }) => {
         { keys: ['Alt', 'A'], description: 'New Agent' },
         { keys: ['Alt', 'E'], description: 'Export Selected Tickets' },
         { keys: ['Alt', 'S'], description: 'Toggle AI/Text Search' },
+        { keys: ['Alt', 'Z'], description: 'Toggle ZenMove Mode' },
+        { keys: ['Alt', 'B'], description: 'Toggle Throwback Panel' },
         { keys: ['Ctrl', 'Enter'], description: 'Save (in dialogs)' },
       ]
     },

@@ -705,7 +705,7 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // TICKET CRUD
   // ============================================
-  const handleCreateTicket = useCallback(async (formData) => {
+  const handleCreateTicket = useCallback(async (formData, { keepOpen = false } = {}) => {
     try {
       const requestBody = {
         agent: formData.agent,
@@ -721,11 +721,15 @@ export const QAManagerProvider = ({ children }) => {
       };
       const response = await axios.post(`${API_URL}/api/qa/tickets`, requestBody, getAuthHeaders());
       setTickets(prev => [response.data, ...prev]);
-      setTicketDialog({ open: false, mode: 'create', data: null });
-      toast.success('Ticket created successfully');
+      if (!keepOpen) {
+        setTicketDialog({ open: false, mode: 'create', data: null });
+      }
+      toast.success(keepOpen ? 'Ticket created - keep going!' : 'Ticket created successfully');
+      return response.data;
     } catch (err) {
       console.error('Error creating ticket:', err);
       toast.error(err.response?.data?.message || 'Failed to create ticket');
+      throw err;
     }
   }, [API_URL, getAuthHeaders]);
 
@@ -1559,10 +1563,10 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // DIALOG HELPERS
   // ============================================
-  const openTicketDialog = useCallback((mode, data = null, source = 'tickets') => {
+  const openTicketDialog = useCallback((mode, data = null, source = 'tickets', prefilledAgent = null) => {
     if (mode === 'create') {
       ticketFormDataRef.current = {
-        agent: '',
+        agent: prefilledAgent || '',
         ticketId: '',
         status: 'Selected',
         qualityScorePercent: '',
