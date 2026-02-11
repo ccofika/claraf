@@ -418,6 +418,7 @@ const TableBlock = ({ content, isEditing, onUpdate }) => {
                     className="px-5 py-3 text-[15px] text-gray-700 dark:text-neutral-300
                       border-r border-gray-200 dark:border-neutral-700 last:border-r-0
                       [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
+                    style={{ whiteSpace: 'pre-wrap' }}
                     dangerouslySetInnerHTML={{ __html: cell.content }}
                   />
                 ))}

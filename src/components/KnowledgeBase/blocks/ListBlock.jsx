@@ -108,6 +108,7 @@ const ListBlock = ({ block, content, isEditing, onUpdate }) => {
               className="text-[17px] leading-[1.6] text-gray-700 dark:text-neutral-300
                 pl-2 marker:text-gray-400 dark:marker:text-neutral-500
                 [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
+              style={{ whiteSpace: 'pre-wrap' }}
               dangerouslySetInnerHTML={{ __html: item }}
             />
           ) : (

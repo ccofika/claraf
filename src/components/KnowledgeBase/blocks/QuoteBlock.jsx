@@ -83,7 +83,8 @@ const QuoteBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <blockquote className="border-l-4 border-gray-300 dark:border-neutral-600 pl-6 py-2 my-6">
-      <p className="text-[19px] leading-[1.6] text-gray-600 dark:text-neutral-400 italic">
+      <p className="text-[19px] leading-[1.6] text-gray-600 dark:text-neutral-400 italic"
+        style={{ whiteSpace: 'pre-wrap' }}>
         {content}
       </p>
     </blockquote>

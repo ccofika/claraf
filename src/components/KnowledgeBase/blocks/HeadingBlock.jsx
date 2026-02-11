@@ -84,6 +84,7 @@ const HeadingBlock = ({ block, content, isEditing, onUpdate }) => {
         <Tag
           className={`${headingStyles[level]} text-gray-900 dark:text-white
             [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline`}
+          style={{ whiteSpace: 'pre-wrap' }}
           dangerouslySetInnerHTML={{ __html: content }}
         />
         <style>{textColorStyles}</style>
