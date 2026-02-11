@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Trash2, GripVertical, Type, Heading1, Heading2, Heading3,
   List, ListOrdered, ChevronRight, AlertCircle, Quote, Code,
-  Image as ImageIcon, Table, Minus, Settings, Pencil, Check,
+  Image as ImageIcon, Table, Minus, Settings, Pencil, Check, AlertTriangle,
   // New icons for new block types
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
   Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp
@@ -94,7 +95,7 @@ const SortableBlock = ({
   editingBlockId,
   setEditingBlockId,
   onUpdateBlock,
-  onDeleteBlock,
+  onRequestDelete,
   onOpenVariants,
   hasDropdowns,
   showAddMenu,
@@ -156,7 +157,7 @@ const SortableBlock = ({
         </button>
 
         <button
-          onClick={() => onDeleteBlock(block.id)}
+          onClick={() => onRequestDelete(block.id)}
           className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium
             bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300
             rounded hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30
@@ -236,6 +237,7 @@ const SortableBlock = ({
 const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) => {
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const firstAddButtonRef = useRef(null);
   const bottomAddButtonRef = useRef(null);
 
@@ -373,7 +375,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
               editingBlockId={editingBlockId}
               setEditingBlockId={setEditingBlockId}
               onUpdateBlock={updateBlock}
-              onDeleteBlock={deleteBlock}
+              onRequestDelete={setPendingDeleteId}
               onOpenVariants={onOpenVariants}
               hasDropdowns={hasDropdowns}
               showAddMenu={showAddMenu}
@@ -473,6 +475,53 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
             )}
           </AnimatePresence>
         </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {pendingDeleteId && createPortal(
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99998]"
+          onClick={() => setPendingDeleteId(null)}
+        >
+          <div
+            className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl p-6 w-[400px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+                  Delete Block
+                </h3>
+                <p className="text-[13px] text-gray-500 dark:text-neutral-400 mt-0.5">
+                  Are you sure? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPendingDeleteId(null)}
+                className="px-4 py-2 text-[13px] font-medium text-gray-700 dark:text-neutral-300
+                  bg-gray-100 dark:bg-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-600
+                  rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteBlock(pendingDeleteId);
+                  setPendingDeleteId(null);
+                }}
+                className="px-4 py-2 text-[13px] font-medium text-white
+                  bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
