@@ -48,26 +48,26 @@ const CodeBlock = ({ block, content, isEditing, onUpdate }) => {
   if (!codeData.code) return null;
 
   return (
-    <div className="relative group rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800">
+    <div className="relative group rounded-lg overflow-hidden bg-[#1e1e1e] dark:bg-[#1a1a1a]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-neutral-900
-        border-b border-neutral-200 dark:border-neutral-800">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#252526] dark:bg-[#1f1f1f]
+        border-b border-[#333] dark:border-[#2a2a2a]">
         {codeData.language && (
-          <span className="text-[12px] font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+          <span className="text-[12px] font-medium text-neutral-400 uppercase tracking-wider">
             {codeData.language}
           </span>
         )}
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-neutral-500 dark:text-neutral-400
-            hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800
-            rounded transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-[12px] text-neutral-400
+            hover:text-neutral-200 hover:bg-white/10
+            rounded transition-colors opacity-0 group-hover:opacity-100"
           title="Copy code"
         >
           {copied ? (
             <>
-              <Check size={14} />
-              Copied
+              <Check size={14} className="text-green-400" />
+              <span className="text-green-400">Copied</span>
             </>
           ) : (
             <>
@@ -79,8 +79,8 @@ const CodeBlock = ({ block, content, isEditing, onUpdate }) => {
       </div>
 
       {/* Code */}
-      <pre className="p-4 bg-neutral-50 dark:bg-neutral-950 overflow-x-auto">
-        <code className="font-mono text-[14px] leading-[1.6] text-neutral-800 dark:text-neutral-200 whitespace-pre">
+      <pre className="p-4 overflow-x-auto">
+        <code className="font-mono text-[13.5px] leading-[1.7] text-neutral-200 whitespace-pre">
           {codeData.code}
         </code>
       </pre>

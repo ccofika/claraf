@@ -19,7 +19,7 @@ const KnowledgeBaseLayoutInner = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
-      className="flex h-full w-full bg-white dark:bg-neutral-950"
+      className="flex h-full w-full bg-white dark:bg-neutral-950 overflow-hidden"
     >
       {/* Sidebar */}
       <KBSidebar />
@@ -35,7 +35,7 @@ const KnowledgeBaseLayoutInner = () => {
         <FloatingSearchBar />
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scroll-smooth">
           <Outlet />
         </div>
       </div>

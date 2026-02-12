@@ -12,9 +12,9 @@ const HeadingBlock = ({ block, content, isEditing, onUpdate }) => {
   const richText = useRichTextEditor({ onUpdate, externalEditorRef: editorRef });
 
   const headingStyles = {
-    1: 'text-[48px] font-bold tracking-tight leading-[1.1] mt-12 mb-6',
-    2: 'text-[34px] font-semibold tracking-tight leading-[1.15] mt-10 mb-5',
-    3: 'text-[24px] font-semibold tracking-[-0.01em] leading-[1.2] mt-8 mb-4'
+    1: 'text-[30px] font-bold tracking-[-0.02em] leading-[1.2] mt-10 mb-1',
+    2: 'text-[24px] font-semibold tracking-[-0.015em] leading-[1.25] mt-8 mb-1',
+    3: 'text-[20px] font-semibold tracking-[-0.01em] leading-[1.3] mt-6 mb-0.5'
   };
 
   useEffect(() => {

@@ -286,12 +286,12 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <figure className="my-4">
+    <figure>
       <div className="relative group">
         <img
           src={imageData.url}
           alt={imageData.alt || ''}
-          className="max-w-full rounded-lg mx-auto cursor-pointer"
+          className="max-w-full rounded-md mx-auto cursor-pointer hover:shadow-sm transition-shadow"
           onError={() => setError(true)}
           onClick={() => setLightboxOpen(true)}
         />
@@ -300,16 +300,16 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
             href={imageData.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-lg
+            className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-md
               opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <ExternalLink size={16} />
+            <ExternalLink size={14} />
           </a>
         )}
       </div>
       {imageData.caption && (
-        <figcaption className="mt-3 text-center text-[14px] text-gray-500 dark:text-neutral-400 italic">
+        <figcaption className="mt-2.5 text-center text-[13px] text-gray-400 dark:text-neutral-500">
           {imageData.caption}
         </figcaption>
       )}

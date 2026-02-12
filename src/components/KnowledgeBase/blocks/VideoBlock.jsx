@@ -145,7 +145,7 @@ const VideoBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <figure className="my-8">
+    <figure>
       <div className="relative group aspect-video rounded-lg overflow-hidden bg-black">
         {embedData.type === 'direct' ? (
           <video
@@ -173,7 +173,7 @@ const VideoBlock = ({ block, content, isEditing, onUpdate }) => {
         </a>
       </div>
       {videoData.caption && (
-        <figcaption className="mt-3 text-center text-[14px] text-gray-500 dark:text-neutral-400">
+        <figcaption className="mt-2.5 text-center text-[13px] text-gray-400 dark:text-neutral-500">
           {videoData.caption}
         </figcaption>
       )}

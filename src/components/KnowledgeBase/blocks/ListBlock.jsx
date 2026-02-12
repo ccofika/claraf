@@ -100,13 +100,13 @@ const ListBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <ListTag className={`space-y-2 pl-6 ${isNumbered ? 'list-decimal' : 'list-disc'}`}>
+      <ListTag className={`space-y-1 pl-6 ${isNumbered ? 'list-decimal' : 'list-disc'}`}>
         {items.map((item, index) => (
           hasHtmlItems ? (
             <li
               key={index}
-              className="text-[17px] leading-[1.6] text-gray-700 dark:text-neutral-300
-                pl-2 marker:text-gray-400 dark:marker:text-neutral-500
+              className="text-[16px] leading-[1.7] text-gray-600 dark:text-neutral-400
+                pl-1.5 marker:text-gray-300 dark:marker:text-neutral-600
                 [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
               style={{ whiteSpace: 'pre-wrap' }}
               dangerouslySetInnerHTML={{ __html: item }}
@@ -114,8 +114,8 @@ const ListBlock = ({ block, content, isEditing, onUpdate }) => {
           ) : (
             <li
               key={index}
-              className="text-[17px] leading-[1.6] text-gray-700 dark:text-neutral-300
-                pl-2 marker:text-gray-400 dark:marker:text-neutral-500"
+              className="text-[16px] leading-[1.7] text-gray-600 dark:text-neutral-400
+                pl-1.5 marker:text-gray-300 dark:marker:text-neutral-600"
             >
               {item}
             </li>

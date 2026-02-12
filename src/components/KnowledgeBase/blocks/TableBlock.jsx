@@ -389,34 +389,36 @@ const TableBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className="overflow-x-auto my-6">
-        <table className="min-w-full border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-          <thead className="bg-gray-100 dark:bg-neutral-800">
-            <tr>
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-neutral-700">
+        <table className="min-w-full">
+          <thead>
+            <tr className="bg-gray-50/80 dark:bg-neutral-800/60">
               {headers.map((header, index) => (
                 <th
                   key={index}
-                  className="px-5 py-3 text-left text-[13px] font-semibold uppercase tracking-wide
-                    text-gray-600 dark:text-neutral-300
-                    border-r border-gray-200 dark:border-neutral-700 last:border-r-0"
+                  className="px-4 py-3 text-left text-[13px] font-semibold
+                    text-gray-500 dark:text-neutral-400
+                    border-b border-gray-200 dark:border-neutral-700
+                    border-r border-r-gray-100 dark:border-r-neutral-700/50 last:border-r-0"
                 >
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-neutral-900/50">
+          <tbody>
             {rows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-t border-gray-200 dark:border-neutral-700"
+                className="border-b border-gray-100 dark:border-neutral-800 last:border-b-0
+                  hover:bg-gray-50/50 dark:hover:bg-neutral-800/30 transition-colors"
               >
                 {row.map((cell, colIndex) => (
                   <td
                     key={colIndex}
                     colSpan={cell.colspan}
-                    className="px-5 py-3 text-[15px] text-gray-700 dark:text-neutral-300
-                      border-r border-gray-200 dark:border-neutral-700 last:border-r-0
+                    className="px-4 py-3 text-[15px] text-gray-600 dark:text-neutral-400
+                      border-r border-gray-100 dark:border-neutral-800 last:border-r-0
                       [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
                     style={{ whiteSpace: 'pre-wrap' }}
                     dangerouslySetInnerHTML={{ __html: cell.content }}

@@ -20,7 +20,7 @@ const KBPageView = () => {
   if (pageLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-900 dark:border-white border-t-transparent dark:border-t-transparent" />
       </div>
     );
   }
@@ -31,12 +31,13 @@ const KBPageView = () => {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
           Page not found
         </h2>
-        <p className="text-gray-500 dark:text-neutral-400 mb-4">
+        <p className="text-[15px] text-gray-500 dark:text-neutral-400 mb-6">
           The page you're looking for doesn't exist or has been deleted.
         </p>
         <button
           onClick={() => navigate('/knowledge-base')}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2.5 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100
+            text-white dark:text-gray-900 rounded-lg text-[14px] font-medium transition-colors"
         >
           Go to Home
         </button>
@@ -63,18 +64,18 @@ const KBPageView = () => {
       )}
 
       {/* Content Area */}
-      <div className="px-6 py-6">
+      <div className="w-full px-8 md:px-12 lg:px-16 pt-16 pb-12 max-w-6xl mx-auto">
         {/* Breadcrumbs */}
         {currentPage.breadcrumbs && currentPage.breadcrumbs.length > 1 && (
-          <nav className="flex items-center gap-1 text-sm text-gray-500 dark:text-neutral-400 mb-4">
+          <nav className="flex items-center gap-1 text-[13px] text-gray-400 dark:text-neutral-500 mb-8">
             {currentPage.breadcrumbs.map((crumb, index) => (
               <React.Fragment key={crumb.slug}>
-                {index > 0 && <ChevronRight size={14} />}
+                {index > 0 && <ChevronRight size={12} className="text-gray-300 dark:text-neutral-600" />}
                 <button
                   onClick={() => navigate(`/knowledge-base/${crumb.slug}`)}
-                  className={`hover:text-gray-700 dark:hover:text-neutral-200 transition-colors ${
+                  className={`hover:text-gray-600 dark:hover:text-neutral-300 transition-colors ${
                     index === currentPage.breadcrumbs.length - 1
-                      ? 'text-gray-900 dark:text-white font-medium'
+                      ? 'text-gray-600 dark:text-neutral-300 font-medium'
                       : ''
                   }`}
                 >
@@ -86,18 +87,21 @@ const KBPageView = () => {
         )}
 
         {/* Page Header */}
-        <div className="flex items-start gap-4 mb-8">
-          <span className="text-4xl">{currentPage.icon || '📄'}</span>
-          <div className="flex-1">
+        <div className="group mb-8">
+          <div className="mb-3">
+            <span className="text-5xl leading-none">{currentPage.icon || '📄'}</span>
+          </div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-[36px] font-bold text-gray-900 dark:text-white tracking-[-0.025em] leading-[1.15]">
                 {currentPage.title}
               </h1>
               {isAdmin && (
                 <button
                   onClick={() => navigate(`/knowledge-base/admin?edit=${currentPage._id}`)}
-                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400
-                    hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                  className="p-2 text-gray-300 dark:text-neutral-600 hover:text-gray-600 dark:hover:text-neutral-300
+                    hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-all
+                    opacity-0 group-hover:opacity-100"
                   title="Edit page"
                 >
                   <Edit size={18} />
@@ -108,33 +112,33 @@ const KBPageView = () => {
         </div>
 
         {/* Page Blocks */}
-        <div className="space-y-1" data-kb-content>
+        <div data-kb-content>
           {currentPage.blocks && currentPage.blocks.length > 0 ? (
             currentPage.blocks.map((block, index) => (
               <BlockRenderer key={block.id || index} block={block} />
             ))
           ) : (
-            <div className="py-8 text-center text-gray-500 dark:text-neutral-400">
+            <div className="py-12 text-center text-gray-400 dark:text-neutral-500">
               {isAdmin ? (
-                <p>
+                <p className="text-[15px]">
                   This page is empty.{' '}
                   <button
                     onClick={() => navigate(`/knowledge-base/admin?edit=${currentPage._id}`)}
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-gray-900 dark:text-white hover:underline font-medium"
                   >
                     Add content
                   </button>
                 </p>
               ) : (
-                <p>This page doesn't have any content yet.</p>
+                <p className="text-[15px]">This page doesn't have any content yet.</p>
               )}
             </div>
           )}
         </div>
 
         {/* Page Footer */}
-        <div className="mt-12 pt-6 border-t border-gray-200 dark:border-neutral-800">
-          <div className="text-sm text-gray-500 dark:text-neutral-400">
+        <div className="mt-16 pt-8 border-t border-gray-100 dark:border-neutral-800/30">
+          <div className="text-[13px] text-gray-400 dark:text-neutral-500">
             {currentPage.lastModifiedBy && (
               <p>
                 Last updated by {currentPage.lastModifiedBy.name || currentPage.lastModifiedBy.email}

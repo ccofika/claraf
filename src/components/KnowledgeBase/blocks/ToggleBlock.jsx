@@ -89,29 +89,29 @@ const ToggleBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className="border border-gray-200 dark:border-neutral-800 rounded-lg overflow-hidden">
+      <div className="rounded-lg overflow-hidden">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-neutral-900/50
-            hover:bg-gray-100 dark:hover:bg-neutral-800/50 transition-colors text-left"
+          className="w-full flex items-center gap-2 px-1 py-1.5
+            hover:bg-gray-50 dark:hover:bg-neutral-900/50 rounded-md transition-colors text-left"
         >
           <ChevronRight
             size={18}
-            className={`text-gray-400 dark:text-neutral-500 transition-transform duration-200
+            className={`flex-shrink-0 text-gray-400 dark:text-neutral-500 transition-transform duration-200
               ${isExpanded ? 'rotate-90' : ''}`}
           />
-          <span className="text-[17px] font-medium text-gray-900 dark:text-white">
+          <span className="text-[16px] font-medium text-gray-800 dark:text-neutral-200">
             {toggleData.title || 'Toggle'}
           </span>
         </button>
 
         {isExpanded && bodyContent && (
-          <div className="px-5 py-4 pl-11 border-t border-gray-200 dark:border-neutral-800 bg-white dark:bg-transparent">
+          <div className="pl-7 pt-1 pb-1">
             {hasHtmlBody ? (
               <div
                 className="prose prose-gray dark:prose-invert max-w-none
-                  text-[15px] leading-[1.6] text-gray-700 dark:text-neutral-300
-                  [&_p]:mb-3 [&_p:last-child]:mb-0
+                  text-[15px] leading-[1.7] text-gray-600 dark:text-neutral-400
+                  [&_p]:mb-2 [&_p:last-child]:mb-0
                   [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline
                   [&_code]:text-[13px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
                   [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded"
@@ -120,8 +120,8 @@ const ToggleBlock = ({ content, isEditing, onUpdate }) => {
               />
             ) : (
               <div className="prose prose-gray dark:prose-invert max-w-none
-                text-[15px] leading-[1.6] text-gray-700 dark:text-neutral-300
-                [&_p]:mb-3 [&_p:last-child]:mb-0
+                text-[15px] leading-[1.7] text-gray-600 dark:text-neutral-400
+                [&_p]:mb-2 [&_p:last-child]:mb-0
                 [&_code]:text-[13px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
                 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>

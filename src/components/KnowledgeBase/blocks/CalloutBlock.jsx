@@ -8,45 +8,45 @@ import RichTextToolbar from './RichTextToolbar';
 
 const calloutStyles = {
   info: {
-    bg: 'bg-blue-50 dark:bg-blue-950/40',
-    border: 'border-l-4 border-blue-500',
+    bg: 'bg-blue-50/70 dark:bg-blue-950/30',
+    border: 'border-l-[3px] border-blue-400',
     icon: Info,
-    iconColor: 'text-blue-600 dark:text-blue-400',
+    iconColor: 'text-blue-500 dark:text-blue-400',
     title: 'Info'
   },
   warning: {
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
-    border: 'border-l-4 border-amber-500',
+    bg: 'bg-amber-50/70 dark:bg-amber-950/30',
+    border: 'border-l-[3px] border-amber-400',
     icon: AlertTriangle,
-    iconColor: 'text-amber-600 dark:text-amber-400',
+    iconColor: 'text-amber-500 dark:text-amber-400',
     title: 'Warning'
   },
   error: {
-    bg: 'bg-red-50 dark:bg-red-950/40',
-    border: 'border-l-4 border-red-500',
+    bg: 'bg-red-50/70 dark:bg-red-950/30',
+    border: 'border-l-[3px] border-red-400',
     icon: AlertCircle,
-    iconColor: 'text-red-600 dark:text-red-400',
+    iconColor: 'text-red-500 dark:text-red-400',
     title: 'Error'
   },
   success: {
-    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
-    border: 'border-l-4 border-emerald-500',
+    bg: 'bg-emerald-50/70 dark:bg-emerald-950/30',
+    border: 'border-l-[3px] border-emerald-400',
     icon: CheckCircle,
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    iconColor: 'text-emerald-500 dark:text-emerald-400',
     title: 'Success'
   },
   tip: {
-    bg: 'bg-violet-50 dark:bg-violet-950/40',
-    border: 'border-l-4 border-violet-500',
+    bg: 'bg-violet-50/70 dark:bg-violet-950/30',
+    border: 'border-l-[3px] border-violet-400',
     icon: Lightbulb,
-    iconColor: 'text-violet-600 dark:text-violet-400',
+    iconColor: 'text-violet-500 dark:text-violet-400',
     title: 'Tip'
   },
   important: {
-    bg: 'bg-rose-50 dark:bg-rose-950/40',
-    border: 'border-l-4 border-rose-500',
+    bg: 'bg-rose-50/70 dark:bg-rose-950/30',
+    border: 'border-l-[3px] border-rose-400',
     icon: Flame,
-    iconColor: 'text-rose-600 dark:text-rose-400',
+    iconColor: 'text-rose-500 dark:text-rose-400',
     title: 'Important'
   }
 };
@@ -90,8 +90,8 @@ const CalloutBlock = ({ block, content, isEditing, onUpdate }) => {
   if (isEditing) {
     return (
       <>
-        <div className={`flex gap-4 p-5 rounded-lg ${style.bg} ${style.border}`}>
-          <Icon size={22} className={`flex-shrink-0 mt-0.5 ${style.iconColor}`} />
+        <div className={`flex gap-3.5 px-4 py-3.5 rounded-lg ${style.bg} ${style.border}`}>
+          <Icon size={20} className={`flex-shrink-0 mt-0.5 ${style.iconColor}`} />
           <div ref={richText.wrapperRef} className="flex-1" style={{ position: 'relative' }}>
             <div
               ref={editorRef}
@@ -101,7 +101,7 @@ const CalloutBlock = ({ block, content, isEditing, onUpdate }) => {
               onInput={handleInput}
               onMouseUp={richText.handleSelectionChange}
               onKeyUp={richText.handleSelectionChange}
-              className="kb-callout-editor w-full bg-transparent text-[15px] leading-[1.6] text-gray-800 dark:text-neutral-200
+              className="kb-callout-editor w-full bg-transparent text-[15px] leading-[1.7] text-gray-700 dark:text-neutral-300
                 focus:outline-none min-h-16
                 [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
               style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}
@@ -129,13 +129,13 @@ const CalloutBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className={`flex gap-4 p-5 rounded-lg ${style.bg} ${style.border}`}>
-        <Icon size={22} className={`flex-shrink-0 mt-0.5 ${style.iconColor}`} />
+      <div className={`flex gap-3.5 px-4 py-3.5 rounded-lg ${style.bg} ${style.border}`}>
+        <Icon size={20} className={`flex-shrink-0 mt-0.5 ${style.iconColor}`} />
         {hasHtml ? (
           <div
             className="flex-1 prose prose-gray dark:prose-invert max-w-none
-              text-[15px] leading-[1.6] text-gray-800 dark:text-neutral-200
-              [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:text-gray-900 [&_strong]:dark:text-white
+              text-[15px] leading-[1.7] text-gray-700 dark:text-neutral-300
+              [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:text-gray-800 [&_strong]:dark:text-neutral-200
               [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline
               [&_code]:text-[13px] [&_code]:bg-white/50 [&_code]:dark:bg-black/20
               [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded"
@@ -144,8 +144,8 @@ const CalloutBlock = ({ block, content, isEditing, onUpdate }) => {
           />
         ) : (
           <div className="flex-1 prose prose-gray dark:prose-invert max-w-none
-            text-[15px] leading-[1.6] text-gray-800 dark:text-neutral-200
-            [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:text-gray-900 [&_strong]:dark:text-white
+            text-[15px] leading-[1.7] text-gray-700 dark:text-neutral-300
+            [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:text-gray-800 [&_strong]:dark:text-neutral-200
             [&_code]:text-[13px] [&_code]:bg-white/50 [&_code]:dark:bg-black/20
             [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>

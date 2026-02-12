@@ -351,11 +351,11 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
       <>
         <div
           className="kb-paragraph-view prose prose-gray dark:prose-invert max-w-none
-            text-[17px] leading-[1.7] text-gray-700 dark:text-neutral-300
-            [&_p]:mb-4 [&_strong]:text-gray-900 [&_strong]:dark:text-white
-            [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline
-            [&_code]:text-[15px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
-            [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded"
+            text-[16px] leading-[1.75] text-gray-600 dark:text-neutral-400
+            [&_p]:mb-3 [&_strong]:text-gray-800 [&_strong]:dark:text-neutral-200 [&_strong]:font-semibold
+            [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:decoration-blue-600/30 [&_a]:hover:decoration-blue-600
+            [&_code]:text-[13.5px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
+            [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-rose-500 [&_code]:dark:text-rose-400"
           style={{ whiteSpace: 'pre-wrap' }}
           onClick={handleClick}
           dangerouslySetInnerHTML={{ __html: content }}
@@ -387,11 +387,11 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <div className="prose prose-gray dark:prose-invert max-w-none
-      text-[17px] leading-[1.7] text-gray-700 dark:text-neutral-300
-      [&_p]:mb-4 [&_strong]:text-gray-900 [&_strong]:dark:text-white
-      [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline
-      [&_code]:text-[15px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
-      [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded">
+      text-[16px] leading-[1.75] text-gray-600 dark:text-neutral-400
+      [&_p]:mb-3 [&_strong]:text-gray-800 [&_strong]:dark:text-neutral-200 [&_strong]:font-semibold
+      [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:decoration-blue-600/30 [&_a]:hover:decoration-blue-600
+      [&_code]:text-[13.5px] [&_code]:bg-gray-100 [&_code]:dark:bg-neutral-800
+      [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-rose-500 [&_code]:dark:text-rose-400">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>
         {preservedContent}
       </ReactMarkdown>

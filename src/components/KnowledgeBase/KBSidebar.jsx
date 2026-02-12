@@ -58,8 +58,8 @@ const ContextMenu = ({ position, onClose, onEdit, onDelete, onAddSubPage, onMove
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[9999] bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
-        rounded-lg shadow-xl py-1 min-w-44"
+      className="fixed z-[9999] bg-white dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800
+        rounded-lg shadow-lg py-1 min-w-44"
       style={{ top: position.y, left: position.x }}
     >
       {!isSection && (
@@ -150,13 +150,13 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
 
   return (
     <div
-      className={`group mt-6 mb-2 first:mt-2 transition-colors ${isDropTarget ? 'bg-blue-50 dark:bg-blue-900/20 rounded-md' : ''}`}
+      className={`group mt-8 mb-2 first:mt-2 transition-colors ${isDropTarget ? 'bg-blue-50 dark:bg-blue-900/20 rounded-md' : ''}`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex items-center gap-2 px-2">
+      <div className="flex items-center gap-2 px-2.5">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -171,13 +171,13 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
                 setIsEditing(false);
               }
             }}
-            className="flex-1 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wider
-              bg-transparent border-b border-blue-500 focus:outline-none
+            className="flex-1 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]
+              bg-transparent border-b border-gray-400 focus:outline-none
               text-gray-500 dark:text-neutral-400"
           />
         ) : (
           <span
-            className="flex-1 text-[11px] font-semibold uppercase tracking-wider
+            className="flex-1 text-[11px] font-semibold uppercase tracking-[0.08em]
               text-gray-400 dark:text-neutral-500 cursor-default"
             onDoubleClick={() => isAdmin && setIsEditing(true)}
           >
@@ -295,15 +295,15 @@ const PageItem = ({
         onDragOver={handleDragOverLocal}
         onDragLeave={(e) => { if (isAdmin) onDragLeave(e); }}
         onDrop={(e) => { if (isAdmin) onDrop(e, page); }}
-        className={`group relative flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all
+        className={`group relative flex items-center gap-1.5 px-2.5 py-[7px] rounded-md cursor-pointer transition-all
           ${isActive
-            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-            : 'hover:bg-gray-100 dark:hover:bg-neutral-800/50 text-gray-700 dark:text-neutral-300'
+            ? 'bg-gray-100 dark:bg-neutral-800/60 text-gray-900 dark:text-white font-medium'
+            : 'hover:bg-gray-50 dark:hover:bg-neutral-800/30 text-gray-600 dark:text-neutral-400'
           }
           ${isDragging ? 'opacity-40' : ''}
           ${isDropInside ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}
         `}
-        style={{ paddingLeft: `${8 + level * 16}px` }}
+        style={{ paddingLeft: `${10 + level * 16}px` }}
       >
         {/* Drop indicator: above */}
         {isDropAbove && (
@@ -343,7 +343,7 @@ const PageItem = ({
         )}
 
         {/* Icon & Title */}
-        <span className="text-base flex-shrink-0">{page.icon || '📄'}</span>
+        <span className="text-[15px] flex-shrink-0">{page.icon || '📄'}</span>
         <span
           className="text-[13px] truncate flex-1 font-medium"
           onClick={() => navigate(`/knowledge-base/${page.slug}`)}
@@ -736,21 +736,21 @@ const KBSidebar = () => {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-100 dark:border-neutral-800/50">
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-neutral-800/30">
         {!sidebarCollapsed && (
           <div
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2.5 cursor-pointer"
             onClick={() => navigate('/knowledge-base')}
           >
-            <Book size={18} className="text-blue-600 dark:text-blue-400" />
-            <span className="font-semibold text-gray-900 dark:text-white text-sm">
+            <Book size={18} className="text-gray-900 dark:text-white" />
+            <span className="font-semibold text-gray-900 dark:text-white text-[14px] tracking-[-0.01em]">
               Knowledge Base
             </span>
           </div>
         )}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-400"
+          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-400"
         >
           <ChevronLeft size={16} className={`transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
         </button>
@@ -759,13 +759,13 @@ const KBSidebar = () => {
       {!sidebarCollapsed && (
         <>
           {/* Home */}
-          <div className="px-3 pt-3">
+          <div className="px-4 pt-4">
             <button
               onClick={() => navigate('/knowledge-base')}
-              className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-[13px] font-medium transition-colors
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[14px] font-medium transition-colors
                 ${!currentSlug || currentSlug === '/'
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                  : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800/50'
+                  ? 'bg-gray-100 dark:bg-neutral-800/60 text-gray-900 dark:text-white'
+                  : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800/30'
                 }`}
             >
               <Home size={16} />
@@ -774,18 +774,18 @@ const KBSidebar = () => {
           </div>
 
           {/* Search - opens floating search bar */}
-          <div className="px-3 py-3">
+          <div className="px-4 py-3">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('focus-kb-search'))}
-              className="w-full flex items-center gap-2 pl-2.5 pr-3 py-2 text-[13px]
-                bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px]
+                bg-gray-50/80 dark:bg-neutral-900/50 border border-transparent
                 rounded-lg text-gray-400 hover:text-gray-500 dark:hover:text-gray-300
-                hover:border-gray-300 dark:hover:border-neutral-700 transition-colors text-left"
+                hover:border-gray-200 dark:hover:border-neutral-700 transition-all text-left"
             >
               <Search size={14} className="shrink-0" />
               <span className="flex-1">Search...</span>
-              <kbd className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800
-                border border-gray-200 dark:border-neutral-700 rounded font-mono">
+              <kbd className="text-[9px] px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800
+                border border-gray-200/80 dark:border-neutral-700 rounded font-mono text-gray-400">
                 Ctrl+K
               </kbd>
             </button>
@@ -793,23 +793,24 @@ const KBSidebar = () => {
 
           {/* Admin Actions */}
           {isAdmin && (
-            <div className="px-3 pb-3 flex gap-2">
+            <div className="px-4 pb-3 flex gap-2">
               <button
                 onClick={() => {
                   setNewPageSection(null);
                   setNewPageParent(null);
                   setShowCreateModal(true);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2
-                  bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[13px] font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5
+                  bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100
+                  text-white dark:text-gray-900 rounded-lg text-[13px] font-medium transition-colors"
               >
                 <Plus size={14} />
                 New Page
               </button>
               <button
                 onClick={handleAddSection}
-                className="px-3 py-2 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700
-                  text-gray-700 dark:text-neutral-300 rounded-lg text-[13px] font-medium transition-colors"
+                className="px-3 py-1.5 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700
+                  text-gray-600 dark:text-neutral-300 rounded-lg text-[13px] font-medium transition-colors"
                 title="Add section header"
               >
                 <Plus size={14} />
@@ -821,10 +822,10 @@ const KBSidebar = () => {
 
       {/* Tag Filter */}
       {!sidebarCollapsed && allTags?.length > 0 && (
-        <div className="px-3 pb-2">
+        <div className="px-4 pb-2">
           <button
             onClick={() => setShowTags(!showTags)}
-            className="flex items-center gap-1.5 px-1 py-1 text-[11px] uppercase tracking-wider text-gray-400 dark:text-neutral-500 font-medium w-full"
+            className="flex items-center gap-1.5 px-1 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-400 dark:text-neutral-500 font-medium w-full"
           >
             <Tag size={10} />
             Tags
@@ -875,7 +876,7 @@ const KBSidebar = () => {
 
       {/* Favorites & Recent - only when expanded */}
       {!sidebarCollapsed && (favorites?.length > 0 || recentPages?.length > 0) && (
-        <div className="px-3 pb-2 space-y-2 border-b border-gray-100 dark:border-neutral-800/50 mb-1">
+        <div className="px-4 pb-2 space-y-3 border-b border-gray-100/80 dark:border-neutral-800/30 mb-1">
           {/* Favorites */}
           {favorites?.length > 0 && (
             <div>
@@ -888,10 +889,10 @@ const KBSidebar = () => {
                   <button
                     key={fav._id}
                     onClick={() => navigate(`/knowledge-base/${fav.slug}`)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors truncate
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] transition-colors truncate
                       ${currentSlug === fav.slug
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800/50'
+                        ? 'bg-gray-100 dark:bg-neutral-800/60 text-gray-900 dark:text-white font-medium'
+                        : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800/30'
                       }`}
                   >
                     <span className="text-sm">{fav.icon || '📄'}</span>
@@ -916,10 +917,10 @@ const KBSidebar = () => {
                     <button
                       key={page._id}
                       onClick={() => navigate(`/knowledge-base/${page.slug}`)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors truncate
+                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] transition-colors truncate
                         ${currentSlug === page.slug
-                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                          : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800/50'
+                          ? 'bg-gray-100 dark:bg-neutral-800/60 text-gray-900 dark:text-white font-medium'
+                          : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800/30'
                         }`}
                     >
                       <span className="text-sm">{page.icon || '📄'}</span>
@@ -934,7 +935,7 @@ const KBSidebar = () => {
       )}
 
       {/* Pages */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3" onDragEnd={handleDragEnd}>
+      <div className="flex-1 overflow-y-auto px-4 pb-3" onDragEnd={handleDragEnd}>
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent" />
@@ -944,7 +945,7 @@ const KBSidebar = () => {
             <button
               onClick={() => navigate('/knowledge-base')}
               className={`w-full p-2 rounded-lg transition-colors ${
-                !currentSlug ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                !currentSlug ? 'bg-gray-100 dark:bg-neutral-800/60' : 'hover:bg-gray-50 dark:hover:bg-neutral-800/30'
               }`}
             >
               <Home size={18} className="mx-auto text-gray-600 dark:text-neutral-400" />
@@ -962,8 +963,8 @@ const KBSidebar = () => {
                 onClick={() => navigate(`/knowledge-base/${node.slug}`)}
                 className={`w-full p-2 rounded-lg transition-colors ${
                   currentSlug === node.slug
-                    ? 'bg-blue-50 dark:bg-blue-900/20'
-                    : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
+                    ? 'bg-gray-100 dark:bg-neutral-800/60'
+                    : 'hover:bg-gray-50 dark:hover:bg-neutral-800/30'
                 }`}
                 title={node.title}
               >
@@ -1085,11 +1086,11 @@ const KBSidebar = () => {
 
       {/* Admin Link */}
       {isAdmin && !sidebarCollapsed && (
-        <div className="p-3 border-t border-gray-100 dark:border-neutral-800/50">
+        <div className="p-4 border-t border-gray-100/80 dark:border-neutral-800/30">
           <button
             onClick={() => navigate('/knowledge-base/admin')}
-            className="flex items-center gap-2 w-full px-2 py-2 text-[13px] text-gray-500 dark:text-neutral-400
-              hover:bg-gray-100 dark:hover:bg-neutral-800/50 rounded-lg transition-colors"
+            className="flex items-center gap-2 w-full px-2.5 py-2 text-[13px] text-gray-500 dark:text-neutral-400
+              hover:bg-gray-50 dark:hover:bg-neutral-800/30 rounded-lg transition-colors"
           >
             <Settings size={14} />
             Admin Panel
@@ -1127,7 +1128,7 @@ const KBSidebar = () => {
               exit={{ x: -280 }}
               transition={{ type: 'tween', duration: 0.2 }}
               className="fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-neutral-950
-                border-r border-gray-200 dark:border-neutral-800 md:hidden"
+                border-r border-gray-100 dark:border-neutral-800/30 md:hidden"
             >
               <button
                 onClick={() => setMobileOpen(false)}
@@ -1143,8 +1144,8 @@ const KBSidebar = () => {
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden md:block h-full border-r border-gray-100 dark:border-neutral-800/50
-          bg-gray-50/50 dark:bg-neutral-950 transition-all duration-200
+        className={`hidden md:block h-full border-r border-gray-100 dark:border-neutral-800/30
+          bg-gray-50/30 dark:bg-neutral-950 transition-all duration-200
           ${sidebarCollapsed ? 'w-14' : 'w-64'}`}
       >
         {sidebarContent}
@@ -1286,8 +1287,8 @@ const KBSidebar = () => {
               <button
                 onClick={handleCreatePage}
                 disabled={creating || !newPageTitle.trim()}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl
-                  font-medium disabled:opacity-50 transition-colors"
+                className="px-5 py-2.5 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100
+                  text-white dark:text-gray-900 rounded-xl font-medium disabled:opacity-50 transition-colors"
               >
                 {creating ? 'Creating...' : newPageParent ? 'Create Sub-page' : 'Create Page'}
               </button>

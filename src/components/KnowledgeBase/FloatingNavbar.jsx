@@ -84,7 +84,7 @@ const FloatingNavbar = () => {
   if (!currentPage?.dropdowns?.length) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50">
+    <div className="fixed top-5 right-6 z-50">
       <AnimatePresence mode="wait">
         {showNavbar ? (
           <motion.div
@@ -93,8 +93,8 @@ const FloatingNavbar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="flex items-center gap-2 p-2 bg-white/90 dark:bg-neutral-900/90
-              backdrop-blur-md rounded-xl shadow-lg border border-gray-200 dark:border-neutral-700"
+            className="flex items-center gap-2 p-2 bg-white/95 dark:bg-neutral-900/95
+              backdrop-blur-md rounded-xl shadow-md border border-gray-100 dark:border-neutral-800"
           >
             {currentPage.dropdowns.map(dropdown => (
               <DropdownButton
@@ -132,8 +132,8 @@ const FloatingNavbar = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             onClick={() => setShowNavbar(true)}
-            className="p-2 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md rounded-lg
-              shadow-lg border border-gray-200 dark:border-neutral-700
+            className="p-2 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-lg
+              shadow-md border border-gray-100 dark:border-neutral-800
               text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
             title="Show filters"
           >

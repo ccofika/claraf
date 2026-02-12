@@ -25,14 +25,14 @@ const ButtonBlock = ({ block, content, isEditing, onUpdate }) => {
     }
   };
 
-  // Style variants
+  // Style variants - clean Notion-like buttons
   const styleClasses = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-    secondary: 'bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-900 dark:text-white border border-gray-200 dark:border-neutral-700',
+    primary: 'bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900',
+    secondary: 'bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-gray-700 dark:text-neutral-200 border border-gray-200 dark:border-neutral-700',
     success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     danger: 'bg-red-600 hover:bg-red-700 text-white',
-    outline: 'bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-2 border-blue-600 dark:border-blue-400',
-    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-neutral-300'
+    outline: 'bg-transparent hover:bg-gray-50 dark:hover:bg-neutral-900 text-gray-700 dark:text-neutral-300 border border-gray-300 dark:border-neutral-600',
+    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-600 dark:text-neutral-400'
   };
 
   const alignClasses = {
@@ -187,7 +187,7 @@ const ButtonBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <div className={`flex my-4 ${alignClasses[buttonData.align || 'left']}`}>
+    <div className={`flex ${alignClasses[buttonData.align || 'left']}`}>
       <button
         onClick={handleClick}
         className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-[14px] transition-colors ${styleClasses[buttonData.style || 'primary']}`}

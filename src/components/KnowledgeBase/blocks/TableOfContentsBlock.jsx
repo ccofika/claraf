@@ -163,9 +163,9 @@ const TableOfContentsBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <div className="my-6 p-5 bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg">
+    <div className="px-5 py-4 bg-gray-50/60 dark:bg-neutral-900/40 border border-gray-100 dark:border-neutral-800 rounded-lg">
       {tocData.title && (
-        <h4 className="text-[15px] font-semibold text-gray-900 dark:text-white mb-4">
+        <h4 className="text-[14px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">
           {tocData.title}
         </h4>
       )}
@@ -191,14 +191,11 @@ const TOCList = ({ headings, tocData, onItemClick, getNumberPrefix }) => {
           <button
             key={heading.id}
             onClick={() => onItemClick(heading.id)}
-            className="group flex items-center gap-2 w-full text-left py-1.5 text-[14px] text-gray-600 dark:text-neutral-400
-              hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            className="group flex items-center gap-2 w-full text-left py-1 text-[14px] text-gray-500 dark:text-neutral-400
+              hover:text-gray-900 dark:hover:text-neutral-200 transition-colors"
             style={{ paddingLeft: indent }}
           >
-            <ChevronRight
-              size={14}
-              className="flex-shrink-0 text-gray-300 dark:text-neutral-600 group-hover:text-blue-400 transition-colors"
-            />
+            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-neutral-600 flex-shrink-0 group-hover:bg-gray-500 transition-colors" />
             <span className="truncate">
               {prefix}{heading.text}
             </span>

@@ -133,7 +133,7 @@ const EmbedBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <figure className="my-8">
+    <figure>
       <div className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-neutral-700">
         {loading && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-neutral-800">
@@ -167,7 +167,7 @@ const EmbedBlock = ({ block, content, isEditing, onUpdate }) => {
         </a>
       </div>
       {embedData.caption && (
-        <figcaption className="mt-3 text-center text-[14px] text-gray-500 dark:text-neutral-400">
+        <figcaption className="mt-2.5 text-center text-[13px] text-gray-400 dark:text-neutral-500">
           {embedData.caption}
         </figcaption>
       )}

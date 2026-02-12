@@ -151,16 +151,16 @@ const FloatingSearchBar = () => {
   };
 
   return (
-    <div className="relative z-30 w-full px-4 pt-4 pb-2" ref={containerRef}>
+    <div className="relative z-30 w-full px-8 md:px-12 lg:px-16 pt-5 pb-3" ref={containerRef}>
       {/* Search Input Bar with Edit Button */}
-      <div className="mx-auto max-w-3xl flex items-center gap-2">
+      <div className="max-w-6xl mx-auto flex items-center gap-2">
         {/* Search Bar */}
-        <div className={`flex-1 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-xl
-          border transition-shadow ${focused
-            ? 'shadow-lg border-blue-300 dark:border-blue-700'
-            : 'shadow border-gray-200 dark:border-neutral-700'
+        <div className={`flex-1 bg-white dark:bg-neutral-900 rounded-xl
+          border transition-all ${focused
+            ? 'shadow-sm border-gray-300 dark:border-neutral-600'
+            : 'border-gray-200 dark:border-neutral-800'
           }`}>
-          <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-3 px-4 py-2.5">
             <Search className="w-5 h-5 text-gray-400 shrink-0" />
             <input
               ref={inputRef}
@@ -193,10 +193,10 @@ const FloatingSearchBar = () => {
         {isAdmin && currentPage?._id && (
           <button
             onClick={handleEditClick}
-            className="flex items-center gap-2 px-4 py-3 bg-white/95 dark:bg-neutral-900/95
-              backdrop-blur-md rounded-xl border border-gray-200 dark:border-neutral-700
-              shadow hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700
-              text-gray-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-400
+            className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-neutral-900
+              rounded-xl border border-gray-200 dark:border-neutral-800
+              hover:bg-gray-50 dark:hover:bg-neutral-800 hover:border-gray-300 dark:hover:border-neutral-700
+              text-gray-600 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white
               transition-all shrink-0"
             title="Edit this page"
           >
@@ -214,11 +214,11 @@ const FloatingSearchBar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-4 top-full mt-1 z-40"
-            style={{ right: isAdmin && currentPage?._id ? '88px' : '16px' }}
+            className="absolute left-0 right-0 top-full mt-1 z-40 px-8 md:px-12 lg:px-16"
+            style={{ paddingRight: isAdmin && currentPage?._id ? '88px' : undefined }}
           >
-            <div className="mx-auto max-w-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-xl
-              shadow-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
+            <div className="max-w-6xl mx-auto bg-white dark:bg-neutral-900 rounded-xl
+              shadow-lg border border-gray-200 dark:border-neutral-800 overflow-hidden">
 
               {/* Results list */}
               {results.length > 0 && (

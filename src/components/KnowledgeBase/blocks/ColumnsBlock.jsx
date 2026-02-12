@@ -179,7 +179,7 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
 
   // View mode - responsive columns: stack on mobile, side-by-side on desktop
   return (
-    <div className="flex flex-col md:flex-row gap-4 my-4" style={{ minHeight: '40px' }}>
+    <div className="flex flex-col md:flex-row gap-8" style={{ minHeight: '40px' }}>
       {columnsData.columns.map((col) => (
         <div
           key={col.id}
@@ -187,7 +187,7 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
           style={{ flex: `0 0 ${col.width}%` }}
         >
           {col.blocks && col.blocks.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {col.blocks.map((childBlock) => (
                 <BlockRenderer key={childBlock.id} block={childBlock} />
               ))}
