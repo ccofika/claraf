@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import {
   Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus,
-  ChevronRight, BarChart3, Target, FileText, X, ExternalLink,
+  ChevronRight, BarChart3, FileText, X, ExternalLink,
   CheckCircle2, AlertCircle, User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTL } from './TLLayout';
 import { ScorecardAnalysis, TopCategories, ScoreDistribution } from './TLDashboard';
 import { Badge } from '../../components/ui/badge';
-import { SCORE_COLORS, SHORT_LABELS, getScorecardValues } from '../../data/scorecardConfig';
+import { SHORT_LABELS, getScorecardValues } from '../../data/scorecardConfig';
 import { TicketContentDisplay } from '../../components/TicketRichTextEditor';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -22,16 +22,16 @@ const getAuthHeaders = () => ({
 });
 
 const getScoreColor = (score) => {
-  if (score >= 90) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-  if (score >= 70) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-  if (score >= 50) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-  return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+  if (score >= 90) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400';
+  if (score >= 70) return 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400';
+  if (score >= 50) return 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400';
+  return 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400';
 };
 
 const getScoreTextColor = (score) => {
-  if (score == null) return 'text-gray-400';
-  if (score >= 90) return 'text-green-600 dark:text-green-400';
-  if (score >= 70) return 'text-yellow-600 dark:text-yellow-400';
+  if (score == null) return 'text-gray-400 dark:text-[#5B5D67]';
+  if (score >= 90) return 'text-emerald-600 dark:text-emerald-400';
+  if (score >= 70) return 'text-amber-600 dark:text-amber-400';
   if (score >= 50) return 'text-orange-600 dark:text-orange-400';
   return 'text-red-600 dark:text-red-400';
 };
@@ -43,12 +43,10 @@ const TLAgentDetail = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Ticket preview
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [fullTicketData, setFullTicketData] = useState(null);
   const [ticketLoading, setTicketLoading] = useState(false);
 
-  // Expanded sections
   const [expandedSections, setExpandedSections] = useState({
     critical: true,
     bad: true,
@@ -80,7 +78,6 @@ const TLAgentDetail = () => {
     fetchAgentDetail();
   }, [fetchAgentDetail]);
 
-  // Fetch ticket details
   const fetchTicketDetails = useCallback(async (ticketId) => {
     setTicketLoading(true);
     try {
@@ -102,7 +99,6 @@ const TLAgentDetail = () => {
     fetchTicketDetails(ticket._id);
   };
 
-  // ESC to close ticket preview
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && selectedTicket) {
@@ -115,15 +111,15 @@ const TLAgentDetail = () => {
   }, [selectedTicket]);
 
   const getTrendIcon = (trend) => {
-    if (trend === 'improving') return <TrendingUp className="w-5 h-5 text-green-500" />;
-    if (trend === 'declining') return <TrendingDown className="w-5 h-5 text-red-500" />;
-    return <Minus className="w-5 h-5 text-gray-400" />;
+    if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />;
+    if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-500 dark:text-red-400" />;
+    return <Minus className="w-4 h-4 text-gray-400 dark:text-[#5B5D67]" />;
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-gray-400 dark:text-[#5B5D67]" />
       </div>
     );
   }
@@ -131,9 +127,9 @@ const TLAgentDetail = () => {
   if (!data) {
     return (
       <div className="text-center py-20">
-        <AlertTriangle className="w-16 h-16 mx-auto text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Greska</h2>
-        <p className="text-gray-500 dark:text-neutral-400">Agent nije pronadjen</p>
+        <AlertTriangle className="w-10 h-10 mx-auto text-red-300 dark:text-red-400/30 mb-3" />
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED] mb-1">Greska</h2>
+        <p className="text-sm text-gray-500 dark:text-[#6B6D77]">Agent nije pronadjen</p>
       </div>
     );
   }
@@ -141,65 +137,45 @@ const TLAgentDetail = () => {
   const { agent, summary, scorecardAnalysis, topCategories, severityGroups, scoreDistribution } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-12">
       {/* Agent Info */}
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
-          <User className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 bg-gray-100 dark:bg-[#1E1E28] rounded flex items-center justify-center flex-shrink-0">
+            <User className="w-5 h-5 text-gray-500 dark:text-[#6B6D77]" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED] truncate">{agent.name}</h2>
+            <p className="text-sm text-gray-500 dark:text-[#6B6D77] truncate">
+              {agent.position || 'Agent'}
+              <span className="inline-block w-1 h-1 rounded-full bg-gray-300 dark:bg-[#3A3A45] mx-1.5 align-middle" />
+              {agent.team}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{agent.name}</h2>
-          <p className="text-sm text-gray-500 dark:text-neutral-400">
-            {agent.position || 'Agent'} | {agent.team}
-          </p>
-        </div>
-      </div>
+        <p className="text-sm text-gray-400 dark:text-[#5B5D67] mt-2">
+          {summary.totalTickets} tiketa · {summary.ticketsWithIssues} sa problemima
+          {summary.avgScore != null && <> · <span className={getScoreTextColor(summary.avgScore)}>Avg: {summary.avgScore}%</span></>}
+          {summary.trendValue != null && (
+            <> · <span className="inline-flex items-center gap-1">{getTrendIcon(summary.trend)} {summary.trendValue}%</span></>
+          )}
+        </p>
+      </section>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Summary Stats */}
-          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 sm:p-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Ukupno tiketa</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{summary.totalTickets}</p>
-              </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Sa problemima</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{summary.ticketsWithIssues}</p>
-              </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Prosecan score</p>
-                <p className={`text-2xl font-bold mt-1 ${getScoreTextColor(summary.avgScore)}`}>
-                  {summary.avgScore != null ? `${summary.avgScore}%` : '-'}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Trend</p>
-                <div className="flex items-center gap-2 mt-1">
-                  {getTrendIcon(summary.trend)}
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">
-                    {summary.trendValue}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
+      <section>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8 items-start">
           {/* Scorecard Analysis */}
           <ScorecardAnalysis data={scorecardAnalysis} />
 
           {/* Tickets with Problems */}
-          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-500" />
+          <div className="bg-gray-50 dark:bg-[#111116] rounded-lg p-5 sm:p-6">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED] mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gray-400 dark:text-[#6B6D77]" />
               Tiketi sa Problemima
             </h3>
 
-            <div className="space-y-4">
-              {/* Critical */}
+            <div className="space-y-3">
               {severityGroups.critical?.length > 0 && (
                 <SeveritySection
                   label="Kriticni (<50%)"
@@ -211,7 +187,6 @@ const TLAgentDetail = () => {
                 />
               )}
 
-              {/* Bad */}
               {severityGroups.bad?.length > 0 && (
                 <SeveritySection
                   label="Losi (50-70%)"
@@ -223,7 +198,6 @@ const TLAgentDetail = () => {
                 />
               )}
 
-              {/* Moderate */}
               {severityGroups.moderate?.length > 0 && (
                 <SeveritySection
                   label="Umereni (70-90%)"
@@ -236,21 +210,21 @@ const TLAgentDetail = () => {
               )}
 
               {summary.ticketsWithIssues === 0 && (
-                <div className="text-center py-8 text-gray-500 dark:text-neutral-400">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500 opacity-50" />
-                  <p>Nema tiketa sa ocenom ispod 90%</p>
+                <div className="text-center py-8 text-gray-500 dark:text-[#6B6D77]">
+                  <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-emerald-400/40 dark:text-emerald-400/20" />
+                  <p className="text-sm">Nema tiketa sa ocenom ispod 90%</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          <TopCategories categories={topCategories} />
+        {/* Bottom row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <TopCategories categories={topCategories} scope="agent" agentId={agentId} />
           <ScoreDistribution data={scoreDistribution} />
         </div>
-      </div>
+      </section>
 
       {/* Ticket Preview Portal */}
       {selectedTicket && createPortal(
@@ -262,7 +236,7 @@ const TLAgentDetail = () => {
             className="fixed inset-0 z-[100] flex"
           >
             <div
-              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/15"
               onClick={() => {
                 setSelectedTicket(null);
                 setFullTicketData(null);
@@ -273,53 +247,52 @@ const TLAgentDetail = () => {
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute right-0 top-0 bottom-0 w-full sm:w-[600px] bg-white dark:bg-neutral-900 shadow-2xl sm:border-l border-gray-200 dark:border-neutral-800 flex flex-col"
+              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+              className="absolute right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white dark:bg-[#141419] shadow-xl sm:border-l border-gray-200 dark:border-[#1E1E28] flex flex-col"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-gray-200 dark:border-[#1E1E28]">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED] truncate">
                     Ticket #{selectedTicket.ticketId}
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-neutral-400">
+                  <p className="text-sm text-gray-500 dark:text-[#6B6D77] mt-0.5">
                     {new Date(selectedTicket.gradedDate).toLocaleDateString('sr-RS')}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <a
                     href={`https://app.intercom.com/a/inbox/cx1ywgf2/inbox/conversation/${selectedTicket.ticketId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-lg transition-colors"
-                    title="Open in Intercom"
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#1E1E28] rounded"
                   >
-                    <ExternalLink className="w-4 h-4 text-blue-500" />
+                    <ExternalLink className="w-4 h-4 text-gray-500 dark:text-[#6B6D77]" />
                   </a>
                   <button
                     onClick={() => {
                       setSelectedTicket(null);
                       setFullTicketData(null);
                     }}
-                    className="p-2 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#1E1E28] rounded"
                   >
-                    <X className="w-5 h-5 text-gray-500" />
+                    <X className="w-4 h-4 text-gray-400 dark:text-[#6B6D77]" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
                 {ticketLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400 dark:text-[#5B5D67]" />
                   </div>
                 ) : fullTicketData ? (
                   <>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`px-3 py-1.5 text-lg font-bold rounded-lg ${getScoreColor(fullTicketData.qualityScorePercent)}`}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-2.5 py-1 text-sm font-bold rounded ${getScoreColor(fullTicketData.qualityScorePercent)}`}>
                         {fullTicketData.qualityScorePercent}%
                       </span>
                       {fullTicketData.categories?.map((cat) => (
-                        <Badge key={cat} variant="outline" className="text-xs">
+                        <Badge key={cat} variant="outline" className="text-xs rounded">
                           {cat}
                         </Badge>
                       ))}
@@ -327,14 +300,11 @@ const TLAgentDetail = () => {
 
                     {fullTicketData.notes && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-gray-400" />
-                          Notes
-                        </h4>
-                        <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-4 border border-gray-200 dark:border-neutral-700">
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-[#6B6D77] mb-1.5">Notes</h4>
+                        <div className="bg-gray-50 dark:bg-[#1A1A21] rounded p-3 border border-gray-100 dark:border-[#1E1E28]">
                           <TicketContentDisplay
                             content={fullTicketData.notes}
-                            className="text-sm text-gray-700 dark:text-neutral-300"
+                            className="text-sm text-gray-700 dark:text-[#A0A2AC]"
                           />
                         </div>
                       </div>
@@ -342,14 +312,11 @@ const TLAgentDetail = () => {
 
                     {fullTicketData.feedback && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-400" />
-                          Feedback
-                        </h4>
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-[#6B6D77] mb-1.5">Feedback</h4>
+                        <div className="bg-blue-50/50 dark:bg-blue-500/5 rounded p-3 border border-blue-100/50 dark:border-blue-500/10">
                           <TicketContentDisplay
                             content={fullTicketData.feedback}
-                            className="text-sm text-gray-700 dark:text-neutral-300"
+                            className="text-sm text-gray-700 dark:text-[#A0A2AC]"
                           />
                         </div>
                       </div>
@@ -357,11 +324,8 @@ const TLAgentDetail = () => {
 
                     {fullTicketData.scorecardValues && Object.keys(fullTicketData.scorecardValues).length > 0 && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4 text-gray-400" />
-                          Scorecard
-                        </h4>
-                        <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-4 border border-gray-200 dark:border-neutral-700 space-y-2">
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-[#6B6D77] mb-1.5">Scorecard</h4>
+                        <div className="bg-gray-50 dark:bg-[#1A1A21] rounded p-3 border border-gray-100 dark:border-[#1E1E28] space-y-1.5">
                           {(() => {
                             const position = fullTicketData.agent?.position;
                             const variant = fullTicketData.scorecardVariant;
@@ -377,27 +341,27 @@ const TLAgentDetail = () => {
                                 : '-';
 
                               const getBgClass = (idx) => {
-                                if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-neutral-700';
+                                if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-[#252530]';
                                 switch (idx) {
-                                  case 0: return 'bg-green-500';
-                                  case 1: return 'bg-yellow-400';
+                                  case 0: return 'bg-emerald-500';
+                                  case 1: return 'bg-amber-400';
                                   case 2: return 'bg-amber-500';
                                   case 3: return 'bg-red-500';
-                                  case 4: return 'bg-gray-400';
-                                  default: return 'bg-gray-100 dark:bg-neutral-700';
+                                  case 4: return 'bg-gray-400 dark:bg-gray-500';
+                                  default: return 'bg-gray-100 dark:bg-[#252530]';
                                 }
                               };
 
                               const getTextClass = (idx) => {
-                                if (idx === null || idx === undefined) return 'text-gray-500';
+                                if (idx === null || idx === undefined) return 'text-gray-500 dark:text-[#6B6D77]';
                                 if (idx === 1) return 'text-gray-900';
                                 return 'text-white';
                               };
 
                               return (
                                 <div key={key} className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-600 dark:text-neutral-400">{label}</span>
-                                  <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${getBgClass(value)} ${getTextClass(value)}`}>
+                                  <span className="text-sm text-gray-600 dark:text-[#8B8D97] truncate pr-2">{label}</span>
+                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0 ${getBgClass(value)} ${getTextClass(value)}`}>
                                     {displayLabel}
                                   </span>
                                 </div>
@@ -409,9 +373,9 @@ const TLAgentDetail = () => {
                     )}
                   </>
                 ) : (
-                  <div className="text-center py-8 text-gray-500 dark:text-neutral-400">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>Greska pri ucitavanju tiketa</p>
+                  <div className="text-center py-10 text-gray-500 dark:text-[#6B6D77]">
+                    <AlertTriangle className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Greska pri ucitavanju tiketa</p>
                   </div>
                 )}
               </div>
@@ -428,44 +392,38 @@ const TLAgentDetail = () => {
 const SeveritySection = ({ label, tickets, color, expanded, onToggle, onTicketClick }) => {
   const colorMap = {
     red: {
-      border: 'border-red-200 dark:border-red-800',
-      bg: 'bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/40',
       text: 'text-red-700 dark:text-red-400',
-      icon: <AlertCircle className="w-4 h-4" />,
-      divider: 'divide-red-100 dark:divide-red-900/30'
+      headerBg: 'hover:bg-red-50/50 dark:hover:bg-red-500/5',
+      icon: <AlertCircle className="w-4 h-4" />
     },
     orange: {
-      border: 'border-orange-200 dark:border-orange-800',
-      bg: 'bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/40',
       text: 'text-orange-700 dark:text-orange-400',
-      icon: <AlertTriangle className="w-4 h-4" />,
-      divider: 'divide-orange-100 dark:divide-orange-900/30'
+      headerBg: 'hover:bg-orange-50/50 dark:hover:bg-orange-500/5',
+      icon: <AlertTriangle className="w-4 h-4" />
     },
     yellow: {
-      border: 'border-yellow-200 dark:border-yellow-800',
-      bg: 'bg-yellow-50 dark:bg-yellow-900/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/40',
-      text: 'text-yellow-700 dark:text-yellow-400',
-      icon: <Minus className="w-4 h-4" />,
-      divider: 'divide-yellow-100 dark:divide-yellow-900/30'
+      text: 'text-amber-700 dark:text-amber-400',
+      headerBg: 'hover:bg-amber-50/50 dark:hover:bg-amber-500/5',
+      icon: <Minus className="w-4 h-4" />
     }
   };
 
   const c = colorMap[color];
 
   return (
-    <div className={`border ${c.border} rounded-lg overflow-hidden`}>
+    <div>
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-3 ${c.bg} transition-colors`}
+        className={`w-full flex items-center justify-between py-2.5 ${c.headerBg} transition-colors rounded`}
       >
         <span className={`flex items-center gap-2 text-sm font-medium ${c.text}`}>
           {c.icon}
           {label} - {tickets.length} tiketa
         </span>
-        <ChevronRight className={`w-4 h-4 ${c.text} transition-transform ${expanded ? 'rotate-90' : ''}`} />
+        <ChevronRight className={`w-4 h-4 ${c.text} transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
       </button>
       {expanded && (
-        <div className={`divide-y ${c.divider}`}>
+        <div className="divide-y divide-gray-200/40 dark:divide-[#1E1E28]">
           {tickets.map((ticket) => (
             <TicketRow key={ticket._id} ticket={ticket} onClick={() => onTicketClick(ticket)} />
           ))}
@@ -478,49 +436,49 @@ const SeveritySection = ({ label, tickets, color, expanded, onToggle, onTicketCl
 // Ticket Row Component
 const TicketRow = ({ ticket, onClick }) => {
   const getScoreBadgeColor = (score) => {
-    if (score >= 90) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-    if (score >= 70) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-    if (score >= 50) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+    if (score >= 90) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400';
+    if (score >= 70) return 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400';
+    if (score >= 50) return 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400';
+    return 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400';
   };
 
   return (
     <button
       onClick={onClick}
-      className="w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+      className="w-full py-3 text-left hover:bg-white/60 dark:hover:bg-[#1A1A21] transition-colors rounded"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-sm text-gray-900 dark:text-white">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="font-mono text-sm text-gray-900 dark:text-[#E8E9ED] font-medium">
               #{ticket.ticketId}
             </span>
-            <span className={`px-2 py-0.5 text-xs font-medium rounded ${getScoreBadgeColor(ticket.score)}`}>
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getScoreBadgeColor(ticket.score)}`}>
               {ticket.score}%
             </span>
-            <span className="text-xs text-gray-400 dark:text-neutral-500">
+            <span className="text-xs text-gray-400 dark:text-[#5B5D67]">
               {new Date(ticket.gradedDate).toLocaleDateString('sr-RS')}
             </span>
           </div>
-          <p className="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2">
+          <p className="text-sm text-gray-500 dark:text-[#6B6D77] line-clamp-2">
             {ticket.feedbackPreview || 'Nema feedback-a'}
           </p>
           {ticket.categories?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="flex flex-wrap gap-1.5 mt-2">
               {ticket.categories.slice(0, 3).map((cat) => (
-                <span key={cat} className="px-1.5 py-0.5 text-[10px] bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-neutral-400 rounded">
+                <span key={cat} className="px-2 py-0.5 text-[10px] bg-white dark:bg-[#1A1A21] text-gray-500 dark:text-[#6B6D77] rounded">
                   {cat}
                 </span>
               ))}
               {ticket.categories.length > 3 && (
-                <span className="px-1.5 py-0.5 text-[10px] text-gray-400 dark:text-neutral-500">
+                <span className="px-2 py-0.5 text-[10px] text-gray-400 dark:text-[#5B5D67]">
                   +{ticket.categories.length - 3}
                 </span>
               )}
             </div>
           )}
         </div>
-        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" />
+        <ChevronRight className="w-4 h-4 text-gray-300 dark:text-[#3A3A45] flex-shrink-0 mt-0.5" />
       </div>
     </button>
   );

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import axios from 'axios';
-import { Users, Loader2, AlertTriangle, ChevronRight, Hash } from 'lucide-react';
+import { Users, Loader2, AlertTriangle, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTL } from './TLLayout';
 import {
@@ -20,11 +19,26 @@ const getAuthHeaders = () => ({
 });
 
 const getScoreColor = (score) => {
-  if (score == null) return 'text-gray-400';
-  if (score >= 90) return 'text-green-600 dark:text-green-400';
-  if (score >= 70) return 'text-yellow-600 dark:text-yellow-400';
+  if (score == null) return 'text-gray-400 dark:text-[#5B5D67]';
+  if (score >= 90) return 'text-emerald-600 dark:text-emerald-400';
+  if (score >= 70) return 'text-amber-600 dark:text-amber-400';
   if (score >= 50) return 'text-orange-600 dark:text-orange-400';
   return 'text-red-600 dark:text-red-400';
+};
+
+const getScoreBarColor = (score) => {
+  if (score >= 90) return 'bg-emerald-500 dark:bg-emerald-400';
+  if (score >= 70) return 'bg-amber-500 dark:bg-amber-400';
+  if (score >= 50) return 'bg-orange-500 dark:bg-orange-400';
+  return 'bg-red-500 dark:bg-red-400';
+};
+
+const getScoreDot = (score) => {
+  if (score == null) return 'bg-gray-300 dark:bg-[#3A3A45]';
+  if (score >= 90) return 'bg-emerald-500 dark:bg-emerald-400';
+  if (score >= 70) return 'bg-amber-500 dark:bg-amber-400';
+  if (score >= 50) return 'bg-orange-500 dark:bg-orange-400';
+  return 'bg-red-500 dark:bg-red-400';
 };
 
 const TLTeamDetail = () => {
@@ -64,7 +78,7 @@ const TLTeamDetail = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-gray-400 dark:text-[#5B5D67]" />
       </div>
     );
   }
@@ -72,115 +86,120 @@ const TLTeamDetail = () => {
   if (!data) {
     return (
       <div className="text-center py-20">
-        <AlertTriangle className="w-16 h-16 mx-auto text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Greska</h2>
-        <p className="text-gray-500 dark:text-neutral-400">Tim nije pronadjen</p>
+        <AlertTriangle className="w-10 h-10 mx-auto text-red-300 dark:text-red-400/30 mb-3" />
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED] mb-1">Greska</h2>
+        <p className="text-sm text-gray-500 dark:text-[#6B6D77]">Tim nije pronadjen</p>
       </div>
     );
   }
 
+  const navigateToAgent = (agentId) => {
+    const agent = data.agentPerformance.find(a => a._id === agentId);
+    navigate(`/tl/agent/${agentId}`, { state: { teamName: decodedTeamName, agentName: agent?.name } });
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       {/* Team Summary Stats */}
-      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 sm:p-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Agenti</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{data.totalAgents}</p>
+      <section>
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED] mb-1">{data.teamName}</h2>
+          <p className="text-sm text-gray-400 dark:text-[#5B5D67]">
+            {data.totalAgents} agenata · {data.totalTickets} tiketa
+            {data.avgScore != null && <> · <span className={getScoreColor(data.avgScore)}>Avg: {data.avgScore}%</span></>}
+          </p>
+        </div>
+
+        {/* Agents Table */}
+        <div className="bg-gray-50 dark:bg-[#111116] rounded-lg overflow-hidden">
+          <div className="px-5 sm:px-6 py-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED] flex items-center gap-2">
+              <Users className="w-4 h-4 text-gray-400 dark:text-[#6B6D77]" />
+              Agenti ({data.agentPerformance.length})
+            </h3>
           </div>
-          <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Tiketa</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{data.totalTickets}</p>
-          </div>
-          <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Avg Score</p>
-            <p className={`text-2xl font-bold mt-1 ${getScoreColor(data.avgScore)}`}>
-              {data.avgScore != null ? `${data.avgScore}%` : '-'}
-            </p>
-          </div>
-          <div className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wide">Tim</p>
-            <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mt-1 truncate">{data.teamName}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-t border-gray-200/60 dark:border-[#1E1E28]">
+                  <th className="text-left py-2.5 pr-2 pl-5 sm:pl-6 w-8 text-gray-400 dark:text-[#5B5D67] font-medium text-xs uppercase tracking-wider">#</th>
+                  <th className="text-left py-2.5 pr-3 text-gray-400 dark:text-[#5B5D67] font-medium text-xs uppercase tracking-wider">Agent</th>
+                  <th className="text-left py-2.5 px-3 text-gray-400 dark:text-[#5B5D67] font-medium text-xs uppercase tracking-wider hidden sm:table-cell">Pozicija</th>
+                  <th className="text-center py-2.5 px-3 text-gray-400 dark:text-[#5B5D67] font-medium text-xs uppercase tracking-wider">Tiketa</th>
+                  <th className="text-left py-2.5 px-3 text-gray-400 dark:text-[#5B5D67] font-medium text-xs uppercase tracking-wider">Avg Score</th>
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.agentPerformance.map((agent, idx) => (
+                  <tr
+                    key={agent._id}
+                    className={`hover:bg-gray-100/60 dark:hover:bg-[#1A1A21] cursor-pointer transition-colors ${idx < data.agentPerformance.length - 1 ? 'border-b border-gray-200/40 dark:border-[#1A1A21]' : ''}`}
+                    onClick={() => navigateToAgent(agent._id)}
+                  >
+                    <td className="py-3.5 pr-2 pl-5 sm:pl-6">
+                      <span className="text-xs font-semibold text-gray-400 dark:text-[#5B5D67]">{idx + 1}</span>
+                    </td>
+                    <td className="py-3.5 pr-3">
+                      <span className="font-medium text-gray-900 dark:text-[#E8E9ED]">{agent.name}</span>
+                    </td>
+                    <td className="py-3.5 px-3 hidden sm:table-cell">
+                      <span className="text-gray-500 dark:text-[#6B6D77]">{agent.position || '-'}</span>
+                    </td>
+                    <td className="py-3.5 px-3 text-center text-gray-500 dark:text-[#6B6D77]">{agent.tickets}</td>
+                    <td className="py-3.5 px-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 min-w-[52px]">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getScoreDot(agent.avgScore)}`} />
+                          <span className={`font-semibold ${getScoreColor(agent.avgScore)}`}>
+                            {agent.avgScore != null ? `${agent.avgScore}%` : '-'}
+                          </span>
+                        </div>
+                        {agent.avgScore != null && (
+                          <div className="hidden md:block w-24 h-1.5 bg-gray-200/60 dark:bg-[#1E1E28] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${getScoreBarColor(agent.avgScore)}`}
+                              style={{ width: `${agent.avgScore}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-[#3A3A45]" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Agent Cards */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Agenti ({data.agentPerformance.length})
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {data.agentPerformance.map((agent, idx) => (
-            <motion.div
-              key={agent._id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.03 }}
-              className="bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer group"
-              onClick={() => navigate(`/tl/agent/${agent._id}`)}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 flex items-center justify-center text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-full flex-shrink-0">
-                      {idx + 1}
-                    </span>
-                    <h3 className="font-medium text-gray-900 dark:text-white truncate text-sm">
-                      {agent.name}
-                    </h3>
-                  </div>
-                  {agent.position && (
-                    <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5 ml-8">
-                      {agent.position}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors flex-shrink-0 mt-1" />
-              </div>
-
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-gray-500 dark:text-neutral-400">
-                  {agent.tickets} tiketa
-                </span>
-                <span className={`text-lg font-bold ${getScoreColor(agent.avgScore)}`}>
-                  {agent.avgScore != null ? `${agent.avgScore}%` : '-'}
-                </span>
-              </div>
-
-              {agent.avgScore != null && (
-                <div className="mt-2 h-1.5 bg-gray-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      agent.avgScore >= 90 ? 'bg-green-500' :
-                      agent.avgScore >= 70 ? 'bg-yellow-500' :
-                      agent.avgScore >= 50 ? 'bg-orange-500' : 'bg-red-500'
-                    }`}
-                    style={{ width: `${agent.avgScore}%` }}
-                  />
-                </div>
-              )}
-            </motion.div>
-          ))}
+      {/* Metrics */}
+      <section>
+        <div className="mb-8">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED]">Analiza</h2>
         </div>
-      </div>
 
-      {/* Team Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+        {/* Agent Performance - full width */}
+        <AgentPerformanceTable agents={data.agentPerformance} onAgentClick={navigateToAgent} />
+
+        {/* Analysis grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8 items-start">
           <ScorecardAnalysis data={data.scorecardAnalysis} />
-          <AgentPerformanceTable agents={data.agentPerformance} onAgentClick={(id) => navigate(`/tl/agent/${id}`)} />
-        </div>
-        <div className="space-y-6">
-          <TopCategories categories={data.topCategories} />
           <TopBottomPerformers
             top={data.topPerformers}
             bottom={data.bottomPerformers}
-            onAgentClick={(id) => navigate(`/tl/agent/${id}`)}
+            onAgentClick={navigateToAgent}
           />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 items-start">
+          <TopCategories categories={data.topCategories} scope="team" teamName={decodedTeamName} />
           <ScoreDistribution data={data.scoreDistribution} />
         </div>
-      </div>
+      </section>
     </div>
   );
 };
