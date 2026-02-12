@@ -62,6 +62,13 @@ import {
 } from './pages/knowledge-base';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
+import {
+  TLLayout,
+  TLDashboard,
+  TLTeamDetail,
+  TLAgentDetail,
+  TLAdmin
+} from './pages/tl';
 
 function App() {
   return (
@@ -224,6 +231,23 @@ function App() {
                           <Route index element={<KBHome />} />
                           <Route path="admin" element={<KBAdmin />} />
                           <Route path=":slug" element={<KBPageView />} />
+                        </Route>
+
+                        {/* TL (Team Leader) routes with nested routing */}
+                        <Route
+                          path="/tl"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="tl">
+                                <TLLayout />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        >
+                          <Route index element={<TLDashboard />} />
+                          <Route path="team/:teamName" element={<TLTeamDetail />} />
+                          <Route path="agent/:agentId" element={<TLAgentDetail />} />
+                          <Route path="admin" element={<TLAdmin />} />
                         </Route>
 
                         <Route

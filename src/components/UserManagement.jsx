@@ -17,10 +17,11 @@ const UserManagement = () => {
   // Role-based page access - must match AppSidebar.jsx roleAccess
   const roleAccess = {
     'user': ['workspaces', 'tools', 'chat', 'knowledge-base'],
+    'tl': ['workspaces', 'tools', 'chat', 'knowledge-base', 'tl'],
     'qa': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
     'qa-admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
-    'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats'],
-    'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats']
+    'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl'],
+    'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl']
   };
 
   // Get permissions based on role (used when pagePermissions is empty)
@@ -207,6 +208,8 @@ const UserManagement = () => {
         return 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400';
       case 'qa':
         return 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400';
+      case 'tl':
+        return 'bg-indigo-100 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400';
       default:
         return 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-400';
     }
@@ -325,6 +328,7 @@ const UserManagement = () => {
                     className={`px-3 py-1.5 rounded-md text-sm font-medium border-0 cursor-pointer ${getRoleBadgeClass(user.role)} focus:ring-2 focus:ring-blue-500`}
                   >
                     <option value="user">user</option>
+                    <option value="tl">tl</option>
                     <option value="qa">qa</option>
                     <option value="qa-admin">qa-admin</option>
                     <option value="developer">developer</option>

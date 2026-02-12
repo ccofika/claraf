@@ -35,6 +35,7 @@ import {
   Analytics,
   Notebook,
   ToolKit,
+  UserMultiple,
 } from '@carbon/icons-react';
 
 const softSpringEasing = 'cubic-bezier(0.25, 1.1, 0.4, 1)';
@@ -93,10 +94,11 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     // Define access per role - PRIMARY SOURCE
     const roleAccess = {
       'user': ['workspaces', 'tools', 'chat', 'knowledge-base'],
+      'tl': ['workspaces', 'tools', 'chat', 'knowledge-base', 'tl'],
       'qa': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
       'qa-admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
-      'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats'],
-      'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats']
+      'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl'],
+      'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl']
     };
 
     // Get default pages for role
@@ -153,6 +155,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     { id: 'developer-dashboard', icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Developer Dashboard' },
     { id: 'qa-manager', icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'QA Manager', isExternal: true },
     { id: 'kyc-agent-stats', icon: <Analytics size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Agent Stats', isExternal: true },
+    { id: 'tl', icon: <UserMultiple size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'TLs', isExternal: true },
   ];
 
   // Filter navigation items based on role defaults and explicit permissions
@@ -177,6 +180,11 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     // Navigate to tools - default to first tool
     if (item.id === 'tools') {
       navigate('/tools/vip-calculator');
+      return;
+    }
+    // Navigate to TL page
+    if (item.id === 'tl') {
+      navigate('/tl');
       return;
     }
     // All items use section change now
