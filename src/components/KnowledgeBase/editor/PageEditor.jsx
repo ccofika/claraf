@@ -74,6 +74,21 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
   const lastSavedDataRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const retryCountRef = useRef(0);
+  const isSavingRef = useRef(false);
+
+  // Refs for always-fresh data - eliminates stale closure issues in autosave
+  const dataRef = useRef({ title: title.trim(), icon, coverImage, blocks, dropdowns });
+  const onAutoSaveRef = useRef(onAutoSave);
+
+  // Keep data ref always in sync with latest state
+  useEffect(() => {
+    dataRef.current = { title: title.trim(), icon, coverImage, blocks, dropdowns };
+  }, [title, icon, coverImage, blocks, dropdowns]);
+
+  // Keep save function ref always in sync
+  useEffect(() => {
+    onAutoSaveRef.current = onAutoSave;
+  }, [onAutoSave]);
 
   // Initialize last saved data from page prop
   useEffect(() => {
@@ -106,46 +121,56 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     };
   }, []);
 
-  // Get current data as serializable object
-  const getCurrentData = useCallback(() => ({
-    title: title.trim(),
-    icon,
-    coverImage,
-    blocks,
-    dropdowns
-  }), [title, icon, coverImage, blocks, dropdowns]);
+  // Get current data - always reads from ref for freshest state
+  const getCurrentData = useCallback(() => dataRef.current, []);
 
   // Check if data has changed from last saved
   const hasChanges = useCallback(() => {
     if (!lastSavedDataRef.current) return false;
-    const currentStr = JSON.stringify(getCurrentData());
+    const currentStr = JSON.stringify(dataRef.current);
     return currentStr !== lastSavedDataRef.current;
-  }, [getCurrentData]);
+  }, []);
 
-  // Perform the auto-save
+  // Perform the auto-save - reads from refs so it ALWAYS has fresh data
   const performAutoSave = useCallback(async () => {
-    if (!onAutoSave || !page?._id) return;
+    if (!onAutoSaveRef.current || !page?._id || isSavingRef.current) return;
 
-    const data = getCurrentData();
-    if (!data.title) return; // Don't save empty title
+    // Read the LATEST data from ref at the moment of save (not from stale closure)
+    const data = { ...dataRef.current };
+    if (!data.title || !data.title.trim()) return;
 
     const currentStr = JSON.stringify(data);
     if (currentStr === lastSavedDataRef.current) {
-      // No actual changes
       setSaveStatus(SAVE_STATUS.SAVED);
       return;
     }
 
     try {
+      isSavingRef.current = true;
       setSaveStatus(SAVE_STATUS.SAVING);
-      await onAutoSave(data);
+      await onAutoSaveRef.current(data);
 
       if (!isMountedRef.current) return;
 
-      lastSavedDataRef.current = currentStr;
-      retryCountRef.current = 0;
-      setSaveStatus(SAVE_STATUS.SAVED);
+      // After save completes, check if data changed DURING the save
+      // If so, don't update lastSavedDataRef to avoid marking stale data as "saved"
+      const postSaveStr = JSON.stringify(dataRef.current);
+      if (postSaveStr === currentStr) {
+        // Data hasn't changed during save - safe to mark as saved
+        lastSavedDataRef.current = currentStr;
+        setSaveStatus(SAVE_STATUS.SAVED);
+      } else {
+        // Data changed during save - mark what we DID save, but keep status as unsaved
+        lastSavedDataRef.current = currentStr;
+        setSaveStatus(SAVE_STATUS.UNSAVED);
+        // Trigger another save for the newer data
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = setTimeout(() => {
+          if (isMountedRef.current) performAutoSave();
+        }, AUTO_SAVE_DELAY);
+      }
 
+      retryCountRef.current = 0;
       const now = new Date();
       setLastSavedAt(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (error) {
@@ -162,14 +187,15 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
           if (isMountedRef.current) performAutoSave();
         }, retryDelay);
       } else {
-        // After 3 retries, give up auto-save but keep status as error
         toast.error('Auto-save failed. Please save manually.');
         retryCountRef.current = 0;
       }
+    } finally {
+      isSavingRef.current = false;
     }
-  }, [onAutoSave, page?._id, getCurrentData]);
+  }, [page?._id]);
 
-  // Debounced auto-save trigger on content changes
+  // Debounced auto-save trigger - ONLY reacts to actual data changes
   useEffect(() => {
     // Skip the initial load - don't auto-save when page data first populates
     if (isInitialLoadRef.current) {
@@ -178,20 +204,21 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     }
 
     // Only auto-save for existing pages with onAutoSave
-    if (!onAutoSave || !page?._id) return;
+    if (!onAutoSaveRef.current || !page?._id) return;
 
-    // Mark as unsaved if there are changes
-    if (hasChanges()) {
-      setSaveStatus(SAVE_STATUS.UNSAVED);
-    } else {
+    // Check for actual changes against last saved data
+    const currentStr = JSON.stringify({ title: title.trim(), icon, coverImage, blocks, dropdowns });
+    if (currentStr === lastSavedDataRef.current) {
       setSaveStatus(SAVE_STATUS.SAVED);
       return;
     }
 
+    setSaveStatus(SAVE_STATUS.UNSAVED);
+
     // Clear previous timer
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
-    // Set new debounced save
+    // Set new debounced save - performAutoSave reads from refs, so always fresh
     autoSaveTimerRef.current = setTimeout(() => {
       performAutoSave();
     }, AUTO_SAVE_DELAY);
@@ -199,7 +226,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [title, icon, coverImage, blocks, dropdowns, onAutoSave, page?._id, hasChanges, performAutoSave]);
+  }, [title, icon, coverImage, blocks, dropdowns, page?._id, performAutoSave]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -216,17 +243,22 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
 
   // Handle close with unsaved changes check
   const handleClose = useCallback(async () => {
-    if (hasChanges() && onAutoSave && page?._id) {
-      // Try to save before closing
+    // Flush any pending autosave timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    if (hasChanges() && onAutoSaveRef.current && page?._id) {
+      // Try to save latest data before closing
       try {
         setSaveStatus(SAVE_STATUS.SAVING);
-        const data = getCurrentData();
-        if (data.title) {
-          await onAutoSave(data);
+        const data = { ...dataRef.current };
+        if (data.title && data.title.trim()) {
+          await onAutoSaveRef.current(data);
           lastSavedDataRef.current = JSON.stringify(data);
         }
       } catch (error) {
-        // If save fails, ask user
         const shouldLeave = window.confirm(
           'You have unsaved changes that could not be saved. Leave anyway?'
         );
@@ -234,7 +266,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
       }
     }
     onClose();
-  }, [hasChanges, onAutoSave, page?._id, getCurrentData, onClose]);
+  }, [hasChanges, page?._id, onClose]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -250,7 +282,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
       setSaving(true);
       setSaveStatus(SAVE_STATUS.SAVING);
 
-      const data = getCurrentData();
+      const data = { ...dataRef.current };
       await onSave(data);
 
       lastSavedDataRef.current = JSON.stringify(data);

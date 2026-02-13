@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -638,7 +638,7 @@ const KBAdmin = () => {
     navigate(`/knowledge-base/${editingPage.slug}`, { replace: true });
   };
 
-  const handleAutoSavePage = async (updates) => {
+  const handleAutoSavePage = useCallback(async (updates) => {
     if (!editingPage?._id) return;
     const token = localStorage.getItem('token');
     await axios.put(
@@ -646,7 +646,7 @@ const KBAdmin = () => {
       updates,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-  };
+  }, [editingPage?._id, API_URL]);
 
   const handleDeletePage = async (pageId) => {
     await deletePage(pageId);
