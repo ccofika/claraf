@@ -1,15 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Save, Plus, Trash2, Settings, ChevronDown, ChevronRight,
-  Image as ImageIcon, Type, Sliders
+  Image as ImageIcon, Type, Sliders, Check, AlertCircle, Loader2, Cloud
 } from 'lucide-react';
 import { toast } from 'sonner';
 import BlockEditor from './BlockEditor';
 import VariantEditor from './VariantEditor';
 import IconPicker from './IconPicker';
 
-const PageEditor = ({ page, onSave, onClose, onDelete }) => {
+const AUTO_SAVE_DELAY = 3000; // 3 seconds after last change
+
+// Save status states
+const SAVE_STATUS = {
+  SAVED: 'saved',
+  SAVING: 'saving',
+  UNSAVED: 'unsaved',
+  ERROR: 'error'
+};
+
+const SaveStatusIndicator = ({ status, lastSavedAt }) => {
+  const statusConfig = {
+    [SAVE_STATUS.SAVED]: {
+      icon: <Check size={14} />,
+      text: lastSavedAt ? `Saved ${lastSavedAt}` : 'All changes saved',
+      className: 'text-emerald-600 dark:text-emerald-400'
+    },
+    [SAVE_STATUS.SAVING]: {
+      icon: <Loader2 size={14} className="animate-spin" />,
+      text: 'Saving...',
+      className: 'text-blue-600 dark:text-blue-400'
+    },
+    [SAVE_STATUS.UNSAVED]: {
+      icon: <Cloud size={14} />,
+      text: 'Unsaved changes',
+      className: 'text-amber-600 dark:text-amber-400'
+    },
+    [SAVE_STATUS.ERROR]: {
+      icon: <AlertCircle size={14} />,
+      text: 'Save failed - retrying...',
+      className: 'text-red-600 dark:text-red-400'
+    }
+  };
+
+  const config = statusConfig[status];
+
+  return (
+    <div className={`flex items-center gap-1.5 text-[12px] font-medium ${config.className} transition-all duration-300`}>
+      {config.icon}
+      <span>{config.text}</span>
+    </div>
+  );
+};
+
+const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
   const [title, setTitle] = useState(page?.title || '');
   const [icon, setIcon] = useState(page?.icon || '📄');
   const [coverImage, setCoverImage] = useState(page?.coverImage || '');
@@ -21,6 +65,17 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
   const [showDropdownEditor, setShowDropdownEditor] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
 
+  // Auto-save state
+  const [saveStatus, setSaveStatus] = useState(SAVE_STATUS.SAVED);
+  const [lastSavedAt, setLastSavedAt] = useState('');
+  const autoSaveTimerRef = useRef(null);
+  const retryTimerRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const lastSavedDataRef = useRef(null);
+  const isInitialLoadRef = useRef(true);
+  const retryCountRef = useRef(0);
+
+  // Initialize last saved data from page prop
   useEffect(() => {
     if (page) {
       setTitle(page.title || '');
@@ -28,8 +83,158 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
       setCoverImage(page.coverImage || '');
       setBlocks(page.blocks || []);
       setDropdowns(page.dropdowns || []);
+
+      // Store initial state as "last saved"
+      lastSavedDataRef.current = JSON.stringify({
+        title: page.title || '',
+        icon: page.icon || '📄',
+        coverImage: page.coverImage || '',
+        blocks: page.blocks || [],
+        dropdowns: page.dropdowns || []
+      });
+      isInitialLoadRef.current = true;
     }
   }, [page]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, []);
+
+  // Get current data as serializable object
+  const getCurrentData = useCallback(() => ({
+    title: title.trim(),
+    icon,
+    coverImage,
+    blocks,
+    dropdowns
+  }), [title, icon, coverImage, blocks, dropdowns]);
+
+  // Check if data has changed from last saved
+  const hasChanges = useCallback(() => {
+    if (!lastSavedDataRef.current) return false;
+    const currentStr = JSON.stringify(getCurrentData());
+    return currentStr !== lastSavedDataRef.current;
+  }, [getCurrentData]);
+
+  // Perform the auto-save
+  const performAutoSave = useCallback(async () => {
+    if (!onAutoSave || !page?._id) return;
+
+    const data = getCurrentData();
+    if (!data.title) return; // Don't save empty title
+
+    const currentStr = JSON.stringify(data);
+    if (currentStr === lastSavedDataRef.current) {
+      // No actual changes
+      setSaveStatus(SAVE_STATUS.SAVED);
+      return;
+    }
+
+    try {
+      setSaveStatus(SAVE_STATUS.SAVING);
+      await onAutoSave(data);
+
+      if (!isMountedRef.current) return;
+
+      lastSavedDataRef.current = currentStr;
+      retryCountRef.current = 0;
+      setSaveStatus(SAVE_STATUS.SAVED);
+
+      const now = new Date();
+      setLastSavedAt(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch (error) {
+      if (!isMountedRef.current) return;
+
+      console.error('Auto-save failed:', error);
+      setSaveStatus(SAVE_STATUS.ERROR);
+      retryCountRef.current += 1;
+
+      // Retry with exponential backoff (max 3 retries)
+      if (retryCountRef.current <= 3) {
+        const retryDelay = Math.min(retryCountRef.current * 5000, 15000);
+        retryTimerRef.current = setTimeout(() => {
+          if (isMountedRef.current) performAutoSave();
+        }, retryDelay);
+      } else {
+        // After 3 retries, give up auto-save but keep status as error
+        toast.error('Auto-save failed. Please save manually.');
+        retryCountRef.current = 0;
+      }
+    }
+  }, [onAutoSave, page?._id, getCurrentData]);
+
+  // Debounced auto-save trigger on content changes
+  useEffect(() => {
+    // Skip the initial load - don't auto-save when page data first populates
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    // Only auto-save for existing pages with onAutoSave
+    if (!onAutoSave || !page?._id) return;
+
+    // Mark as unsaved if there are changes
+    if (hasChanges()) {
+      setSaveStatus(SAVE_STATUS.UNSAVED);
+    } else {
+      setSaveStatus(SAVE_STATUS.SAVED);
+      return;
+    }
+
+    // Clear previous timer
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    // Set new debounced save
+    autoSaveTimerRef.current = setTimeout(() => {
+      performAutoSave();
+    }, AUTO_SAVE_DELAY);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [title, icon, coverImage, blocks, dropdowns, onAutoSave, page?._id, hasChanges, performAutoSave]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasChanges()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
+
+  // Handle close with unsaved changes check
+  const handleClose = useCallback(async () => {
+    if (hasChanges() && onAutoSave && page?._id) {
+      // Try to save before closing
+      try {
+        setSaveStatus(SAVE_STATUS.SAVING);
+        const data = getCurrentData();
+        if (data.title) {
+          await onAutoSave(data);
+          lastSavedDataRef.current = JSON.stringify(data);
+        }
+      } catch (error) {
+        // If save fails, ask user
+        const shouldLeave = window.confirm(
+          'You have unsaved changes that could not be saved. Leave anyway?'
+        );
+        if (!shouldLeave) return;
+      }
+    }
+    onClose();
+  }, [hasChanges, onAutoSave, page?._id, getCurrentData, onClose]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -37,17 +242,22 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
       return;
     }
 
+    // Clear any pending auto-save
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+
     try {
       setSaving(true);
-      await onSave({
-        title: title.trim(),
-        icon,
-        coverImage,
-        blocks,
-        dropdowns
-      });
+      setSaveStatus(SAVE_STATUS.SAVING);
+
+      const data = getCurrentData();
+      await onSave(data);
+
+      lastSavedDataRef.current = JSON.stringify(data);
+      setSaveStatus(SAVE_STATUS.SAVED);
       toast.success('Page saved successfully');
     } catch (error) {
+      setSaveStatus(SAVE_STATUS.ERROR);
       toast.error(error.response?.data?.message || 'Failed to save page');
     } finally {
       setSaving(false);
@@ -127,7 +337,7 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-950">
         <div className="flex items-center gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200
               hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg"
           >
@@ -156,7 +366,12 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Auto-save status indicator */}
+          {onAutoSave && page?._id && (
+            <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+          )}
+
           {page?._id && (
             <button
               onClick={() => {
@@ -176,7 +391,7 @@ const PageEditor = ({ page, onSave, onClose, onDelete }) => {
               text-white rounded-lg disabled:opacity-50"
           >
             <Save size={18} />
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? 'Saving...' : 'Save & Close'}
           </button>
         </div>
       </div>

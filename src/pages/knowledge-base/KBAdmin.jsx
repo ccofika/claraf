@@ -638,6 +638,16 @@ const KBAdmin = () => {
     navigate(`/knowledge-base/${editingPage.slug}`, { replace: true });
   };
 
+  const handleAutoSavePage = async (updates) => {
+    if (!editingPage?._id) return;
+    const token = localStorage.getItem('token');
+    await axios.put(
+      `${API_URL}/api/knowledge-base/pages/${editingPage._id}`,
+      updates,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  };
+
   const handleDeletePage = async (pageId) => {
     await deletePage(pageId);
     setEditingPage(null);
@@ -686,6 +696,7 @@ const KBAdmin = () => {
       <PageEditor
         page={editingPage}
         onSave={handleSavePage}
+        onAutoSave={handleAutoSavePage}
         onClose={handleCloseEditor}
         onDelete={handleDeletePage}
       />
