@@ -198,7 +198,7 @@ const FilePreview = ({ data }) => {
   const fileExt = fileName.split('.').pop()?.toUpperCase() || '';
 
   return (
-    <div className="group flex items-center gap-4 p-4 bg-gray-50/60 dark:bg-neutral-900/40 border border-gray-200 dark:border-neutral-700 rounded-lg hover:border-gray-300 dark:hover:border-neutral-600 transition-colors">
+    <div className="group flex items-center gap-4 p-5 bg-gray-50/60 dark:bg-neutral-900/40 border border-gray-200 dark:border-neutral-700 rounded-xl hover:border-gray-300 dark:hover:border-neutral-600 transition-colors">
       {/* Icon */}
       <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${getExtensionColor(fileName)}`}>
         <FileIcon size={24} />

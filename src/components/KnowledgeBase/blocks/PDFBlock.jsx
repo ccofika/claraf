@@ -79,7 +79,7 @@ const PDFBlock = ({ block, content, isEditing, onUpdate }) => {
   return (
     <div className="my-4">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-t-lg">
+      <div className="flex items-center justify-between px-5 py-3 bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-t-xl">
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-red-500" />
           <span className="text-[14px] font-medium text-gray-800 dark:text-neutral-200 truncate max-w-md">
@@ -116,7 +116,7 @@ const PDFBlock = ({ block, content, isEditing, onUpdate }) => {
 
       {/* PDF Viewer */}
       {error ? (
-        <div className="flex items-center justify-center bg-gray-50 dark:bg-neutral-900 border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-lg"
+        <div className="flex items-center justify-center bg-gray-50 dark:bg-neutral-900 border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-xl"
           style={{ height: displayHeight }}>
           <div className="text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
@@ -134,7 +134,7 @@ const PDFBlock = ({ block, content, isEditing, onUpdate }) => {
       ) : (
         <iframe
           src={`${pdfData.url}#toolbar=1&navpanes=0`}
-          className="w-full border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-lg"
+          className="w-full border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-xl"
           style={{ height: displayHeight }}
           title={fileName}
           onError={() => setError(true)}

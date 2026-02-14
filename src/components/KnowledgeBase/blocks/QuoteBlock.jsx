@@ -68,9 +68,9 @@ const QuoteBlock = ({ content, isEditing, onUpdate }) => {
   if (hasHtml) {
     return (
       <>
-        <blockquote className="border-l-[3px] border-gray-300 dark:border-neutral-600 pl-5 py-1">
+        <blockquote className="border-l-[3px] border-gray-300 dark:border-neutral-600 pl-6 py-2">
           <div
-            className="text-[16px] leading-[1.7] text-gray-500 dark:text-neutral-400 italic
+            className="text-[16px] leading-[1.75] text-gray-500 dark:text-neutral-400 italic
               [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:not-italic"
             style={{ whiteSpace: 'pre-wrap' }}
             dangerouslySetInnerHTML={{ __html: content }}
@@ -82,8 +82,8 @@ const QuoteBlock = ({ content, isEditing, onUpdate }) => {
   }
 
   return (
-    <blockquote className="border-l-[3px] border-gray-300 dark:border-neutral-600 pl-5 py-1">
-      <p className="text-[16px] leading-[1.7] text-gray-500 dark:text-neutral-400 italic"
+    <blockquote className="border-l-[3px] border-gray-300 dark:border-neutral-600 pl-6 py-2">
+      <p className="text-[16px] leading-[1.75] text-gray-500 dark:text-neutral-400 italic"
         style={{ whiteSpace: 'pre-wrap' }}>
         {content}
       </p>

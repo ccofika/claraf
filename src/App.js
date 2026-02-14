@@ -58,7 +58,8 @@ import {
   KnowledgeBaseLayout,
   KBHome,
   KBPageView,
-  KBAdmin
+  KBAdmin,
+  KBLearn
 } from './pages/knowledge-base';
 import KYCAgentStats from './pages/KYCAgentStats';
 import ActiveIssues from './pages/ActiveIssues';
@@ -230,6 +231,7 @@ function App() {
                         >
                           <Route index element={<KBHome />} />
                           <Route path="admin" element={<KBAdmin />} />
+                          <Route path="learn" element={<KBLearn />} />
                           <Route path=":slug" element={<KBPageView />} />
                         </Route>
 

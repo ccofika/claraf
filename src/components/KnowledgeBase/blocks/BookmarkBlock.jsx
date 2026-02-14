@@ -143,11 +143,11 @@ const BookmarkPreview = ({ data }) => {
       href={data.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden
+      className="group flex border border-gray-200 dark:border-neutral-700 rounded-xl overflow-hidden
         hover:border-gray-300 dark:hover:border-neutral-600 hover:shadow-sm transition-all"
     >
       {/* Content */}
-      <div className="flex-1 p-4 min-w-0">
+      <div className="flex-1 p-5 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-[14px] font-medium text-gray-800 dark:text-neutral-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {data.title || getDomain(data.url) || 'Untitled'}

@@ -5,11 +5,10 @@ import {
   Plus, Trash2, GripVertical, Type, Heading1, Heading2, Heading3,
   List, ListOrdered, ChevronRight, AlertCircle, Quote, Code,
   Image as ImageIcon, Table, Minus, Settings, Pencil, Check, AlertTriangle,
-  // New icons for new block types
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
   Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp
 } from 'lucide-react';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import BlockRenderer from '../BlockRenderer';
@@ -24,12 +23,11 @@ const useSmartPosition = (isOpen, triggerRef, menuHeight = 400) => {
     const calculatePosition = () => {
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
-      const navBarHeight = 140; // Approximate height of navigation bars
+      const navBarHeight = 140;
 
       const spaceAbove = triggerRect.top - navBarHeight;
       const spaceBelow = viewportHeight - triggerRect.bottom - 20;
 
-      // Prefer going down if there's enough space
       if (spaceBelow >= menuHeight || spaceBelow >= spaceAbove) {
         setPosition({
           direction: 'down',
@@ -89,41 +87,153 @@ const blockTypeOptions = [
   { type: 'collapsible_heading', label: 'Collapsible Section', icon: ChevronsDownUp, category: 'advanced' }
 ];
 
+// Side menu options - no nested columns
+const sideBlockOptions = blockTypeOptions.filter(o => o.type !== 'columns');
+
+// Extracted helpers for reuse
+const getDefaultContent = (blockType) => {
+  switch (blockType) {
+    case 'table': return { headers: ['Column 1', 'Column 2'], rows: [['', '']] };
+    case 'toggle': return { title: '', body: '' };
+    case 'callout': return { text: '' };
+    case 'code': return { code: '', language: 'javascript' };
+    case 'image': return { url: '', alt: '', caption: '' };
+    case 'video': return { url: '', caption: '' };
+    case 'embed': return { url: '', height: 400, caption: '' };
+    case 'bookmark': return { url: '', title: '', description: '', image: '' };
+    case 'file': return { url: '', name: '', size: '', type: '' };
+    case 'equation': return { latex: '', displayMode: true };
+    case 'button': return { label: 'Click me', action: 'link', url: '', copyText: '', style: 'primary', align: 'left' };
+    case 'table_of_contents': return { title: 'Table of Contents', maxDepth: 3, showNumbers: false };
+    case 'audio': return { url: '', title: '', caption: '' };
+    case 'pdf': return { url: '', title: '', height: 600 };
+    case 'breadcrumbs': return {};
+    case 'synced_block': return { sourcePageId: '', sourceBlockId: '' };
+    case 'columns': return { columns: [
+      { id: 'col1', width: 50, blocks: [] },
+      { id: 'col2', width: 50, blocks: [] }
+    ] };
+    case 'collapsible_heading': return { title: '', blocks: [] };
+    default: return '';
+  }
+};
+
+const getDefaultProperties = (blockType) => {
+  switch (blockType) {
+    case 'callout': return { variant: 'info' };
+    case 'code': return { language: 'javascript' };
+    default: return {};
+  }
+};
+
+const createNewBlock = (type) => ({
+  id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  type,
+  defaultContent: getDefaultContent(type),
+  variants: {},
+  properties: getDefaultProperties(type)
+});
+
+// Side add menu rendered via portal for proper z-index and no overflow clipping
+const SideAddMenu = ({ isOpen, blockId, side, anchorRef, onAdd, onClose }) => {
+  const [pos, setPos] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen || !anchorRef?.current) { setPos(null); return; }
+
+    const calculate = () => {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const menuW = 240;
+      const menuH = 340;
+
+      // Vertical: prefer below the button, fallback above
+      const spaceBelow = vh - rect.bottom - 12;
+      const goUp = spaceBelow < menuH && rect.top > spaceBelow;
+      const top = goUp ? Math.max(8, rect.top - menuH - 4) : rect.bottom + 4;
+      const maxH = goUp ? rect.top - 12 : spaceBelow;
+
+      // Horizontal: center on button, clamp to viewport
+      let left = rect.left + rect.width / 2 - menuW / 2;
+      left = Math.max(8, Math.min(left, vw - menuW - 8));
+
+      setPos({ top, left, maxH: Math.min(maxH, menuH) });
+    };
+
+    calculate();
+    window.addEventListener('scroll', calculate, true);
+    window.addEventListener('resize', calculate);
+    return () => {
+      window.removeEventListener('scroll', calculate, true);
+      window.removeEventListener('resize', calculate);
+    };
+  }, [isOpen, anchorRef]);
+
+  if (!isOpen || !pos) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.12 }}
+      className="add-block-menu fixed z-[99990] bg-white dark:bg-neutral-900
+        border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl p-2 w-60
+        grid grid-cols-2 gap-1 overflow-y-auto"
+      style={{ top: pos.top, left: pos.left, maxHeight: pos.maxH }}
+    >
+      <div className="col-span-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-neutral-500">
+        Add to {side}
+      </div>
+      {sideBlockOptions.map(opt => (
+        <button
+          key={opt.type}
+          onClick={() => onAdd(opt.type)}
+          className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-neutral-300
+            hover:bg-gray-100 dark:hover:bg-neutral-800 rounded"
+        >
+          <opt.icon size={14} />
+          {opt.label}
+        </button>
+      ))}
+    </motion.div>,
+    document.body
+  );
+};
+
 const SortableBlock = ({
-  block,
-  index,
-  editingBlockId,
-  setEditingBlockId,
-  onUpdateBlock,
-  onRequestDelete,
-  onOpenVariants,
-  hasDropdowns,
-  showAddMenu,
-  setShowAddMenu,
-  addBlock
+  block, index, editingBlockId, setEditingBlockId,
+  onUpdateBlock, onRequestDelete, onOpenVariants, hasDropdowns,
+  showAddMenu, setShowAddMenu, addBlock,
+  activeId, sideDropTarget, onAddToSide
 }) => {
   const addButtonRef = useRef(null);
+  const sideLeftRef = useRef(null);
+  const sideRightRef = useRef(null);
   const menuPosition = useSmartPosition(showAddMenu === index, addButtonRef, 350);
 
   const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
+    attributes, listeners, setNodeRef, transform, transition, isDragging
   } = useSortable({ id: block.id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1
+    opacity: isDragging ? 0.3 : 1,
+    position: 'relative',
+    zIndex: isDragging ? 0 : 1,
   };
 
   const isEditing = editingBlockId === block.id;
+  const isDragActive = !!activeId;
+  const isSideDropLeft = !isDragging && activeId && activeId !== block.id
+    && sideDropTarget?.blockId === block.id && sideDropTarget?.side === 'left';
+  const isSideDropRight = !isDragging && activeId && activeId !== block.id
+    && sideDropTarget?.blockId === block.id && sideDropTarget?.side === 'right';
 
   return (
-    <div ref={setNodeRef} style={style} className="group relative mb-3">
+    <div ref={setNodeRef} style={style} data-block-id={block.id} className="group relative mb-3">
       {/* Block Actions - Floating toolbar above block */}
       <div className={`absolute -top-8 right-0 z-10 flex items-center gap-1 px-1.5 py-1
         bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
@@ -168,7 +278,7 @@ const SortableBlock = ({
         </button>
       </div>
 
-      {/* Block Controls - Left Side */}
+      {/* Block Controls - Left Side (grip + add below) */}
       <div className="absolute -left-8 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
         <button
           {...attributes}
@@ -186,7 +296,7 @@ const SortableBlock = ({
         </button>
       </div>
 
-      {/* Add Block Menu - Smart Positioned */}
+      {/* Add Block Menu (below via left toolbar) */}
       <AnimatePresence>
         {showAddMenu === index && (
           <motion.div
@@ -217,11 +327,109 @@ const SortableBlock = ({
         )}
       </AnimatePresence>
 
+      {/* ===== LEFT SIDE ADD ZONE - visible on hover, md+ only, hidden during drag ===== */}
+      {!isDragActive && (
+        <div
+          className="hidden md:flex absolute left-0 top-0 bottom-0 w-7 -ml-0.5 z-20
+            items-center justify-center pointer-events-none"
+        >
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto">
+            <button
+              ref={sideLeftRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddMenu(showAddMenu === `side_left_${block.id}` ? null : `side_left_${block.id}`);
+              }}
+              className="add-block-trigger w-5 h-5 rounded-full bg-blue-500/80 hover:bg-blue-600
+                text-white flex items-center justify-center shadow-md
+                transition-all duration-150 hover:scale-110"
+              title="Add block to the left"
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Left side menu (portal) */}
+      <AnimatePresence>
+        <SideAddMenu
+          isOpen={showAddMenu === `side_left_${block.id}`}
+          blockId={block.id}
+          side="left"
+          anchorRef={sideLeftRef}
+          onAdd={(type) => { onAddToSide(type, block.id, 'left'); setShowAddMenu(null); }}
+          onClose={() => setShowAddMenu(null)}
+        />
+      </AnimatePresence>
+
+      {/* ===== RIGHT SIDE ADD ZONE - visible on hover, md+ only, hidden during drag ===== */}
+      {!isDragActive && (
+        <div
+          className="hidden md:flex absolute right-0 top-0 bottom-0 w-7 -mr-0.5 z-20
+            items-center justify-center pointer-events-none"
+        >
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto">
+            <button
+              ref={sideRightRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddMenu(showAddMenu === `side_right_${block.id}` ? null : `side_right_${block.id}`);
+              }}
+              className="add-block-trigger w-5 h-5 rounded-full bg-blue-500/80 hover:bg-blue-600
+                text-white flex items-center justify-center shadow-md
+                transition-all duration-150 hover:scale-110"
+              title="Add block to the right"
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Right side menu (portal) */}
+      <AnimatePresence>
+        <SideAddMenu
+          isOpen={showAddMenu === `side_right_${block.id}`}
+          blockId={block.id}
+          side="right"
+          anchorRef={sideRightRef}
+          onAdd={(type) => { onAddToSide(type, block.id, 'right'); setShowAddMenu(null); }}
+          onClose={() => setShowAddMenu(null)}
+        />
+      </AnimatePresence>
+
+      {/* ===== DRAG SIDE DROP INDICATORS ===== */}
+      <AnimatePresence>
+        {isSideDropLeft && (
+          <motion.div
+            initial={{ opacity: 0, scaleY: 0.5 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.5 }}
+            className="absolute left-0 top-1 bottom-1 w-1.5 bg-blue-500 rounded-full z-30
+              shadow-[0_0_10px_rgba(59,130,246,0.6)]"
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isSideDropRight && (
+          <motion.div
+            initial={{ opacity: 0, scaleY: 0.5 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.5 }}
+            className="absolute right-0 top-1 bottom-1 w-1.5 bg-blue-500 rounded-full z-30
+              shadow-[0_0_10px_rgba(59,130,246,0.6)]"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Block Content */}
       <div className={`relative bg-gray-50 dark:bg-neutral-900 rounded-lg p-3 border transition-colors
         ${isEditing
           ? 'border-blue-300 dark:border-blue-700 ring-1 ring-blue-200 dark:ring-blue-800'
-          : 'border-transparent hover:border-gray-200 dark:hover:border-neutral-700'
+          : isSideDropLeft || isSideDropRight
+            ? 'border-blue-400 dark:border-blue-600 bg-blue-50/30 dark:bg-blue-950/20'
+            : 'border-transparent hover:border-gray-200 dark:hover:border-neutral-700'
         }`}>
 
         <BlockRenderer
@@ -234,10 +442,65 @@ const SortableBlock = ({
   );
 };
 
+// Hover-activated insert line between blocks
+const InsertBlockLine = ({ showMenu, onToggleMenu, onAdd }) => {
+  const buttonRef = useRef(null);
+  const menuPosition = useSmartPosition(showMenu, buttonRef, 350);
+
+  return (
+    <div className="relative group/insert py-0.5 flex items-center justify-center">
+      {/* Line + Button - visible on hover */}
+      <div className="opacity-0 group-hover/insert:opacity-100 transition-opacity duration-150 flex items-center w-full">
+        <div className="flex-1 h-[1.5px] bg-blue-400/50 rounded-full" />
+        <button
+          ref={buttonRef}
+          onClick={(e) => { e.stopPropagation(); onToggleMenu(); }}
+          className="add-block-trigger flex-shrink-0 w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-600
+            text-white flex items-center justify-center shadow-sm transition-all duration-150 hover:scale-110"
+        >
+          <Plus size={12} />
+        </button>
+        <div className="flex-1 h-[1.5px] bg-blue-400/50 rounded-full" />
+      </div>
+
+      {/* Block type menu */}
+      <AnimatePresence>
+        {showMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: menuPosition.direction === 'down' ? -8 : 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: menuPosition.direction === 'down' ? -8 : 8 }}
+            className={`add-block-menu absolute left-1/2 -translate-x-1/2 z-50
+              bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
+              rounded-lg shadow-lg p-2 w-64 grid grid-cols-2 gap-1 overflow-y-auto
+              ${menuPosition.direction === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
+            style={{ maxHeight: menuPosition.maxHeight }}
+          >
+            {blockTypeOptions.map(opt => (
+              <button
+                key={opt.type}
+                onClick={() => onAdd(opt.type)}
+                className="flex items-center gap-2 px-2 py-1.5 text-sm
+                  text-gray-700 dark:text-neutral-300 hover:bg-gray-100
+                  dark:hover:bg-neutral-800 rounded"
+              >
+                <opt.icon size={14} />
+                {opt.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) => {
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(null);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [activeId, setActiveId] = useState(null);
+  const [sideDropTarget, setSideDropTarget] = useState(null);
   const firstAddButtonRef = useRef(null);
   const bottomAddButtonRef = useRef(null);
 
@@ -246,9 +509,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5
-      }
+      activationConstraint: { distance: 5 }
     })
   );
 
@@ -263,127 +524,245 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAddMenu]);
 
-  const addBlock = (type, afterIndex) => {
-    // Default content based on block type
-    const getDefaultContent = (blockType) => {
-      switch (blockType) {
-        case 'table':
-          return { headers: ['Column 1', 'Column 2'], rows: [['', '']] };
-        case 'toggle':
-          return { title: '', body: '' };
-        case 'callout':
-          return { text: '' };
-        case 'code':
-          return { code: '', language: 'javascript' };
-        case 'image':
-          return { url: '', alt: '', caption: '' };
-        case 'video':
-          return { url: '', caption: '' };
-        case 'embed':
-          return { url: '', height: 400, caption: '' };
-        case 'bookmark':
-          return { url: '', title: '', description: '', image: '' };
-        case 'file':
-          return { url: '', name: '', size: '', type: '' };
-        case 'equation':
-          return { latex: '', displayMode: true };
-        case 'button':
-          return { label: 'Click me', action: 'link', url: '', copyText: '', style: 'primary', align: 'left' };
-        case 'table_of_contents':
-          return { title: 'Table of Contents', maxDepth: 3, showNumbers: false };
-        case 'audio':
-          return { url: '', title: '', caption: '' };
-        case 'pdf':
-          return { url: '', title: '', height: 600 };
-        case 'breadcrumbs':
-          return {};
-        case 'synced_block':
-          return { sourcePageId: '', sourceBlockId: '' };
-        case 'columns':
-          return { columns: [
-            { id: 'col1', width: 50, blocks: [] },
-            { id: 'col2', width: 50, blocks: [] }
-          ] };
-        case 'collapsible_heading':
-          return { title: '', blocks: [] };
-        default:
-          return '';
+  // Pointer tracking during drag for side-drop detection
+  useEffect(() => {
+    if (!activeId) {
+      setSideDropTarget(null);
+      return;
+    }
+
+    const handlePointerMove = (e) => {
+      // Find the block element under the pointer (elementFromPoint sees through pointer-events:none overlay)
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const blockEl = target?.closest?.('[data-block-id]');
+
+      if (!blockEl || blockEl.dataset.blockId === activeId) {
+        setSideDropTarget(null);
+        return;
+      }
+
+      const rect = blockEl.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const width = rect.width;
+      // Edge zone: 18% of width, capped at 90px for very wide blocks
+      const edgeZone = Math.min(width * 0.18, 90);
+
+      if (relativeX < edgeZone) {
+        setSideDropTarget({ blockId: blockEl.dataset.blockId, side: 'left' });
+      } else if (relativeX > width - edgeZone) {
+        setSideDropTarget({ blockId: blockEl.dataset.blockId, side: 'right' });
+      } else {
+        setSideDropTarget(null);
       }
     };
 
-    // Default properties based on block type
-    const getDefaultProperties = (blockType) => {
-      switch (blockType) {
-        case 'callout':
-          return { variant: 'info' };
-        case 'code':
-          return { language: 'javascript' };
-        default:
-          return {};
-      }
-    };
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [activeId]);
 
-    const newBlock = {
-      id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      defaultContent: getDefaultContent(type),
-      variants: {},
-      properties: getDefaultProperties(type)
-    };
-
+  // Add a block below (existing behavior)
+  const addBlock = useCallback((type, afterIndex) => {
+    const newBlock = createNewBlock(type);
     const newBlocks = [...blocks];
     newBlocks.splice(afterIndex + 1, 0, newBlock);
     onChange(newBlocks);
     setEditingBlockId(newBlock.id);
-  };
+  }, [blocks, onChange]);
+
+  // Add a new block to the side of an existing block (creates/extends columns)
+  const addBlockToSide = useCallback((type, targetBlockId, side) => {
+    const targetBlock = blocks.find(b => b.id === targetBlockId);
+    if (!targetBlock) return;
+
+    const newBlock = createNewBlock(type);
+
+    if (targetBlock.type === 'columns' && targetBlock.defaultContent?.columns) {
+      // Add column to existing columns block
+      const existingCols = targetBlock.defaultContent.columns.map(c => ({ ...c }));
+      if (existingCols.length >= 5) return;
+
+      const newCol = { id: `col_${Date.now()}`, width: 0, blocks: [newBlock] };
+      if (side === 'left') {
+        existingCols.unshift(newCol);
+      } else {
+        existingCols.push(newCol);
+      }
+
+      // Redistribute widths evenly
+      const colWidth = Math.floor(100 / existingCols.length);
+      const remainder = 100 - (colWidth * existingCols.length);
+      existingCols.forEach((col, i) => { col.width = colWidth + (i === 0 ? remainder : 0); });
+
+      const updatedBlock = { ...targetBlock, defaultContent: { columns: existingCols } };
+      onChange(blocks.map(b => b.id === targetBlockId ? updatedBlock : b));
+    } else {
+      // Wrap target + new block in a columns block
+      const leftBlock = side === 'left' ? newBlock : targetBlock;
+      const rightBlock = side === 'left' ? targetBlock : newBlock;
+
+      const columnsBlock = {
+        id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'columns',
+        defaultContent: {
+          columns: [
+            { id: `col_${Date.now()}_l`, width: 50, blocks: [leftBlock] },
+            { id: `col_${Date.now()}_r`, width: 50, blocks: [rightBlock] }
+          ]
+        },
+        variants: {},
+        properties: {}
+      };
+
+      onChange(blocks.map(b => b.id === targetBlockId ? columnsBlock : b));
+    }
+
+    setEditingBlockId(newBlock.id);
+  }, [blocks, onChange]);
+
+  // Merge two existing blocks side by side (drag-to-side)
+  const mergeBlocksSideBySide = useCallback((draggedBlockId, targetBlockId, side) => {
+    const draggedBlock = blocks.find(b => b.id === draggedBlockId);
+    const targetBlock = blocks.find(b => b.id === targetBlockId);
+    if (!draggedBlock || !targetBlock || draggedBlockId === targetBlockId) return;
+
+    let newColumnsBlock;
+
+    if (targetBlock.type === 'columns' && targetBlock.defaultContent?.columns) {
+      // Add to existing columns block
+      const existingCols = targetBlock.defaultContent.columns.map(c => ({ ...c }));
+      if (existingCols.length >= 5) return;
+
+      const newCol = { id: `col_${Date.now()}`, width: 0, blocks: [draggedBlock] };
+      if (side === 'left') {
+        existingCols.unshift(newCol);
+      } else {
+        existingCols.push(newCol);
+      }
+
+      const colWidth = Math.floor(100 / existingCols.length);
+      const remainder = 100 - (colWidth * existingCols.length);
+      existingCols.forEach((col, i) => { col.width = colWidth + (i === 0 ? remainder : 0); });
+
+      newColumnsBlock = { ...targetBlock, defaultContent: { columns: existingCols } };
+    } else {
+      const leftBlock = side === 'left' ? draggedBlock : targetBlock;
+      const rightBlock = side === 'left' ? targetBlock : draggedBlock;
+
+      newColumnsBlock = {
+        id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'columns',
+        defaultContent: {
+          columns: [
+            { id: `col_${Date.now()}_l`, width: 50, blocks: [leftBlock] },
+            { id: `col_${Date.now()}_r`, width: 50, blocks: [rightBlock] }
+          ]
+        },
+        variants: {},
+        properties: {}
+      };
+    }
+
+    // Remove dragged block and replace target with the columns block
+    const newBlocks = blocks
+      .filter(b => b.id !== draggedBlockId)
+      .map(b => b.id === targetBlockId ? newColumnsBlock : b);
+
+    onChange(newBlocks);
+  }, [blocks, onChange]);
 
   const updateBlock = (blockId, field, value) => {
-    const newBlocks = blocks.map(b =>
-      b.id === blockId ? { ...b, [field]: value } : b
-    );
-    onChange(newBlocks);
+    onChange(blocks.map(b => b.id === blockId ? { ...b, [field]: value } : b));
   };
 
   const deleteBlock = (blockId) => {
-    const newBlocks = blocks.filter(b => b.id !== blockId);
-    onChange(newBlocks);
-    if (editingBlockId === blockId) {
-      setEditingBlockId(null);
-    }
+    onChange(blocks.filter(b => b.id !== blockId));
+    if (editingBlockId === blockId) setEditingBlockId(null);
+  };
+
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+    setShowAddMenu(null);
+    setSideDropTarget(null);
   };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-    if (active.id !== over?.id) {
+
+    // Side drop takes priority over reorder
+    if (sideDropTarget && sideDropTarget.blockId !== active.id) {
+      mergeBlocksSideBySide(active.id, sideDropTarget.blockId, sideDropTarget.side);
+    } else if (active.id !== over?.id) {
+      // Normal reorder
       const oldIndex = blocks.findIndex(b => b.id === active.id);
       const newIndex = blocks.findIndex(b => b.id === over.id);
-      onChange(arrayMove(blocks, oldIndex, newIndex));
+      if (oldIndex !== -1 && newIndex !== -1) {
+        onChange(arrayMove(blocks, oldIndex, newIndex));
+      }
     }
+
+    setActiveId(null);
+    setSideDropTarget(null);
   };
 
   const hasDropdowns = dropdowns && dropdowns.length > 0;
 
   return (
     <div className="space-y-2">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
           {blocks.map((block, index) => (
-            <SortableBlock
-              key={block.id}
-              block={block}
-              index={index}
-              editingBlockId={editingBlockId}
-              setEditingBlockId={setEditingBlockId}
-              onUpdateBlock={updateBlock}
-              onRequestDelete={setPendingDeleteId}
-              onOpenVariants={onOpenVariants}
-              hasDropdowns={hasDropdowns}
-              showAddMenu={showAddMenu}
-              setShowAddMenu={setShowAddMenu}
-              addBlock={addBlock}
-            />
+            <React.Fragment key={block.id}>
+              {/* Insert line before first block */}
+              {index === 0 && !activeId && (
+                <InsertBlockLine
+                  showMenu={showAddMenu === 'between_-1'}
+                  onToggleMenu={() => setShowAddMenu(showAddMenu === 'between_-1' ? null : 'between_-1')}
+                  onAdd={(type) => { addBlock(type, -1); setShowAddMenu(null); }}
+                />
+              )}
+              <SortableBlock
+                block={block}
+                index={index}
+                editingBlockId={editingBlockId}
+                setEditingBlockId={setEditingBlockId}
+                onUpdateBlock={updateBlock}
+                onRequestDelete={setPendingDeleteId}
+                onOpenVariants={onOpenVariants}
+                hasDropdowns={hasDropdowns}
+                showAddMenu={showAddMenu}
+                setShowAddMenu={setShowAddMenu}
+                addBlock={addBlock}
+                activeId={activeId}
+                sideDropTarget={sideDropTarget}
+                onAddToSide={addBlockToSide}
+              />
+              {/* Insert line between blocks */}
+              {index < blocks.length - 1 && !activeId && (
+                <InsertBlockLine
+                  showMenu={showAddMenu === `between_${index}`}
+                  onToggleMenu={() => setShowAddMenu(showAddMenu === `between_${index}` ? null : `between_${index}`)}
+                  onAdd={(type) => { addBlock(type, index); setShowAddMenu(null); }}
+                />
+              )}
+            </React.Fragment>
           ))}
         </SortableContext>
+
+        {/* Drag Overlay - renders dragged block at cursor, pointer-events:none so elementFromPoint can see through */}
+        <DragOverlay>
+          {activeId ? (() => {
+            const activeBlock = blocks.find(b => b.id === activeId);
+            return activeBlock ? (
+              <div
+                style={{ pointerEvents: 'none' }}
+                className="bg-gray-50 dark:bg-neutral-900 rounded-lg p-3 border-2
+                  border-blue-400 dark:border-blue-600 shadow-xl cursor-grabbing max-w-full"
+              >
+                <BlockRenderer block={activeBlock} isEditing={false} />
+              </div>
+            ) : null;
+          })() : null}
+        </DragOverlay>
       </DndContext>
 
       {/* Add First Block Button */}
@@ -476,6 +855,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
           </AnimatePresence>
         </div>
       )}
+
       {/* Delete Confirmation Modal */}
       {pendingDeleteId && createPortal(
         <div
@@ -483,7 +863,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
           onClick={() => setPendingDeleteId(null)}
         >
           <div
-            className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl p-6 w-[400px]"
+            className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl p-6 w-[400px] max-w-[calc(100vw-2rem)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">

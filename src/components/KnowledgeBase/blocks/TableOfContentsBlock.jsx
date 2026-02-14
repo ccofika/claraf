@@ -163,7 +163,7 @@ const TableOfContentsBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <div className="px-5 py-4 bg-gray-50/60 dark:bg-neutral-900/40 border border-gray-100 dark:border-neutral-800 rounded-lg">
+    <div className="px-6 py-5 bg-gray-50/60 dark:bg-neutral-900/40 border border-gray-100 dark:border-neutral-800 rounded-xl">
       {tocData.title && (
         <h4 className="text-[14px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-3">
           {tocData.title}

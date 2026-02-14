@@ -167,7 +167,7 @@ const EquationBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <div
-      className={`my-6 ${equationData.displayMode !== false ? 'text-center py-4' : 'inline'}`}
+      className={`${equationData.displayMode !== false ? 'text-center py-5' : 'inline'}`}
     >
       <div
         ref={renderRef}

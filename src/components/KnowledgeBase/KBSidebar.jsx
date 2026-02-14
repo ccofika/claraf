@@ -6,7 +6,7 @@ import {
   ChevronRight, ChevronDown, ChevronLeft, Search,
   Book, Settings, Menu, X, Plus, MoreHorizontal,
   Edit, Trash2, GripVertical, Home, Star, Clock, Tag,
-  FilePlus, ArrowUpToLine
+  FilePlus, ArrowUpToLine, GraduationCap
 } from 'lucide-react';
 import { useKnowledgeBase } from '../../context/KnowledgeBaseContext';
 import { toast } from 'sonner';
@@ -771,6 +771,19 @@ const KBSidebar = () => {
               <Home size={16} />
               Home
             </button>
+
+            {/* Learn Mode */}
+            <button
+              onClick={() => navigate('/knowledge-base/learn')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[14px] font-medium transition-colors mt-1
+                ${location.pathname === '/knowledge-base/learn'
+                  ? 'bg-gray-100 dark:bg-neutral-800/60 text-gray-900 dark:text-white'
+                  : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800/30'
+                }`}
+            >
+              <GraduationCap size={16} />
+              Learn
+            </button>
           </div>
 
           {/* Search - opens floating search bar */}
@@ -949,6 +962,15 @@ const KBSidebar = () => {
               }`}
             >
               <Home size={18} className="mx-auto text-gray-600 dark:text-neutral-400" />
+            </button>
+            <button
+              onClick={() => navigate('/knowledge-base/learn')}
+              className={`w-full p-2 rounded-lg transition-colors ${
+                location.pathname === '/knowledge-base/learn' ? 'bg-gray-100 dark:bg-neutral-800/60' : 'hover:bg-gray-50 dark:hover:bg-neutral-800/30'
+              }`}
+              title="Learn"
+            >
+              <GraduationCap size={18} className="mx-auto text-gray-600 dark:text-neutral-400" />
             </button>
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('focus-kb-search'))}

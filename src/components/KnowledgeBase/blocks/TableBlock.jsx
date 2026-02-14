@@ -389,14 +389,14 @@ const TableBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-neutral-700">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-neutral-700">
         <table className="min-w-full">
           <thead>
             <tr className="bg-gray-50/80 dark:bg-neutral-800/60">
               {headers.map((header, index) => (
                 <th
                   key={index}
-                  className="px-4 py-3 text-left text-[13px] font-semibold
+                  className="px-5 py-3.5 text-left text-[13px] font-semibold
                     text-gray-500 dark:text-neutral-400
                     border-b border-gray-200 dark:border-neutral-700
                     border-r border-r-gray-100 dark:border-r-neutral-700/50 last:border-r-0"
@@ -417,7 +417,7 @@ const TableBlock = ({ content, isEditing, onUpdate }) => {
                   <td
                     key={colIndex}
                     colSpan={cell.colspan}
-                    className="px-4 py-3 text-[15px] text-gray-600 dark:text-neutral-400
+                    className="px-5 py-3.5 text-[15px] text-gray-600 dark:text-neutral-400
                       border-r border-gray-100 dark:border-neutral-800 last:border-r-0
                       [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
                     style={{ whiteSpace: 'pre-wrap' }}

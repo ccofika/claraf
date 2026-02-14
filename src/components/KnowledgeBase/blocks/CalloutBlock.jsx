@@ -129,7 +129,7 @@ const CalloutBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className={`flex gap-3.5 px-4 py-3.5 rounded-lg ${style.bg} ${style.border}`}>
+      <div className={`flex gap-4 px-5 py-4 rounded-xl ${style.bg} ${style.border}`}>
         <Icon size={20} className={`flex-shrink-0 mt-0.5 ${style.iconColor}`} />
         {hasHtml ? (
           <div

@@ -119,7 +119,7 @@ const AudioBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <figure className="my-4">
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-4">
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
         <audio
           ref={audioRef}
           src={audioData.url}
@@ -190,7 +190,7 @@ const AudioBlock = ({ block, content, isEditing, onUpdate }) => {
         </div>
       </div>
       {audioData.caption && (
-        <figcaption className="mt-2 text-center text-[13px] text-gray-500 dark:text-neutral-400">
+        <figcaption className="mt-3 text-center text-[13px] text-gray-500 dark:text-neutral-400">
           {audioData.caption}
         </figcaption>
       )}

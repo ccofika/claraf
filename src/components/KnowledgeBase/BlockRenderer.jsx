@@ -58,34 +58,35 @@ const blockComponents = {
 };
 
 // Centralized vertical spacing per block type
-// Notion-like: paragraphs/lists have tight spacing, structural blocks have generous spacing
+// Text blocks: tight spacing. Structural/card blocks: generous spacing (16-24px).
+// Based on reference design measurements (design13): 16px between paragraphs, 20-24px for structural blocks.
 const blockSpacing = {
-  paragraph:            'mb-1',
+  paragraph:            'mb-1.5',
   heading_1:            '',
   heading_2:            '',
   heading_3:            '',
-  bulleted_list:        'my-1',
-  numbered_list:        'my-1',
-  toggle:               'my-2',
-  callout:              'my-4',
-  quote:                'my-3',
-  code:                 'my-4',
-  image:                'my-5',
-  table:                'my-4',
+  bulleted_list:        'my-1.5',
+  numbered_list:        'my-1.5',
+  toggle:               'my-3.5',
+  callout:              'my-5',
+  quote:                'my-4',
+  code:                 'my-5',
+  image:                'my-6',
+  table:                'my-5',
   divider:              '',
-  video:                'my-5',
-  embed:                'my-5',
-  bookmark:             'my-3',
-  file:                 'my-3',
-  equation:             'my-3',
-  button:               'my-3',
-  table_of_contents:    'my-4',
-  audio:                'my-5',
-  pdf:                  'my-5',
-  breadcrumbs:          'my-2',
-  synced_block:         'my-2',
-  columns:              'my-5',
-  collapsible_heading:  'my-3'
+  video:                'my-6',
+  embed:                'my-6',
+  bookmark:             'my-4',
+  file:                 'my-4',
+  equation:             'my-4',
+  button:               'my-4',
+  table_of_contents:    'my-5',
+  audio:                'my-6',
+  pdf:                  'my-6',
+  breadcrumbs:          'my-3',
+  synced_block:         'my-3',
+  columns:              'my-6',
+  collapsible_heading:  'my-4'
 };
 
 const BlockRenderer = ({ block, isEditing = false, onUpdate }) => {

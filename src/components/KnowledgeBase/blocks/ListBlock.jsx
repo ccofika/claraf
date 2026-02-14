@@ -100,7 +100,7 @@ const ListBlock = ({ block, content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <ListTag className={`space-y-1 pl-6 ${isNumbered ? 'list-decimal' : 'list-disc'}`}>
+      <ListTag className={`space-y-1.5 pl-7 ${isNumbered ? 'list-decimal' : 'list-disc'}`}>
         {items.map((item, index) => (
           hasHtmlItems ? (
             <li

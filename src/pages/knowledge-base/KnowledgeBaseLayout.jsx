@@ -35,7 +35,7 @@ const KnowledgeBaseLayoutInner = () => {
         <FloatingSearchBar />
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto scroll-smooth">
+        <div className="flex-1 overflow-y-auto scroll-smooth" data-kb-scroll-container>
           <Outlet />
         </div>
       </div>

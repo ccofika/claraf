@@ -89,11 +89,11 @@ const ToggleBlock = ({ content, isEditing, onUpdate }) => {
 
   return (
     <>
-      <div className="rounded-lg overflow-hidden">
+      <div className="rounded-xl overflow-hidden">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center gap-2 px-1 py-1.5
-            hover:bg-gray-50 dark:hover:bg-neutral-900/50 rounded-md transition-colors text-left"
+          className="w-full flex items-center gap-2 px-2 py-2
+            hover:bg-gray-50 dark:hover:bg-neutral-900/50 rounded-lg transition-colors text-left"
         >
           <ChevronRight
             size={18}
@@ -106,7 +106,7 @@ const ToggleBlock = ({ content, isEditing, onUpdate }) => {
         </button>
 
         {isExpanded && bodyContent && (
-          <div className="pl-7 pt-1 pb-1">
+          <div className="pl-7 pt-2 pb-2">
             {hasHtmlBody ? (
               <div
                 className="prose prose-gray dark:prose-invert max-w-none

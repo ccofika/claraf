@@ -213,8 +213,8 @@ const CollapsibleHeadingBlock = ({ block, content, isEditing, onUpdate }) => {
       {/* Title row with collapse/expand arrow */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 group/title text-left py-1.5 -ml-1
-          hover:bg-gray-50 dark:hover:bg-neutral-900/50 rounded-md px-1 transition-colors"
+        className="w-full flex items-center gap-2 group/title text-left py-2 -ml-1
+          hover:bg-gray-50 dark:hover:bg-neutral-900/50 rounded-lg px-2 transition-colors"
       >
         <ChevronRight
           size={18}
@@ -237,7 +237,7 @@ const CollapsibleHeadingBlock = ({ block, content, isEditing, onUpdate }) => {
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="pl-7 mt-1 space-y-2">
+            <div className="pl-7 mt-2 space-y-3">
               {childBlocks.map((child) => (
                 <BlockRenderer key={child.id} block={child} />
               ))}

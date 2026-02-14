@@ -48,9 +48,9 @@ const CodeBlock = ({ block, content, isEditing, onUpdate }) => {
   if (!codeData.code) return null;
 
   return (
-    <div className="relative group rounded-lg overflow-hidden bg-[#1e1e1e] dark:bg-[#1a1a1a]">
+    <div className="relative group rounded-xl overflow-hidden bg-[#1e1e1e] dark:bg-[#1a1a1a]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#252526] dark:bg-[#1f1f1f]
+      <div className="flex items-center justify-between px-5 py-3 bg-[#252526] dark:bg-[#1f1f1f]
         border-b border-[#333] dark:border-[#2a2a2a]">
         {codeData.language && (
           <span className="text-[12px] font-medium text-neutral-400 uppercase tracking-wider">
@@ -79,7 +79,7 @@ const CodeBlock = ({ block, content, isEditing, onUpdate }) => {
       </div>
 
       {/* Code */}
-      <pre className="p-4 overflow-x-auto">
+      <pre className="p-5 overflow-x-auto">
         <code className="font-mono text-[13.5px] leading-[1.7] text-neutral-200 whitespace-pre">
           {codeData.code}
         </code>

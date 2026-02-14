@@ -12,9 +12,9 @@ const HeadingBlock = ({ block, content, isEditing, onUpdate }) => {
   const richText = useRichTextEditor({ onUpdate, externalEditorRef: editorRef });
 
   const headingStyles = {
-    1: 'text-[30px] font-bold tracking-[-0.02em] leading-[1.2] mt-10 mb-1',
-    2: 'text-[24px] font-semibold tracking-[-0.015em] leading-[1.25] mt-8 mb-1',
-    3: 'text-[20px] font-semibold tracking-[-0.01em] leading-[1.3] mt-6 mb-0.5'
+    1: 'text-[30px] font-bold tracking-[-0.02em] leading-[1.2] mt-12 mb-2',
+    2: 'text-[24px] font-semibold tracking-[-0.015em] leading-[1.25] mt-10 mb-1.5',
+    3: 'text-[20px] font-semibold tracking-[-0.01em] leading-[1.3] mt-8 mb-1'
   };
 
   useEffect(() => {
@@ -78,10 +78,13 @@ const HeadingBlock = ({ block, content, isEditing, onUpdate }) => {
   const Tag = `h${level}`;
   const hasHtml = /<[^>]+>/.test(content);
 
+  const headingId = block.id ? `kb-h-${block.id}` : undefined;
+
   if (hasHtml) {
     return (
       <>
         <Tag
+          id={headingId}
           className={`${headingStyles[level]} text-gray-900 dark:text-white
             [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline`}
           style={{ whiteSpace: 'pre-wrap' }}
@@ -93,7 +96,7 @@ const HeadingBlock = ({ block, content, isEditing, onUpdate }) => {
   }
 
   return (
-    <Tag className={`${headingStyles[level]} text-gray-900 dark:text-white`}>
+    <Tag id={headingId} className={`${headingStyles[level]} text-gray-900 dark:text-white`}>
       {content}
     </Tag>
   );

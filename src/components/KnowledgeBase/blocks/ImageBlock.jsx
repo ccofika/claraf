@@ -291,7 +291,7 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
         <img
           src={imageData.url}
           alt={imageData.alt || ''}
-          className="max-w-full rounded-md mx-auto cursor-pointer hover:shadow-sm transition-shadow"
+          className="max-w-full rounded-lg mx-auto cursor-pointer hover:shadow-sm transition-shadow"
           onError={() => setError(true)}
           onClick={() => setLightboxOpen(true)}
         />
@@ -309,7 +309,7 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
         )}
       </div>
       {imageData.caption && (
-        <figcaption className="mt-2.5 text-center text-[13px] text-gray-400 dark:text-neutral-500">
+        <figcaption className="mt-3 text-center text-[13px] text-gray-400 dark:text-neutral-500">
           {imageData.caption}
         </figcaption>
       )}
