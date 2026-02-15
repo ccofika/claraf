@@ -26,6 +26,7 @@ import BreadcrumbsBlock from './blocks/BreadcrumbsBlock';
 import SyncedBlock from './blocks/SyncedBlock';
 import ColumnsBlock from './blocks/ColumnsBlock';
 import CollapsibleHeadingBlock from './blocks/CollapsibleHeadingBlock';
+import ExpandableContentListBlock from './blocks/ExpandableContentListBlock';
 
 const blockComponents = {
   paragraph: ParagraphBlock,
@@ -54,7 +55,8 @@ const blockComponents = {
   breadcrumbs: BreadcrumbsBlock,
   synced_block: SyncedBlock,
   columns: ColumnsBlock,
-  collapsible_heading: CollapsibleHeadingBlock
+  collapsible_heading: CollapsibleHeadingBlock,
+  expandable_content_list: ExpandableContentListBlock
 };
 
 // Centralized vertical spacing per block type
@@ -86,10 +88,11 @@ const blockSpacing = {
   breadcrumbs:          'my-3',
   synced_block:         'my-3',
   columns:              'my-6',
-  collapsible_heading:  'my-4'
+  collapsible_heading:  'my-4',
+  expandable_content_list: 'my-5'
 };
 
-const BlockRenderer = ({ block, isEditing = false, onUpdate }) => {
+const BlockRenderer = ({ block, isEditing = false, onUpdate, ...extraProps }) => {
   const { resolveContent } = useKnowledgeBase();
 
   if (!block) return null;
@@ -116,6 +119,7 @@ const BlockRenderer = ({ block, isEditing = false, onUpdate }) => {
         content={resolvedContent}
         isEditing={isEditing}
         onUpdate={onUpdate}
+        {...extraProps}
       />
     </div>
   );

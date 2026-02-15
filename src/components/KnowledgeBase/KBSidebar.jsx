@@ -122,7 +122,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
 
   const handleSave = () => {
     if (editName.trim() && editName !== section.name) {
-      onRename(section.id, editName.trim());
+      onRename(section._id, editName.trim());
     }
     setIsEditing(false);
   };
@@ -134,7 +134,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
 
   const handleDragEnter = (e) => {
     e.preventDefault();
-    onDragEnter?.(section.id);
+    onDragEnter?.(section._id);
   };
 
   const handleDragLeave = (e) => {
@@ -145,7 +145,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onDrop(section.id);
+    onDrop(section._id);
   };
 
   return (
@@ -188,7 +188,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
         {isAdmin && !isEditing && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
             <button
-              onClick={() => onAddPage(section.id)}
+              onClick={() => onAddPage(section._id)}
               className="p-1 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded text-gray-400 hover:text-green-600"
               title="Add page to section"
             >
@@ -217,7 +217,7 @@ const SectionHeader = ({ section, onAddPage, onDelete, onRename, onDrop, onDragE
           }}
           onDelete={() => {
             setMenuPosition(null);
-            onDelete(section.id);
+            onDelete(section._id);
           }}
           isSection={true}
         />
@@ -445,6 +445,7 @@ const KBSidebar = () => {
     createPage,
     deletePage,
     reorderPage,
+    fetchPageTree,
     sections,
     setSections,
     addSection,
@@ -523,7 +524,7 @@ const KBSidebar = () => {
 
     // Initialize sections
     (sections || []).forEach(s => {
-      result.sections[s.id] = { ...s, pages: [] };
+      result.sections[s._id] = { ...s, pages: [] };
     });
 
     // Group pages
@@ -601,16 +602,27 @@ const KBSidebar = () => {
     }
   };
 
-  const handleAddSection = () => {
+  const handleAddSection = async () => {
     const name = prompt('Section name:');
     if (name?.trim()) {
-      addSection(name.trim());
+      try {
+        await addSection(name.trim());
+        toast.success('Section created');
+      } catch (error) {
+        toast.error('Failed to create section');
+      }
     }
   };
 
-  const handleDeleteSection = (sectionId) => {
+  const handleDeleteSection = async (sectionId) => {
     if (window.confirm('Delete this section? Pages will be moved to unsectioned.')) {
-      removeSection(sectionId);
+      try {
+        await removeSection(sectionId);
+        await fetchPageTree();
+        toast.success('Section deleted');
+      } catch (error) {
+        toast.error('Failed to delete section');
+      }
     }
   };
 
@@ -1052,7 +1064,7 @@ const KBSidebar = () => {
 
             {/* Sections with their pages */}
             {Object.values(groupedPages.sections).map(section => (
-              <div key={section.id}>
+              <div key={section._id}>
                 <SectionHeader
                   section={section}
                   onAddPage={handleAddPageToSection}
@@ -1061,7 +1073,7 @@ const KBSidebar = () => {
                   onDrop={handleDropOnSection}
                   onDragEnter={draggingNode ? setDropSectionId : undefined}
                   onDragLeave={draggingNode ? () => setDropSectionId(null) : undefined}
-                  isDropTarget={dropSectionId === section.id && draggingNode}
+                  isDropTarget={dropSectionId === section._id && draggingNode}
                   isAdmin={isAdmin}
                 />
                 <div className="space-y-0.5">
@@ -1286,7 +1298,7 @@ const KBSidebar = () => {
                   >
                     <option value="">No section</option>
                     {sections.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s._id} value={s._id}>{s.name}</option>
                     ))}
                   </select>
                 </div>

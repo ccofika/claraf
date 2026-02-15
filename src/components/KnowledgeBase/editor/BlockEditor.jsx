@@ -84,11 +84,12 @@ const blockTypeOptions = [
   { type: 'columns', label: 'Columns', icon: Columns, category: 'advanced' },
   { type: 'breadcrumbs', label: 'Breadcrumbs', icon: Navigation, category: 'advanced' },
   { type: 'synced_block', label: 'Synced Block', icon: RefreshCw, category: 'advanced' },
-  { type: 'collapsible_heading', label: 'Collapsible Section', icon: ChevronsDownUp, category: 'advanced' }
+  { type: 'collapsible_heading', label: 'Collapsible Section', icon: ChevronsDownUp, category: 'advanced' },
+  { type: 'expandable_content_list', label: 'Expandable List', icon: ListTree, category: 'advanced' }
 ];
 
 // Side menu options - no nested columns
-const sideBlockOptions = blockTypeOptions.filter(o => o.type !== 'columns');
+const sideBlockOptions = blockTypeOptions.filter(o => o.type !== 'columns' && o.type !== 'expandable_content_list');
 
 // Extracted helpers for reuse
 const getDefaultContent = (blockType) => {
@@ -114,6 +115,7 @@ const getDefaultContent = (blockType) => {
       { id: 'col2', width: 50, blocks: [] }
     ] };
     case 'collapsible_heading': return { title: '', blocks: [] };
+    case 'expandable_content_list': return { entries: [{ id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, title: 'First Entry', blocks: [] }], sortMode: 'manual' };
     default: return '';
   }
 };
@@ -206,7 +208,8 @@ const SortableBlock = ({
   block, index, editingBlockId, setEditingBlockId,
   onUpdateBlock, onRequestDelete, onOpenVariants, hasDropdowns,
   showAddMenu, setShowAddMenu, addBlock,
-  activeId, sideDropTarget, onAddToSide
+  activeId, sideDropTarget, onAddToSide,
+  onExtractFromColumns, onDeleteFromColumns, onDissolveColumns, onRemoveColumnFromColumns
 }) => {
   const addButtonRef = useRef(null);
   const sideLeftRef = useRef(null);
@@ -436,6 +439,10 @@ const SortableBlock = ({
           block={block}
           isEditing={isEditing}
           onUpdate={(content) => onUpdateBlock(block.id, 'defaultContent', content)}
+          onExtractBlock={(childBlockId) => onExtractFromColumns?.(block.id, childBlockId)}
+          onDeleteBlockFromColumn={(childBlockId) => onDeleteFromColumns?.(block.id, childBlockId)}
+          onDissolveColumns={() => onDissolveColumns?.(block.id)}
+          onRemoveColumn={(colIndex) => onRemoveColumnFromColumns?.(block.id, colIndex)}
         />
       </div>
     </div>
@@ -670,6 +677,111 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
     onChange(newBlocks);
   }, [blocks, onChange]);
 
+  // --- Columns block management callbacks ---
+
+  const extractBlockFromColumns = useCallback((columnsBlockId, childBlockId) => {
+    const columnsIndex = blocks.findIndex(b => b.id === columnsBlockId);
+    if (columnsIndex === -1) return;
+    const columnsBlock = blocks[columnsIndex];
+    let extractedBlock = null;
+    const updatedColumns = columnsBlock.defaultContent.columns.map(col => {
+      const child = (col.blocks || []).find(b => b.id === childBlockId);
+      if (child) extractedBlock = child;
+      return { ...col, blocks: (col.blocks || []).filter(b => b.id !== childBlockId) };
+    });
+    if (!extractedBlock) return;
+    const nonEmptyCols = updatedColumns.filter(c => (c.blocks || []).length > 0);
+    const newBlocks = [...blocks];
+    if (nonEmptyCols.length === 0) {
+      newBlocks.splice(columnsIndex, 1, extractedBlock);
+    } else if (nonEmptyCols.length === 1) {
+      newBlocks.splice(columnsIndex, 1, ...nonEmptyCols[0].blocks, extractedBlock);
+    } else {
+      let finalColumns = updatedColumns;
+      if (updatedColumns.length > 2 && nonEmptyCols.length < updatedColumns.length) {
+        finalColumns = nonEmptyCols;
+      }
+      const evenWidth = Math.floor(100 / finalColumns.length);
+      const remainder = 100 - (evenWidth * finalColumns.length);
+      finalColumns = finalColumns.map((col, i) => ({
+        ...col, width: evenWidth + (i === 0 ? remainder : 0)
+      }));
+      newBlocks[columnsIndex] = { ...columnsBlock, defaultContent: { columns: finalColumns } };
+      newBlocks.splice(columnsIndex + 1, 0, extractedBlock);
+    }
+    onChange(newBlocks);
+  }, [blocks, onChange]);
+
+  const deleteBlockFromColumns = useCallback((columnsBlockId, childBlockId) => {
+    const columnsIndex = blocks.findIndex(b => b.id === columnsBlockId);
+    if (columnsIndex === -1) return;
+    const columnsBlock = blocks[columnsIndex];
+    const updatedColumns = columnsBlock.defaultContent.columns.map(col => ({
+      ...col, blocks: (col.blocks || []).filter(b => b.id !== childBlockId)
+    }));
+    const nonEmptyCols = updatedColumns.filter(c => (c.blocks || []).length > 0);
+    const newBlocks = [...blocks];
+    if (nonEmptyCols.length === 0) {
+      newBlocks.splice(columnsIndex, 1);
+    } else if (nonEmptyCols.length === 1) {
+      newBlocks.splice(columnsIndex, 1, ...nonEmptyCols[0].blocks);
+    } else {
+      let finalColumns = updatedColumns;
+      if (updatedColumns.length > 2 && nonEmptyCols.length < updatedColumns.length) {
+        finalColumns = nonEmptyCols;
+      }
+      const evenWidth = Math.floor(100 / finalColumns.length);
+      const remainder = 100 - (evenWidth * finalColumns.length);
+      finalColumns = finalColumns.map((col, i) => ({
+        ...col, width: evenWidth + (i === 0 ? remainder : 0)
+      }));
+      newBlocks[columnsIndex] = { ...columnsBlock, defaultContent: { columns: finalColumns } };
+    }
+    onChange(newBlocks);
+    if (editingBlockId === childBlockId) setEditingBlockId(null);
+  }, [blocks, onChange, editingBlockId]);
+
+  const dissolveColumnsBlock = useCallback((columnsBlockId) => {
+    const columnsIndex = blocks.findIndex(b => b.id === columnsBlockId);
+    if (columnsIndex === -1) return;
+    const columnsBlock = blocks[columnsIndex];
+    const allChildBlocks = (columnsBlock.defaultContent?.columns || []).flatMap(c => c.blocks || []);
+    const newBlocks = [...blocks];
+    newBlocks.splice(columnsIndex, 1, ...allChildBlocks);
+    onChange(newBlocks);
+  }, [blocks, onChange]);
+
+  const removeColumnFromColumns = useCallback((columnsBlockId, colIndex) => {
+    const columnsIndex = blocks.findIndex(b => b.id === columnsBlockId);
+    if (columnsIndex === -1) return;
+    const columnsBlock = blocks[columnsIndex];
+    const columns = columnsBlock.defaultContent.columns;
+    const removedCol = columns[colIndex];
+    const extractedBlocks = removedCol.blocks || [];
+    if (columns.length <= 2) {
+      const allBlocks = columns.flatMap(c => c.blocks || []);
+      const newBlocks = [...blocks];
+      if (allBlocks.length > 0) {
+        newBlocks.splice(columnsIndex, 1, ...allBlocks);
+      } else {
+        newBlocks.splice(columnsIndex, 1);
+      }
+      onChange(newBlocks);
+      return;
+    }
+    const newColumns = columns.filter((_, i) => i !== colIndex).map(c => ({ ...c }));
+    const evenWidth = Math.floor(100 / newColumns.length);
+    const remainder = 100 - (evenWidth * newColumns.length);
+    newColumns.forEach((col, i) => { col.width = evenWidth + (i === 0 ? remainder : 0); });
+    const updatedColumnsBlock = { ...columnsBlock, defaultContent: { columns: newColumns } };
+    const newBlocks = [...blocks];
+    newBlocks[columnsIndex] = updatedColumnsBlock;
+    if (extractedBlocks.length > 0) {
+      newBlocks.splice(columnsIndex + 1, 0, ...extractedBlocks);
+    }
+    onChange(newBlocks);
+  }, [blocks, onChange]);
+
   const updateBlock = (blockId, field, value) => {
     onChange(blocks.map(b => b.id === blockId ? { ...b, [field]: value } : b));
   };
@@ -735,6 +847,10 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
                 activeId={activeId}
                 sideDropTarget={sideDropTarget}
                 onAddToSide={addBlockToSide}
+                onExtractFromColumns={extractBlockFromColumns}
+                onDeleteFromColumns={deleteBlockFromColumns}
+                onDissolveColumns={dissolveColumnsBlock}
+                onRemoveColumnFromColumns={removeColumnFromColumns}
               />
               {/* Insert line between blocks */}
               {index < blocks.length - 1 && !activeId && (

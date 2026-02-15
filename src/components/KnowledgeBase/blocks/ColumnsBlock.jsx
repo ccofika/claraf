@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   Columns, Plus, Trash2, Pencil, Check, Type, Heading1, Heading2,
   List, Quote, Code, Image as ImageIcon, AlertCircle, Minus, ChevronRight,
-  ListOrdered, Play, Music, FileText, Link, Table, MousePointer, FileType
+  ListOrdered, Play, Music, FileText, Link, Table, MousePointer, FileType,
+  ArrowUpRight, Unlink
 } from 'lucide-react';
 import BlockRenderer from '../BlockRenderer';
 
@@ -53,7 +54,7 @@ const getBlockDefaultProperties = (blockType) => {
   }
 };
 
-const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
+const ColumnsBlock = ({ block, content, isEditing, onUpdate, onExtractBlock, onDeleteBlockFromColumn, onDissolveColumns, onRemoveColumn }) => {
   const [dragCol, setDragCol] = useState(null);
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [addingToColumn, setAddingToColumn] = useState(null);
@@ -83,14 +84,9 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
   };
 
   const removeColumn = (colIndex) => {
-    if (columnsData.columns.length <= 2) return;
-    const newColumns = columnsData.columns.filter((_, i) => i !== colIndex);
-    const evenWidth = Math.floor(100 / newColumns.length);
-    const remainder = 100 - (evenWidth * newColumns.length);
-    newColumns.forEach((col, i) => {
-      col.width = evenWidth + (i === 0 ? remainder : 0);
-    });
-    onUpdate?.({ columns: newColumns });
+    if (onRemoveColumn) {
+      onRemoveColumn(colIndex);
+    }
   };
 
   const presetLayouts = [
@@ -127,11 +123,15 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
   };
 
   const removeBlockFromColumn = (colIndex, blockId) => {
-    const newColumns = columnsData.columns.map((col, ci) => {
-      if (ci !== colIndex) return col;
-      return { ...col, blocks: (col.blocks || []).filter(b => b.id !== blockId) };
-    });
-    onUpdate?.({ columns: newColumns });
+    if (onDeleteBlockFromColumn) {
+      onDeleteBlockFromColumn(blockId);
+    } else {
+      const newColumns = columnsData.columns.map((col, ci) => {
+        if (ci !== colIndex) return col;
+        return { ...col, blocks: (col.blocks || []).filter(b => b.id !== blockId) };
+      });
+      onUpdate?.({ columns: newColumns });
+    }
     if (editingBlockId === blockId) setEditingBlockId(null);
   };
 
@@ -163,16 +163,28 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
               Columns Layout ({columnsData.columns.length} columns)
             </span>
           </div>
-          <button
-            onClick={addColumn}
-            disabled={columnsData.columns.length >= 5}
-            className="flex items-center gap-1 px-2 py-1 text-[12px] bg-blue-50 dark:bg-blue-900/20
-              text-blue-600 dark:text-blue-400 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30
-              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Plus size={12} />
-            Add Column
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onDissolveColumns?.()}
+              className="flex items-center gap-1 px-2 py-1 text-[12px] bg-orange-50 dark:bg-orange-900/20
+                text-orange-600 dark:text-orange-400 rounded hover:bg-orange-100 dark:hover:bg-orange-900/30
+                transition-colors"
+              title="Dissolve columns layout and extract all blocks"
+            >
+              <Unlink size={12} />
+              Dissolve
+            </button>
+            <button
+              onClick={addColumn}
+              disabled={columnsData.columns.length >= 5}
+              className="flex items-center gap-1 px-2 py-1 text-[12px] bg-blue-50 dark:bg-blue-900/20
+                text-blue-600 dark:text-blue-400 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30
+                disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus size={12} />
+              Add Column
+            </button>
+          </div>
         </div>
 
         {/* Preset Layouts */}
@@ -228,14 +240,13 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
                 <span className="text-[12px] text-gray-600 dark:text-neutral-400 w-10 text-right font-mono">
                   {col.width}%
                 </span>
-                {columnsData.columns.length > 2 && (
-                  <button
-                    onClick={() => removeColumn(index)}
-                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
+                <button
+                  onClick={() => removeColumn(index)}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title={columnsData.columns.length <= 2 ? 'Dissolve columns layout' : 'Remove column'}
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
             ))}
           </div>
@@ -289,6 +300,14 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
                           </span>
                           <div className="flex items-center gap-0.5">
                             <button
+                              onClick={() => onExtractBlock?.(childBlock.id)}
+                              className="p-1 text-gray-400 hover:text-orange-500 rounded
+                                hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                              title="Move out of columns"
+                            >
+                              <ArrowUpRight size={11} />
+                            </button>
+                            <button
                               onClick={() => setEditingBlockId(isBlockEditing ? null : childBlock.id)}
                               className={`p-1 rounded transition-colors ${
                                 isBlockEditing
@@ -303,7 +322,7 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate }) => {
                               onClick={() => removeBlockFromColumn(colIndex, childBlock.id)}
                               className="p-1 text-gray-400 hover:text-red-500 rounded
                                 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Remove block"
+                              title="Delete block"
                             >
                               <Trash2 size={11} />
                             </button>

@@ -38,41 +38,68 @@ export const KnowledgeBaseProvider = ({ children }) => {
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Sections (stored in localStorage, not database - purely UI organization)
-  const [sections, setSections] = useState(() => {
-    try {
-      const saved = localStorage.getItem('kb_sections');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Sections (stored in database, shared across all users)
+  const [sections, setSections] = useState([]);
 
-  // Persist sections to localStorage
-  useEffect(() => {
-    localStorage.setItem('kb_sections', JSON.stringify(sections));
-  }, [sections]);
+  // Fetch sections from API
+  const fetchSections = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/knowledge-base/sections`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSections(response.data);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+    }
+  }, [API_URL]);
 
   // Section management
-  const addSection = useCallback((name) => {
-    const newSection = {
-      id: `section_${Date.now()}`,
-      name,
-      order: sections.length
-    };
-    setSections(prev => [...prev, newSection]);
-    return newSection;
-  }, [sections]);
+  const addSection = useCallback(async (name) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/api/knowledge-base/sections`,
+        { name },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(prev => [...prev, response.data]);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating section:', error);
+      throw error;
+    }
+  }, [API_URL]);
 
-  const removeSection = useCallback((sectionId) => {
-    setSections(prev => prev.filter(s => s.id !== sectionId));
-  }, []);
+  const removeSection = useCallback(async (sectionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/api/knowledge-base/sections/${sectionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSections(prev => prev.filter(s => s._id !== sectionId));
+    } catch (error) {
+      console.error('Error deleting section:', error);
+      throw error;
+    }
+  }, [API_URL]);
 
-  const renameSection = useCallback((sectionId, newName) => {
-    setSections(prev => prev.map(s =>
-      s.id === sectionId ? { ...s, name: newName } : s
-    ));
-  }, []);
+  const renameSection = useCallback(async (sectionId, newName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${API_URL}/api/knowledge-base/sections/${sectionId}`,
+        { name: newName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(prev => prev.map(s =>
+        s._id === sectionId ? response.data : s
+      ));
+    } catch (error) {
+      console.error('Error renaming section:', error);
+      throw error;
+    }
+  }, [API_URL]);
 
   // Check admin status on mount
   useEffect(() => {
@@ -119,12 +146,13 @@ export const KnowledgeBaseProvider = ({ children }) => {
     }
   }, [user, API_URL]);
 
-  // Fetch page tree on mount
+  // Fetch page tree and sections on mount
   useEffect(() => {
     if (user) {
       fetchPageTree();
+      fetchSections();
     }
-  }, [user, fetchPageTree]);
+  }, [user, fetchPageTree, fetchSections]);
 
   // Load a page by slug
   const loadPage = useCallback(async (slug) => {
@@ -786,12 +814,13 @@ export const KnowledgeBaseProvider = ({ children }) => {
     // Logs
     getEditLogs,
 
-    // Sections (local UI organization)
+    // Sections
     sections,
     setSections,
     addSection,
     removeSection,
     renameSection,
+    fetchSections,
 
     // Templates
     templates,
