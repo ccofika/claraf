@@ -101,6 +101,9 @@ export const NotificationProvider = ({ children }) => {
       }
 
       try {
+        // Push notifications PAUSED
+        return;
+
         // Get VAPID public key from server
         const { data: vapidData } = await axios.get(`${API_URL}/api/push/vapid-public-key`);
 
@@ -195,8 +198,8 @@ export const NotificationProvider = ({ children }) => {
       if (result === 'granted') {
         toast.success('Notifications enabled!');
 
-        // Try to subscribe to push notifications
-        if (isPushSupported && serviceWorkerRegistration && user) {
+        // Push notifications PAUSED
+        if (false && isPushSupported && serviceWorkerRegistration && user) {
           try {
             const { data: vapidData } = await axios.get(`${API_URL}/api/push/vapid-public-key`);
 

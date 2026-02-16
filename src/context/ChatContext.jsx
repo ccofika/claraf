@@ -56,20 +56,10 @@ export const ChatProvider = ({ children }) => {
     setTotalUnreadCount(total);
   }, [unreadCounts]);
 
-  // Fetch muted channels
+  // Fetch muted channels - PAUSED (chat backend disabled)
   const fetchMutedChannels = useCallback(async () => {
-    const authToken = getAuthToken();
-    if (!authToken) return;
-
-    try {
-      const { data } = await axios.get(`${API_URL}/api/chat/muted`, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      setMutedChannels(data.mutedChannels.map(mc => mc.channel._id || mc.channel));
-    } catch (error) {
-      console.error('Error fetching muted channels:', error);
-    }
-  }, [API_URL]);
+    return;
+  }, []);
 
   // Check if channel is muted
   const isChannelMuted = useCallback((channelId) => {
@@ -85,30 +75,10 @@ export const ChatProvider = ({ children }) => {
     return mentionPattern.test(message.content);
   }, [user]);
 
-  // Fetch channels
+  // Fetch channels - PAUSED (chat backend disabled)
   const fetchChannels = useCallback(async () => {
-    const authToken = getAuthToken();
-    if (!authToken) return;
-
-    try {
-      console.log('📡 Fetching channels...');
-      const response = await axios.get(`${API_URL}/api/chat/channels`, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-
-      setChannels(response.data);
-
-      // Update unread counts
-      const counts = {};
-      response.data.forEach(channel => {
-        counts[channel._id] = channel.unreadCount || 0;
-      });
-      setUnreadCounts(counts);
-    } catch (error) {
-      console.error('❌ Error fetching channels:', error);
-      toast.error('Failed to load chat channels');
-    }
-  }, [API_URL]);
+    return;
+  }, []);
 
   // Fetch messages for a channel
   const fetchMessages = useCallback(async (channelId, before = null) => {
@@ -1255,20 +1225,10 @@ export const ChatProvider = ({ children }) => {
     }
   }, [starredChannels, channels, API_URL]);
 
-  // Fetch starred channels
+  // Fetch starred channels - PAUSED (chat backend disabled)
   const fetchStarredChannels = useCallback(async () => {
-    const authToken = getAuthToken();
-    if (!authToken) return;
-
-    try {
-      const response = await axios.get(`${API_URL}/api/chat/starred`, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      setStarredChannels(response.data);
-    } catch (error) {
-      console.error('Error fetching starred channels:', error);
-    }
-  }, [API_URL]);
+    return;
+  }, []);
 
   // Update user's own presence status
   const updateMyPresence = useCallback(async (status, customStatus = null) => {

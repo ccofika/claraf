@@ -59,21 +59,8 @@ const ChatSidebar = ({ isCollapsed, onToggleCollapse, chatView = 'messages', onC
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch muted channels
-  useEffect(() => {
-    const fetchMutedChannels = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const { data } = await axios.get(`${API_URL}/api/chat/muted`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMutedChannels(data.mutedChannels.map(mc => mc.channel._id || mc.channel));
-      } catch (error) {
-        console.error('Error fetching muted channels:', error);
-      }
-    };
-    fetchMutedChannels();
-  }, []);
+  // Fetch muted channels - PAUSED (chat backend disabled)
+  // useEffect(() => { ... }, []);
 
   // Fetch sections
   useEffect(() => {
