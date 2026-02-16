@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Image as ImageIcon, ExternalLink, Upload, Clipboard, X } from 'lucide-react';
+import { Image as ImageIcon, ExternalLink, Upload, Clipboard, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { uploadKnowledgeBaseImage } from '../../../utils/imageUpload';
 import { toast } from 'sonner';
 
@@ -47,6 +47,29 @@ const ImageLightbox = ({ src, alt, onClose }) => {
   );
 };
 
+const sizeOptions = [
+  { key: '', label: 'Auto' },
+  { key: 'small', label: 'Small' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'large', label: 'Large' },
+  { key: 'full', label: 'Full' },
+];
+
+const sizeClasses = {
+  '': 'max-w-full',
+  'small': 'max-w-xs',
+  'medium': 'max-w-lg',
+  'large': 'max-w-3xl',
+  'full': 'w-full',
+};
+
+const alignClasses = {
+  '': 'mx-auto',
+  'left': 'mr-auto',
+  'center': 'mx-auto',
+  'right': 'ml-auto',
+};
+
 const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
   const [error, setError] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -54,10 +77,20 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const dropZoneRef = useRef(null);
 
+  const align = block.properties?.align || 'center';
+  const size = block.properties?.size || '';
+
   // Content structure: { url: string, alt: string, caption: string, publicId?: string }
   const imageData = typeof content === 'object' && content !== null
     ? content
     : { url: content || '', alt: '', caption: '' };
+
+  const updateProperty = useCallback((key, value) => {
+    const event = new CustomEvent('kb-block-property-update', {
+      detail: { blockId: block.id, properties: { ...block.properties, [key]: value } }
+    });
+    document.dispatchEvent(event);
+  }, [block.id, block.properties]);
 
   // Handle file upload
   const handleUpload = useCallback(async (file) => {
@@ -151,7 +184,6 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
       }
       toast.error('No image found in clipboard');
     } catch (err) {
-      // Fallback: listen for paste event
       toast.info('Press Ctrl+V to paste from clipboard');
     }
   }, [handleUpload]);
@@ -241,22 +273,62 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
           </div>
         )}
 
+        {/* Settings row when image exists */}
+        {imageData.url && (
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Alignment */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400 mr-1">Align</span>
+              {[
+                { key: 'left', icon: AlignLeft },
+                { key: 'center', icon: AlignCenter },
+                { key: 'right', icon: AlignRight },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => updateProperty('align', opt.key)}
+                  className={`p-1.5 rounded transition-colors
+                    ${align === opt.key
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  <opt.icon size={14} />
+                </button>
+              ))}
+            </div>
+
+            {/* Size */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400 mr-1">Size</span>
+              {sizeOptions.map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => updateProperty('size', opt.key)}
+                  className={`px-2 py-1 text-[11px] font-medium rounded transition-colors
+                    ${size === opt.key
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Caption Input - always show when there's an image */}
         {imageData.url && (
-          <div>
-            <label className="block text-[12px] font-medium text-gray-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
-              Caption (optional)
-            </label>
-            <input
-              type="text"
-              value={imageData.caption || ''}
-              onChange={(e) => onUpdate?.({ ...imageData, caption: e.target.value })}
-              className="w-full px-3 py-2 text-[14px] bg-white dark:bg-neutral-800
-                border border-gray-200 dark:border-neutral-700 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add a caption for this image..."
-            />
-          </div>
+          <input
+            type="text"
+            value={imageData.caption || ''}
+            onChange={(e) => onUpdate?.({ ...imageData, caption: e.target.value })}
+            className="w-full px-3 py-2 text-[14px] bg-white dark:bg-neutral-800
+              border border-gray-200 dark:border-neutral-700 rounded-lg
+              focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Add a caption..."
+          />
         )}
 
         {error && (
@@ -285,13 +357,16 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
     );
   }
 
+  const sizeClass = sizeClasses[size] || 'max-w-full';
+  const alignClass = alignClasses[align] || 'mx-auto';
+
   return (
-    <figure>
+    <figure className={`${alignClass} ${sizeClass}`}>
       <div className="relative group">
         <img
           src={imageData.url}
           alt={imageData.alt || ''}
-          className="max-w-full rounded-lg mx-auto cursor-pointer hover:shadow-sm transition-shadow"
+          className="w-full rounded-lg cursor-pointer hover:shadow-sm transition-shadow"
           onError={() => setError(true)}
           onClick={() => setLightboxOpen(true)}
         />
@@ -309,7 +384,7 @@ const ImageBlock = ({ block, content, isEditing, onUpdate }) => {
         )}
       </div>
       {imageData.caption && (
-        <figcaption className="mt-3 text-center text-[13px] text-gray-400 dark:text-neutral-500">
+        <figcaption className="mt-3 text-center text-[13px] text-gray-400 dark:text-neutral-500 italic">
           {imageData.caption}
         </figcaption>
       )}

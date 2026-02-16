@@ -1234,7 +1234,7 @@ export const QAManagerProvider = ({ children }) => {
       }
     }
 
-    if (!ticket.categories || ticket.categories.length === 0) {
+    if (!USE_NEW_SCORECARD && (!ticket.categories || ticket.categories.length === 0)) {
       missing.push('Categories');
     }
 
@@ -1586,7 +1586,7 @@ export const QAManagerProvider = ({ children }) => {
         categories: [],
         scorecardVariant: null,
         scorecardValues: {},
-        reoccurringError: null,
+        reoccurringError: USE_NEW_SCORECARD ? 'unsure' : null,
         reoccurringErrorCategories: []
       };
     } else if (mode === 'edit' && data) {
@@ -1605,7 +1605,7 @@ export const QAManagerProvider = ({ children }) => {
         scorecardVariant: data.scorecardVariant || null,
         scorecardValues: scorecardValuesObj,
         additionalNote: data.additionalNote || '',
-        reoccurringError: data.reoccurringError || null,
+        reoccurringError: data.reoccurringError || (USE_NEW_SCORECARD ? 'unsure' : null),
         reoccurringErrorCategories: data.reoccurringErrorCategories || []
       };
     }

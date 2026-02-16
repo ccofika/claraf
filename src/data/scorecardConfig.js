@@ -4,7 +4,7 @@
 // =============================================================================
 // V2 SCORECARD FLAG - Set to false to revert to old position-based scorecards
 // =============================================================================
-export const USE_NEW_SCORECARD = false;
+export const USE_NEW_SCORECARD = true;
 
 // Color scheme for scorecard value indices
 // 0 = Best (green), 1 = Good (yellow), 2 = Needs improvement (amber), 3 = Poor (red), 4 = N/A (gray)

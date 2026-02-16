@@ -17,8 +17,18 @@ const KBTableOfContents = ({ blocks }) => {
   const headings = useMemo(() => {
     if (!blocks) return [];
     return blocks
-      .filter(b => ['heading_1', 'heading_2', 'heading_3'].includes(b.type) && b.id)
+      .filter(b => (['heading_1', 'heading_2', 'heading_3'].includes(b.type) || b.type === 'collapsible_heading') && b.id)
       .map(b => {
+        if (b.type === 'collapsible_heading') {
+          const data = typeof b.defaultContent === 'object' && b.defaultContent !== null
+            ? b.defaultContent
+            : { title: '' };
+          return {
+            id: `kb-h-${b.id}`,
+            text: stripHtml(data.title || ''),
+            level: 2
+          };
+        }
         const raw = b.defaultContent || b.content || '';
         return {
           id: `kb-h-${b.id}`,

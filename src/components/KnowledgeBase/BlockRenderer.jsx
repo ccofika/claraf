@@ -92,6 +92,19 @@ const blockSpacing = {
   expandable_content_list: 'my-5'
 };
 
+// Block background color classes
+const blockBgClasses = {
+  '': '',
+  'blue': 'bg-blue-50/60 dark:bg-blue-900/15 rounded-lg px-4 py-3',
+  'green': 'bg-emerald-50/60 dark:bg-emerald-900/15 rounded-lg px-4 py-3',
+  'yellow': 'bg-amber-50/60 dark:bg-amber-900/15 rounded-lg px-4 py-3',
+  'red': 'bg-red-50/60 dark:bg-red-900/15 rounded-lg px-4 py-3',
+  'purple': 'bg-purple-50/60 dark:bg-purple-900/15 rounded-lg px-4 py-3',
+  'gray': 'bg-gray-50 dark:bg-neutral-800/40 rounded-lg px-4 py-3',
+  'orange': 'bg-orange-50/60 dark:bg-orange-900/15 rounded-lg px-4 py-3',
+  'pink': 'bg-pink-50/60 dark:bg-pink-900/15 rounded-lg px-4 py-3',
+};
+
 const BlockRenderer = ({ block, isEditing = false, onUpdate, ...extraProps }) => {
   const { resolveContent } = useKnowledgeBase();
 
@@ -111,9 +124,16 @@ const BlockRenderer = ({ block, isEditing = false, onUpdate, ...extraProps }) =>
   // Resolve dynamic content based on current dropdown selections
   const resolvedContent = resolveContent(block);
   const spacing = blockSpacing[block.type] || '';
+  const bgColor = block.properties?.bgColor || '';
+  const bgClass = blockBgClasses[bgColor] || '';
+  const width = block.properties?.width || '';
+  const widthClass = width === 'narrow' ? 'max-w-2xl mx-auto'
+    : width === 'wide' ? 'max-w-7xl mx-auto'
+    : width === 'full' ? 'w-full'
+    : '';
 
   return (
-    <div className={`group relative ${spacing}`}>
+    <div className={`group relative ${spacing} ${bgClass} ${widthClass}`}>
       <BlockComponent
         block={block}
         content={resolvedContent}

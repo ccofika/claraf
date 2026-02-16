@@ -305,6 +305,24 @@ const InnerBlockEditor = ({ blocks, onBlocksChange, addButtonLabel = 'Add block 
     if (editingChildId === blockId) setEditingChildId(null);
   }, [blocks, onBlocksChange, editingChildId]);
 
+  // Listen for property updates from child blocks (CustomEvent pattern)
+  const updateBlockProperties = useCallback((blockId, properties) => {
+    onBlocksChange(blocks.map(b => b.id === blockId ? { ...b, properties } : b));
+  }, [blocks, onBlocksChange]);
+
+  useEffect(() => {
+    const handlePropertyUpdate = (e) => {
+      const { blockId, properties } = e.detail;
+      if (!blockId || !properties) return;
+      const found = blocks.some(b => b.id === blockId);
+      if (found) {
+        updateBlockProperties(blockId, properties);
+      }
+    };
+    document.addEventListener('kb-block-property-update', handlePropertyUpdate);
+    return () => document.removeEventListener('kb-block-property-update', handlePropertyUpdate);
+  }, [blocks, updateBlockProperties]);
+
   // ── Columns block management ──
 
   const extractBlockFromColumns = useCallback((columnsBlockId, childBlockId) => {

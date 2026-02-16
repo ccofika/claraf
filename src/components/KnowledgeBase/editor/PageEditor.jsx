@@ -53,12 +53,59 @@ const SaveStatusIndicator = ({ status, lastSavedAt }) => {
   );
 };
 
+// Page theme presets
+const PAGE_THEMES = [
+  { key: '', label: 'Default', desc: 'Standard KB styling' },
+  { key: 'docs', label: 'Documentation', desc: 'Clean, technical docs feel' },
+  { key: 'wiki', label: 'Wiki', desc: 'Compact, information-dense' },
+  { key: 'minimal', label: 'Minimal', desc: 'Ultra-clean, minimal chrome' },
+];
+
+// Reading time estimate (avg 200 words/min)
+const estimateReadingTime = (blocks) => {
+  let text = '';
+  const extractText = (content) => {
+    if (typeof content === 'string') {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = content;
+      return (tmp.textContent || '') + ' ';
+    }
+    if (content && typeof content === 'object') {
+      if (typeof content.text === 'string') text += content.text + ' ';
+      if (typeof content.title === 'string') text += content.title + ' ';
+      if (typeof content.body === 'string') text += content.body + ' ';
+      if (typeof content.code === 'string') text += content.code + ' ';
+      if (Array.isArray(content.headers)) content.headers.forEach(h => { text += h + ' '; });
+      if (Array.isArray(content.rows)) content.rows.forEach(row => {
+        if (Array.isArray(row)) row.forEach(cell => {
+          text += (typeof cell === 'string' ? cell : cell?.content || '') + ' ';
+        });
+      });
+      if (Array.isArray(content.columns)) content.columns.forEach(col => {
+        if (Array.isArray(col.blocks)) col.blocks.forEach(b => extractText(b.defaultContent));
+      });
+      if (Array.isArray(content.blocks)) content.blocks.forEach(b => extractText(b.defaultContent));
+      if (Array.isArray(content.entries)) content.entries.forEach(e => {
+        text += (e.title || '') + ' ';
+        if (Array.isArray(e.blocks)) e.blocks.forEach(b => extractText(b.defaultContent));
+      });
+    }
+    return '';
+  };
+  (blocks || []).forEach(b => {
+    text += extractText(b.defaultContent);
+  });
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  return Math.max(1, Math.ceil(words / 200));
+};
+
 const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
   const [title, setTitle] = useState(page?.title || '');
   const [icon, setIcon] = useState(page?.icon || '📄');
   const [coverImage, setCoverImage] = useState(page?.coverImage || '');
   const [blocks, setBlocks] = useState(page?.blocks || []);
   const [dropdowns, setDropdowns] = useState(page?.dropdowns || []);
+  const [pageSettings, setPageSettings] = useState(page?.pageSettings || { fullWidth: false, theme: '' });
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('content');
   const [variantBlock, setVariantBlock] = useState(null);
@@ -77,13 +124,13 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
   const isSavingRef = useRef(false);
 
   // Refs for always-fresh data - eliminates stale closure issues in autosave
-  const dataRef = useRef({ title: title.trim(), icon, coverImage, blocks, dropdowns });
+  const dataRef = useRef({ title: title.trim(), icon, coverImage, blocks, dropdowns, pageSettings });
   const onAutoSaveRef = useRef(onAutoSave);
 
   // Keep data ref always in sync with latest state
   useEffect(() => {
-    dataRef.current = { title: title.trim(), icon, coverImage, blocks, dropdowns };
-  }, [title, icon, coverImage, blocks, dropdowns]);
+    dataRef.current = { title: title.trim(), icon, coverImage, blocks, dropdowns, pageSettings };
+  }, [title, icon, coverImage, blocks, dropdowns, pageSettings]);
 
   // Keep save function ref always in sync
   useEffect(() => {
@@ -98,6 +145,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
       setCoverImage(page.coverImage || '');
       setBlocks(page.blocks || []);
       setDropdowns(page.dropdowns || []);
+      setPageSettings(page.pageSettings || { fullWidth: false, theme: '' });
 
       // Store initial state as "last saved"
       lastSavedDataRef.current = JSON.stringify({
@@ -105,7 +153,8 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
         icon: page.icon || '📄',
         coverImage: page.coverImage || '',
         blocks: page.blocks || [],
-        dropdowns: page.dropdowns || []
+        dropdowns: page.dropdowns || [],
+        pageSettings: page.pageSettings || { fullWidth: false, theme: '' }
       });
       isInitialLoadRef.current = true;
     }
@@ -207,7 +256,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     if (!onAutoSaveRef.current || !page?._id) return;
 
     // Check for actual changes against last saved data
-    const currentStr = JSON.stringify({ title: title.trim(), icon, coverImage, blocks, dropdowns });
+    const currentStr = JSON.stringify({ title: title.trim(), icon, coverImage, blocks, dropdowns, pageSettings });
     if (currentStr === lastSavedDataRef.current) {
       setSaveStatus(SAVE_STATUS.SAVED);
       return;
@@ -226,7 +275,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [title, icon, coverImage, blocks, dropdowns, page?._id, performAutoSave]);
+  }, [title, icon, coverImage, blocks, dropdowns, pageSettings, page?._id, performAutoSave]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -649,6 +698,70 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Page Width */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+                  Content Width
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPageSettings(s => ({ ...s, fullWidth: false }))}
+                    className={`flex-1 px-3 py-2.5 text-sm font-medium rounded-lg border transition-colors
+                      ${!pageSettings.fullWidth
+                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-50 dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                      }`}
+                  >
+                    Standard
+                  </button>
+                  <button
+                    onClick={() => setPageSettings(s => ({ ...s, fullWidth: true }))}
+                    className={`flex-1 px-3 py-2.5 text-sm font-medium rounded-lg border transition-colors
+                      ${pageSettings.fullWidth
+                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-50 dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                      }`}
+                  >
+                    Full Width
+                  </button>
+                </div>
+              </div>
+
+              {/* Page Theme */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+                  Page Theme
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAGE_THEMES.map(theme => (
+                    <button
+                      key={theme.key}
+                      onClick={() => setPageSettings(s => ({ ...s, theme: theme.key }))}
+                      className={`px-3 py-2.5 text-left rounded-lg border transition-colors
+                        ${(pageSettings.theme || '') === theme.key
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700'
+                          : 'bg-gray-50 dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                        }`}
+                    >
+                      <div className={`text-sm font-medium ${(pageSettings.theme || '') === theme.key ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-neutral-300'}`}>
+                        {theme.label}
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-neutral-500">{theme.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reading Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+                  Reading Time Estimate
+                </label>
+                <div className="px-3 py-2 bg-gray-50 dark:bg-neutral-800 rounded-lg text-sm text-gray-600 dark:text-neutral-400">
+                  ~{estimateReadingTime(blocks)} min read
+                </div>
               </div>
 
               {/* Page Info */}

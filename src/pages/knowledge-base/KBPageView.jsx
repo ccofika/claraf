@@ -1,10 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronRight, Edit, ArrowLeft } from 'lucide-react';
+import { ChevronRight, Edit, ArrowLeft, Clock } from 'lucide-react';
 import { useKnowledgeBase } from '../../context/KnowledgeBaseContext';
 import BlockRenderer from '../../components/KnowledgeBase/BlockRenderer';
 import KBTableOfContents from '../../components/KnowledgeBase/KBTableOfContents';
+
+// Page theme classes
+const pageThemeClasses = {
+  '': '',
+  'docs': 'kb-theme-docs',
+  'wiki': 'kb-theme-wiki',
+  'minimal': 'kb-theme-minimal',
+};
+
+// Reading time estimate
+const estimateReadingTime = (blocks) => {
+  let text = '';
+  const extractText = (content) => {
+    if (typeof content === 'string') {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = content;
+      return (tmp.textContent || '') + ' ';
+    }
+    if (content && typeof content === 'object') {
+      if (typeof content.text === 'string') text += content.text + ' ';
+      if (typeof content.title === 'string') text += content.title + ' ';
+      if (typeof content.body === 'string') text += content.body + ' ';
+      if (typeof content.code === 'string') text += content.code + ' ';
+      if (Array.isArray(content.headers)) content.headers.forEach(h => { text += h + ' '; });
+      if (Array.isArray(content.rows)) content.rows.forEach(row => {
+        if (Array.isArray(row)) row.forEach(cell => {
+          text += (typeof cell === 'string' ? cell : cell?.content || '') + ' ';
+        });
+      });
+      if (Array.isArray(content.columns)) content.columns.forEach(col => {
+        if (Array.isArray(col.blocks)) col.blocks.forEach(b => extractText(b.defaultContent));
+      });
+      if (Array.isArray(content.blocks)) content.blocks.forEach(b => extractText(b.defaultContent));
+      if (Array.isArray(content.entries)) content.entries.forEach(e => {
+        text += (e.title || '') + ' ';
+        if (Array.isArray(e.blocks)) e.blocks.forEach(b => extractText(b.defaultContent));
+      });
+    }
+    return '';
+  };
+  (blocks || []).forEach(b => { text += extractText(b.defaultContent); });
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  return Math.max(1, Math.ceil(words / 200));
+};
 
 const KBPageView = () => {
   const { slug } = useParams();
@@ -95,10 +139,10 @@ const KBPageView = () => {
       )}
 
       {/* Content + Table of Contents */}
-      <div className="flex w-full">
+      <div className={`flex w-full ${pageThemeClasses[currentPage.pageSettings?.theme || ''] || ''}`}>
         {/* Main Content */}
         <div className="flex-1 min-w-0">
-          <div className="w-full px-8 md:px-12 lg:px-16 pt-16 pb-12 max-w-6xl mx-auto">
+          <div className={`w-full px-8 md:px-12 lg:px-16 pt-16 pb-12 mx-auto ${currentPage.pageSettings?.fullWidth ? '' : 'max-w-6xl'}`}>
             {/* Breadcrumbs */}
             {currentPage.breadcrumbs && currentPage.breadcrumbs.length > 1 && (
               <nav className="flex items-center gap-1 text-[13px] text-gray-400 dark:text-neutral-500 mb-8">
@@ -142,6 +186,13 @@ const KBPageView = () => {
                     </button>
                   )}
                 </div>
+                {/* Reading time */}
+                {currentPage.blocks && currentPage.blocks.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-3 text-[13px] text-gray-400 dark:text-neutral-500">
+                    <Clock size={13} />
+                    <span>{estimateReadingTime(currentPage.blocks)} min read</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -191,6 +242,22 @@ const KBPageView = () => {
         {/* Table of Contents Sidebar */}
         <KBTableOfContents blocks={currentPage.blocks} />
       </div>
+
+      {/* Theme styles */}
+      <style>{`
+        .kb-theme-docs [data-kb-content] { font-size: 15px; line-height: 1.7; }
+        .kb-theme-docs h1 { font-size: 32px !important; letter-spacing: -0.02em; }
+        .kb-theme-docs h2 { font-size: 24px !important; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 8px; }
+
+        .kb-theme-wiki [data-kb-content] { font-size: 14.5px; line-height: 1.65; }
+        .kb-theme-wiki h1 { font-size: 28px !important; }
+        .kb-theme-wiki h2 { font-size: 21px !important; }
+        .kb-theme-wiki h3 { font-size: 17px !important; }
+
+        .kb-theme-minimal [data-kb-content] { font-size: 16px; line-height: 1.8; }
+        .kb-theme-minimal h1 { font-size: 30px !important; font-weight: 500 !important; letter-spacing: -0.03em; }
+        .kb-theme-minimal h2 { font-size: 22px !important; font-weight: 500 !important; }
+      `}</style>
 
       {/* Back to Learn floating button */}
       {showBackToLearn && (

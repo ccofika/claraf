@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Columns, Plus, Trash2, Pencil, Check, Type, Heading1, Heading2,
   List, Quote, Code, Image as ImageIcon, AlertCircle, Minus, ChevronRight,
   ListOrdered, Play, Music, FileText, Link, Table, MousePointer, FileType,
-  ArrowUpRight, Unlink
+  ArrowUpRight, Unlink,
+  AlignStartVertical, AlignCenterVertical, AlignEndVertical
 } from 'lucide-react';
 import BlockRenderer from '../BlockRenderer';
 
@@ -59,13 +60,15 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate, onExtractBlock, onD
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [addingToColumn, setAddingToColumn] = useState(null);
 
-  // Content structure: { columns: [{ id, width, blocks: [] }] }
+  // Content structure: { columns: [{ id, width, blocks: [] }], verticalAlign?: 'top'|'center'|'bottom' }
   const columnsData = typeof content === 'object' && content !== null && content.columns
     ? content
     : { columns: [
         { id: 'col1', width: 50, blocks: [] },
         { id: 'col2', width: 50, blocks: [] }
       ] };
+
+  const verticalAlign = columnsData.verticalAlign || 'top';
 
   const addColumn = () => {
     if (columnsData.columns.length >= 5) return;
@@ -153,6 +156,33 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate, onExtractBlock, onD
     setAddingToColumn(null);
   };
 
+  // Listen for property updates from child blocks inside columns
+  const updateChildBlockProperties = useCallback((blockId, properties) => {
+    const newColumns = columnsData.columns.map(col => ({
+      ...col,
+      blocks: (col.blocks || []).map(b =>
+        b.id === blockId ? { ...b, properties } : b
+      )
+    }));
+    onUpdate?.({ columns: newColumns });
+  }, [columnsData, onUpdate]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const handlePropertyUpdate = (e) => {
+      const { blockId, properties } = e.detail;
+      if (!blockId || !properties) return;
+      const found = columnsData.columns.some(col =>
+        (col.blocks || []).some(b => b.id === blockId)
+      );
+      if (found) {
+        updateChildBlockProperties(blockId, properties);
+      }
+    };
+    document.addEventListener('kb-block-property-update', handlePropertyUpdate);
+    return () => document.removeEventListener('kb-block-property-update', handlePropertyUpdate);
+  }, [isEditing, columnsData, updateChildBlockProperties]);
+
   if (isEditing) {
     return (
       <div className="space-y-4 p-5 bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg">
@@ -164,6 +194,26 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate, onExtractBlock, onD
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Vertical alignment */}
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-neutral-800 rounded-md p-0.5">
+              {[
+                { key: 'top', icon: AlignStartVertical, label: 'Align top' },
+                { key: 'center', icon: AlignCenterVertical, label: 'Align center' },
+                { key: 'bottom', icon: AlignEndVertical, label: 'Align bottom' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => onUpdate?.({ ...columnsData, verticalAlign: opt.key })}
+                  className={`p-1.5 rounded transition-colors ${verticalAlign === opt.key
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300'}`}
+                  title={opt.label}
+                >
+                  <opt.icon size={13} />
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={() => onDissolveColumns?.()}
               className="flex items-center gap-1 px-2 py-1 text-[12px] bg-orange-50 dark:bg-orange-900/20
@@ -394,8 +444,12 @@ const ColumnsBlock = ({ block, content, isEditing, onUpdate, onExtractBlock, onD
   }
 
   // View mode - responsive columns: stack on mobile, side-by-side on desktop
+  const vAlignClass = verticalAlign === 'center' ? 'items-center'
+    : verticalAlign === 'bottom' ? 'items-end'
+    : 'items-start';
+
   return (
-    <div className="flex flex-col md:flex-row gap-6" style={{ minHeight: '40px' }}>
+    <div className={`flex flex-col md:flex-row gap-6 ${vAlignClass}`} style={{ minHeight: '40px' }}>
       {columnsData.columns.map((col) => (
         <div
           key={col.id}

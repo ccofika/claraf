@@ -56,8 +56,11 @@ const CollapsibleHeadingBlock = ({ block, content, isEditing, onUpdate }) => {
           className={`text-gray-400 dark:text-neutral-500 transition-transform duration-200 flex-shrink-0
             ${isExpanded ? 'rotate-90' : ''}`}
         />
-        <h2 className="text-[22px] font-semibold tracking-[-0.01em] leading-[1.25]
-          text-gray-800 dark:text-neutral-200">
+        <h2
+          id={block.id ? `kb-h-${block.id}` : undefined}
+          className="text-[22px] font-semibold tracking-[-0.01em] leading-[1.25]
+          text-gray-800 dark:text-neutral-200"
+        >
           {data.title || 'Untitled Section'}
         </h2>
       </button>

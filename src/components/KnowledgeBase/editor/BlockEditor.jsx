@@ -6,7 +6,8 @@ import {
   List, ListOrdered, ChevronRight, AlertCircle, Quote, Code,
   Image as ImageIcon, Table, Minus, Settings, Pencil, Check, AlertTriangle,
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
-  Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp
+  Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp, Palette, Copy,
+  ArrowUp, ArrowDown, Replace, AlignCenter, AlignLeft, AlignRight, Maximize
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -90,6 +91,27 @@ const blockTypeOptions = [
 
 // Side menu options - no nested columns
 const sideBlockOptions = blockTypeOptions.filter(o => o.type !== 'columns' && o.type !== 'expandable_content_list');
+
+// Block background color options
+const blockBgColorOptions = [
+  { key: '', label: 'None', swatch: 'bg-white dark:bg-neutral-900 border-gray-300 dark:border-neutral-600' },
+  { key: 'blue', label: 'Blue', swatch: 'bg-blue-200 dark:bg-blue-800 border-blue-300 dark:border-blue-700' },
+  { key: 'green', label: 'Green', swatch: 'bg-emerald-200 dark:bg-emerald-800 border-emerald-300 dark:border-emerald-700' },
+  { key: 'yellow', label: 'Yellow', swatch: 'bg-amber-200 dark:bg-amber-800 border-amber-300 dark:border-amber-700' },
+  { key: 'red', label: 'Red', swatch: 'bg-red-200 dark:bg-red-800 border-red-300 dark:border-red-700' },
+  { key: 'purple', label: 'Purple', swatch: 'bg-purple-200 dark:bg-purple-800 border-purple-300 dark:border-purple-700' },
+  { key: 'gray', label: 'Gray', swatch: 'bg-gray-300 dark:bg-neutral-600 border-gray-400 dark:border-neutral-500' },
+  { key: 'orange', label: 'Orange', swatch: 'bg-orange-200 dark:bg-orange-800 border-orange-300 dark:border-orange-700' },
+  { key: 'pink', label: 'Pink', swatch: 'bg-pink-200 dark:bg-pink-800 border-pink-300 dark:border-pink-700' },
+];
+
+// Block width options
+const blockWidthOptions = [
+  { key: '', label: 'Default', icon: AlignCenter },
+  { key: 'narrow', label: 'Narrow', icon: AlignLeft },
+  { key: 'wide', label: 'Wide', icon: AlignRight },
+  { key: 'full', label: 'Full', icon: Maximize },
+];
 
 // Extracted helpers for reuse
 const getDefaultContent = (blockType) => {
@@ -205,15 +227,22 @@ const SideAddMenu = ({ isOpen, blockId, side, anchorRef, onAdd, onClose }) => {
 };
 
 const SortableBlock = ({
-  block, index, editingBlockId, setEditingBlockId,
+  block, index, totalBlocks, editingBlockId, setEditingBlockId,
   onUpdateBlock, onRequestDelete, onOpenVariants, hasDropdowns,
   showAddMenu, setShowAddMenu, addBlock,
   activeId, sideDropTarget, onAddToSide,
-  onExtractFromColumns, onDeleteFromColumns, onDissolveColumns, onRemoveColumnFromColumns
+  onExtractFromColumns, onDeleteFromColumns, onDissolveColumns, onRemoveColumnFromColumns,
+  onDuplicateBlock, onUpdateProperties, onConvertBlock, onCreateBlockBelow, onDeleteEmptyBlock,
+  onMoveBlock
 }) => {
   const addButtonRef = useRef(null);
   const sideLeftRef = useRef(null);
   const sideRightRef = useRef(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showTurnInto, setShowTurnInto] = useState(false);
+  const [showWidthPicker, setShowWidthPicker] = useState(false);
+  const [turnIntoFilter, setTurnIntoFilter] = useState('');
+  const turnIntoRef = useRef(null);
   const menuPosition = useSmartPosition(showAddMenu === index, addButtonRef, 350);
 
   const {
@@ -238,7 +267,7 @@ const SortableBlock = ({
   return (
     <div ref={setNodeRef} style={style} data-block-id={block.id} className="group relative mb-3">
       {/* Block Actions - Floating toolbar above block */}
-      <div className={`absolute -top-8 right-0 z-10 flex items-center gap-1 px-1.5 py-1
+      <div className={`absolute -top-8 right-0 z-10 flex items-center gap-0.5 px-1 py-0.5
         bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
         rounded-lg shadow-sm transition-all duration-200
         ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -251,33 +280,197 @@ const SortableBlock = ({
               rounded hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
             title="Edit variants"
           >
-            <Settings size={12} />
+            <Settings size={11} />
             Variants
           </button>
         )}
 
         <button
           onClick={() => setEditingBlockId(isEditing ? null : block.id)}
-          className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors
+          className={`flex items-center gap-1 px-1.5 py-1 text-[11px] font-medium rounded transition-colors
             ${isEditing
               ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50'
               : 'bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-600'
             }`}
           title={isEditing ? 'Done editing' : 'Edit block'}
         >
-          {isEditing ? <Check size={12} /> : <Pencil size={12} />}
+          {isEditing ? <Check size={11} /> : <Pencil size={11} />}
           {isEditing ? 'Done' : 'Edit'}
         </button>
 
+        {/* Turn into... */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowTurnInto(!showTurnInto); setShowColorPicker(false); setShowWidthPicker(false); setTurnIntoFilter(''); }}
+            className="p-1 text-[11px] font-medium rounded transition-colors
+              bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-600"
+            title="Turn into..."
+          >
+            <Replace size={11} />
+          </button>
+          {showTurnInto && (
+            <div ref={turnIntoRef} className="absolute bottom-full mb-2 right-0 z-50 bg-white dark:bg-neutral-900
+              border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xl w-[220px] overflow-hidden">
+              <div className="p-2 border-b border-gray-100 dark:border-neutral-800">
+                <input
+                  autoFocus
+                  value={turnIntoFilter}
+                  onChange={(e) => setTurnIntoFilter(e.target.value)}
+                  placeholder="Filter..."
+                  className="w-full px-2 py-1 text-[12px] bg-gray-50 dark:bg-neutral-800
+                    border border-gray-200 dark:border-neutral-700 rounded-md
+                    focus:outline-none focus:ring-1 focus:ring-blue-500
+                    text-gray-700 dark:text-neutral-300 placeholder-gray-400"
+                />
+              </div>
+              <div className="max-h-[280px] overflow-y-auto py-1">
+                {blockTypeOptions
+                  .filter(opt => opt.type !== block.type)
+                  .filter(opt => !turnIntoFilter || opt.label.toLowerCase().includes(turnIntoFilter.toLowerCase()))
+                  .map(opt => (
+                    <button
+                      key={opt.type}
+                      onClick={() => {
+                        onConvertBlock(block.id, opt.type);
+                        setShowTurnInto(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px]
+                        text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <opt.icon size={13} className="shrink-0 text-gray-400 dark:text-neutral-500" />
+                      <span>{opt.label}</span>
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Style (bg color) button */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowColorPicker(!showColorPicker); setShowTurnInto(false); setShowWidthPicker(false); }}
+            className={`p-1 text-[11px] font-medium rounded transition-colors
+              ${block.properties?.bgColor
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                : 'bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-600'
+              }`}
+            title="Background color"
+          >
+            <Palette size={11} />
+          </button>
+          {showColorPicker && (
+            <div className="absolute bottom-full mb-2 right-0 z-50 bg-white dark:bg-neutral-800
+              border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xl p-3 w-[220px]">
+              <div className="text-[10px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                Background
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {blockBgColorOptions.map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => {
+                      onUpdateProperties(block.id, { ...block.properties, bgColor: opt.key });
+                      setShowColorPicker(false);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all
+                      ${(block.properties?.bgColor || '') === opt.key
+                        ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-neutral-800 bg-blue-50 dark:bg-blue-900/20'
+                        : 'hover:bg-gray-50 dark:hover:bg-neutral-700'
+                      }`}
+                  >
+                    <span className={`w-3.5 h-3.5 rounded border shrink-0 ${opt.swatch}`} />
+                    <span className="text-gray-700 dark:text-neutral-300 truncate">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Block width */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowWidthPicker(!showWidthPicker); setShowColorPicker(false); setShowTurnInto(false); }}
+            className={`p-1 text-[11px] font-medium rounded transition-colors
+              ${block.properties?.width
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                : 'bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-600'
+              }`}
+            title="Block width"
+          >
+            <Maximize size={11} />
+          </button>
+          {showWidthPicker && (
+            <div className="absolute bottom-full mb-2 right-0 z-50 bg-white dark:bg-neutral-800
+              border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xl p-2 w-[160px]">
+              <div className="text-[10px] font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 px-1">
+                Width
+              </div>
+              {blockWidthOptions.map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => {
+                    onUpdateProperties(block.id, { ...block.properties, width: opt.key });
+                    setShowWidthPicker(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] font-medium transition-all
+                    ${(block.properties?.width || '') === opt.key
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  <opt.icon size={13} className="shrink-0" />
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-4 bg-gray-200 dark:bg-neutral-700 mx-0.5" />
+
+        {/* Move up/down */}
+        <button
+          onClick={() => onMoveBlock(index, -1)}
+          disabled={index === 0}
+          className="p-1 text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200
+            disabled:opacity-30 disabled:cursor-not-allowed rounded hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          title="Move up"
+        >
+          <ArrowUp size={11} />
+        </button>
+        <button
+          onClick={() => onMoveBlock(index, 1)}
+          disabled={index === totalBlocks - 1}
+          className="p-1 text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200
+            disabled:opacity-30 disabled:cursor-not-allowed rounded hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          title="Move down"
+        >
+          <ArrowDown size={11} />
+        </button>
+
+        {/* Duplicate */}
+        <button
+          onClick={() => onDuplicateBlock(block, index)}
+          className="p-1 text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200
+            rounded hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          title="Duplicate block"
+        >
+          <Copy size={11} />
+        </button>
+
+        {/* Delete */}
         <button
           onClick={() => onRequestDelete(block.id)}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium
-            bg-gray-50 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300
+          className="p-1 text-gray-500 dark:text-neutral-400
             rounded hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30
             dark:hover:text-red-400 transition-colors"
           title="Delete block"
         >
-          <Trash2 size={12} />
+          <Trash2 size={11} />
         </button>
       </div>
 
@@ -443,6 +636,9 @@ const SortableBlock = ({
           onDeleteBlockFromColumn={(childBlockId) => onDeleteFromColumns?.(block.id, childBlockId)}
           onDissolveColumns={() => onDissolveColumns?.(block.id)}
           onRemoveColumn={(colIndex) => onRemoveColumnFromColumns?.(block.id, colIndex)}
+          onConvertBlock={(type) => onConvertBlock?.(block.id, type)}
+          onCreateBlockBelow={() => onCreateBlockBelow?.(block.id)}
+          onDeleteEmptyBlock={() => onDeleteEmptyBlock?.(block.id)}
         />
       </div>
     </div>
@@ -510,6 +706,67 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
   const [sideDropTarget, setSideDropTarget] = useState(null);
   const firstAddButtonRef = useRef(null);
   const bottomAddButtonRef = useRef(null);
+
+  // ─── Undo / Redo history ────────────────────────
+  const historyRef = useRef([JSON.stringify(blocks)]);
+  const historyIndexRef = useRef(0);
+  const isUndoRedoRef = useRef(false); // guard to skip pushing during undo/redo
+
+  // Push state to history whenever blocks change (debounced to avoid flooding)
+  const pushTimerRef = useRef(null);
+  useEffect(() => {
+    if (isUndoRedoRef.current) {
+      isUndoRedoRef.current = false;
+      return;
+    }
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    pushTimerRef.current = setTimeout(() => {
+      const snapshot = JSON.stringify(blocks);
+      const history = historyRef.current;
+      const idx = historyIndexRef.current;
+      if (snapshot !== history[idx]) {
+        // Truncate any forward history
+        historyRef.current = history.slice(0, idx + 1);
+        historyRef.current.push(snapshot);
+        // Cap at 50 entries
+        if (historyRef.current.length > 50) historyRef.current.shift();
+        historyIndexRef.current = historyRef.current.length - 1;
+      }
+    }, 500);
+    return () => { if (pushTimerRef.current) clearTimeout(pushTimerRef.current); };
+  }, [blocks]);
+
+  // Keyboard handler for Ctrl+Z / Ctrl+Shift+Z
+  useEffect(() => {
+    const handleUndoRedo = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === 'z' || e.key === 'Z') {
+        if (e.shiftKey) {
+          // Redo
+          e.preventDefault();
+          const history = historyRef.current;
+          const idx = historyIndexRef.current;
+          if (idx < history.length - 1) {
+            historyIndexRef.current = idx + 1;
+            isUndoRedoRef.current = true;
+            onChange(JSON.parse(history[idx + 1]));
+          }
+        } else {
+          // Undo
+          e.preventDefault();
+          const history = historyRef.current;
+          const idx = historyIndexRef.current;
+          if (idx > 0) {
+            historyIndexRef.current = idx - 1;
+            isUndoRedoRef.current = true;
+            onChange(JSON.parse(history[idx - 1]));
+          }
+        }
+      }
+    };
+    document.addEventListener('keydown', handleUndoRedo);
+    return () => document.removeEventListener('keydown', handleUndoRedo);
+  }, [onChange]);
 
   const firstMenuPosition = useSmartPosition(showAddMenu === -1, firstAddButtonRef, 400);
   const bottomMenuPosition = useSmartPosition(showAddMenu === 'bottom', bottomAddButtonRef, 400);
@@ -786,6 +1043,98 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
     onChange(blocks.map(b => b.id === blockId ? { ...b, [field]: value } : b));
   };
 
+  // Convert a block to a different type (used by slash commands)
+  const convertBlock = useCallback((blockId, newType) => {
+    onChange(blocks.map(b => {
+      if (b.id !== blockId) return b;
+      return {
+        ...b,
+        type: newType,
+        defaultContent: getDefaultContent(newType),
+        properties: getDefaultProperties(newType)
+      };
+    }));
+  }, [blocks, onChange]);
+
+  // Create a new empty paragraph block below the given block
+  const createBlockBelow = useCallback((blockId) => {
+    const index = blocks.findIndex(b => b.id === blockId);
+    if (index === -1) return;
+    const newBlock = createNewBlock('paragraph');
+    const newBlocks = [...blocks];
+    newBlocks.splice(index + 1, 0, newBlock);
+    onChange(newBlocks);
+    setEditingBlockId(newBlock.id);
+    // Focus the new block's editor after React renders
+    requestAnimationFrame(() => {
+      const newBlockEl = document.querySelector(`[data-block-id="${newBlock.id}"] .kb-paragraph-editor`);
+      if (newBlockEl) newBlockEl.focus();
+    });
+  }, [blocks, onChange]);
+
+  // Delete an empty block and focus the previous one
+  const deleteEmptyBlock = useCallback((blockId) => {
+    const index = blocks.findIndex(b => b.id === blockId);
+    if (index === -1 || blocks.length <= 1) return;
+    const prevBlock = index > 0 ? blocks[index - 1] : null;
+    onChange(blocks.filter(b => b.id !== blockId));
+    if (prevBlock) {
+      setEditingBlockId(prevBlock.id);
+      requestAnimationFrame(() => {
+        const prevEl = document.querySelector(`[data-block-id="${prevBlock.id}"] .kb-paragraph-editor`);
+        if (prevEl) {
+          prevEl.focus();
+          // Move cursor to end
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(prevEl);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      });
+    }
+  }, [blocks, onChange]);
+
+  const updateBlockProperties = useCallback((blockId, properties) => {
+    onChange(blocks.map(b => b.id === blockId ? { ...b, properties } : b));
+  }, [blocks, onChange]);
+
+  // Listen for property updates from child blocks (CustomEvent pattern)
+  useEffect(() => {
+    const handlePropertyUpdate = (e) => {
+      const { blockId, properties } = e.detail;
+      if (!blockId || !properties) return;
+      // Only handle if blockId belongs to our top-level blocks
+      const found = blocks.some(b => b.id === blockId);
+      if (found) {
+        updateBlockProperties(blockId, properties);
+      }
+    };
+    document.addEventListener('kb-block-property-update', handlePropertyUpdate);
+    return () => document.removeEventListener('kb-block-property-update', handlePropertyUpdate);
+  }, [blocks, updateBlockProperties]);
+
+  const duplicateBlock = useCallback((block, afterIndex) => {
+    const newBlock = {
+      ...block,
+      id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      defaultContent: JSON.parse(JSON.stringify(block.defaultContent)),
+      variants: JSON.parse(JSON.stringify(block.variants || {})),
+      properties: JSON.parse(JSON.stringify(block.properties || {}))
+    };
+    const newBlocks = [...blocks];
+    newBlocks.splice(afterIndex + 1, 0, newBlock);
+    onChange(newBlocks);
+  }, [blocks, onChange]);
+
+  // Move a block up or down by 1 position
+  const moveBlock = useCallback((fromIndex, direction) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= blocks.length) return;
+    onChange(arrayMove(blocks, fromIndex, toIndex));
+  }, [blocks, onChange]);
+
   const deleteBlock = (blockId) => {
     onChange(blocks.filter(b => b.id !== blockId));
     if (editingBlockId === blockId) setEditingBlockId(null);
@@ -835,6 +1184,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
               <SortableBlock
                 block={block}
                 index={index}
+                totalBlocks={blocks.length}
                 editingBlockId={editingBlockId}
                 setEditingBlockId={setEditingBlockId}
                 onUpdateBlock={updateBlock}
@@ -851,6 +1201,12 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
                 onDeleteFromColumns={deleteBlockFromColumns}
                 onDissolveColumns={dissolveColumnsBlock}
                 onRemoveColumnFromColumns={removeColumnFromColumns}
+                onDuplicateBlock={duplicateBlock}
+                onUpdateProperties={updateBlockProperties}
+                onConvertBlock={convertBlock}
+                onCreateBlockBelow={createBlockBelow}
+                onDeleteEmptyBlock={deleteEmptyBlock}
+                onMoveBlock={moveBlock}
               />
               {/* Insert line between blocks */}
               {index < blocks.length - 1 && !activeId && (

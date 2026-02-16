@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +8,35 @@ import { X } from 'lucide-react';
 import { useKnowledgeBase } from '../../../context/KnowledgeBaseContext';
 import useRichTextEditor, { textColorStyles } from '../../../hooks/useRichTextEditor';
 import RichTextToolbar from './RichTextToolbar';
+
+// ═══════════════════════════════════════════════════
+// Slash command block options
+// ═══════════════════════════════════════════════════
+const slashCommandOptions = [
+  { type: 'heading_1', label: 'Heading 1', keywords: 'h1 heading title large', icon: '𝐇₁' },
+  { type: 'heading_2', label: 'Heading 2', keywords: 'h2 heading subtitle', icon: '𝐇₂' },
+  { type: 'heading_3', label: 'Heading 3', keywords: 'h3 heading small', icon: '𝐇₃' },
+  { type: 'bulleted_list', label: 'Bullet List', keywords: 'bullet list ul unordered', icon: '•' },
+  { type: 'numbered_list', label: 'Numbered List', keywords: 'number list ol ordered', icon: '1.' },
+  { type: 'toggle', label: 'Toggle', keywords: 'toggle collapse expand', icon: '▸' },
+  { type: 'callout', label: 'Callout', keywords: 'callout info warning alert note', icon: '💡' },
+  { type: 'quote', label: 'Quote', keywords: 'quote blockquote', icon: '❝' },
+  { type: 'code', label: 'Code Block', keywords: 'code snippet programming', icon: '</>' },
+  { type: 'divider', label: 'Divider', keywords: 'divider line separator hr', icon: '—' },
+  { type: 'image', label: 'Image', keywords: 'image picture photo', icon: '🖼' },
+  { type: 'table', label: 'Table', keywords: 'table grid spreadsheet', icon: '⊞' },
+  { type: 'video', label: 'Video', keywords: 'video youtube embed', icon: '▶' },
+  { type: 'audio', label: 'Audio', keywords: 'audio music sound', icon: '🎵' },
+  { type: 'embed', label: 'Embed', keywords: 'embed iframe website', icon: '🔗' },
+  { type: 'bookmark', label: 'Bookmark', keywords: 'bookmark link preview', icon: '🔖' },
+  { type: 'equation', label: 'Equation', keywords: 'equation math latex formula', icon: '∑' },
+  { type: 'button', label: 'Button', keywords: 'button link cta action', icon: '🔘' },
+  { type: 'columns', label: 'Columns', keywords: 'columns layout side by side', icon: '⫼' },
+  { type: 'collapsible_heading', label: 'Collapsible Section', keywords: 'collapsible fold accordion section', icon: '▼' },
+  { type: 'table_of_contents', label: 'Table of Contents', keywords: 'toc contents navigation', icon: '📑' },
+  { type: 'file', label: 'File', keywords: 'file attachment upload document', icon: '📎' },
+  { type: 'pdf', label: 'PDF', keywords: 'pdf document viewer', icon: '📄' },
+];
 
 // Image Lightbox Component
 const ImageLightbox = ({ src, alt, onClose }) => {
@@ -115,15 +144,57 @@ const CaptionModal = ({ onSave, onCancel, initialCaption = '' }) => {
   );
 };
 
-const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
+const ParagraphBlock = ({ content, isEditing, onUpdate, onConvertBlock, onCreateBlockBelow, onDeleteEmptyBlock }) => {
   const { pageTree } = useKnowledgeBase();
   const editorRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [pendingImage, setPendingImage] = useState(null);
+  const [slashMenu, setSlashMenu] = useState(null); // { query: string, position: { top, left } }
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const slashMenuRef = useRef(null);
 
   // Shared rich text editor hook
   const richText = useRichTextEditor({ onUpdate, externalEditorRef: editorRef });
+
+  // Filtered slash command options
+  const filteredSlashOptions = useMemo(() => {
+    if (!slashMenu) return [];
+    const q = (slashMenu.query || '').toLowerCase().trim();
+    if (!q) return slashCommandOptions;
+    return slashCommandOptions.filter(opt =>
+      opt.label.toLowerCase().includes(q) ||
+      opt.keywords.toLowerCase().includes(q) ||
+      opt.type.includes(q)
+    );
+  }, [slashMenu]);
+
+  // Reset selected index when query changes
+  useEffect(() => {
+    setSlashSelectedIndex(0);
+  }, [slashMenu?.query]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (slashMenuRef.current && slashMenu) {
+      const selected = slashMenuRef.current.querySelector('[data-slash-selected="true"]');
+      if (selected) {
+        selected.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [slashSelectedIndex, slashMenu]);
+
+  // Close slash menu on outside click
+  useEffect(() => {
+    if (!slashMenu) return;
+    const handleOutsideClick = (e) => {
+      if (slashMenuRef.current && !slashMenuRef.current.contains(e.target) && editorRef.current && !editorRef.current.contains(e.target)) {
+        setSlashMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [slashMenu]);
 
   // Initialize editor with HTML content
   useEffect(() => {
@@ -276,8 +347,89 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
   }, [handleImageUpload, richText.saveSelection]);
 
   const handleInput = useCallback((e) => {
-    onUpdate?.(e.target.innerHTML);
+    const html = e.target.innerHTML;
+    onUpdate?.(html);
+
+    // Detect slash command: "/" at the start of an otherwise empty block
+    const text = (e.target.textContent || '').trim();
+    if (text.startsWith('/') && text.length <= 30 && text.indexOf('\n') === -1) {
+      const query = text.slice(1);
+      // Get caret position for menu placement
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.top > 0) {
+          setSlashMenu({ query, position: { top: rect.bottom + 4, left: rect.left } });
+          return;
+        }
+      }
+    }
+    setSlashMenu(null);
   }, [onUpdate]);
+
+  // Handle keyboard events for slash menu and block shortcuts
+  const handleKeyDown = useCallback((e) => {
+    // Slash menu navigation
+    if (slashMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashSelectedIndex(i => Math.min(i + 1, filteredSlashOptions.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashSelectedIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const selected = filteredSlashOptions[slashSelectedIndex];
+        if (selected && onConvertBlock) {
+          onConvertBlock(selected.type);
+        }
+        setSlashMenu(null);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashMenu(null);
+        return;
+      }
+      // Tab to select (like autocomplete)
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const selected = filteredSlashOptions[slashSelectedIndex];
+        if (selected && onConvertBlock) {
+          onConvertBlock(selected.type);
+        }
+        setSlashMenu(null);
+        return;
+      }
+    }
+
+    // Enter on empty paragraph → create new paragraph below
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const text = (editorRef.current?.textContent || '').trim();
+      if (!text && onCreateBlockBelow) {
+        e.preventDefault();
+        onCreateBlockBelow();
+        return;
+      }
+    }
+
+    // Backspace on empty paragraph → delete block
+    if (e.key === 'Backspace') {
+      const text = (editorRef.current?.textContent || '').trim();
+      const html = (editorRef.current?.innerHTML || '').trim();
+      // Only delete if truly empty (no text, no images, no content)
+      if (!text && (!html || html === '<br>' || html === '') && onDeleteEmptyBlock) {
+        e.preventDefault();
+        onDeleteEmptyBlock();
+        return;
+      }
+    }
+  }, [slashMenu, filteredSlashOptions, slashSelectedIndex, onConvertBlock, onCreateBlockBelow, onDeleteEmptyBlock]);
 
   const handleClick = useCallback((e) => {
     const target = e.target;
@@ -298,6 +450,7 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             onInput={handleInput}
+            onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onClick={handleClick}
             onMouseUp={richText.handleSelectionChange}
@@ -307,7 +460,7 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
               focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-24
               [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline"
             style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}
-            data-placeholder="Write something... (Paste images with Ctrl+V)"
+            data-placeholder="Write something... Type / for commands"
             suppressContentEditableWarning
           />
 
@@ -327,6 +480,58 @@ const ParagraphBlock = ({ content, isEditing, onUpdate }) => {
             alt={lightboxImage.alt}
             onClose={() => setLightboxImage(null)}
           />
+        )}
+
+        {/* Slash Command Menu */}
+        {slashMenu && filteredSlashOptions.length > 0 && createPortal(
+          <div
+            ref={slashMenuRef}
+            className="fixed z-[99990] bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
+              rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: slashMenu.position.top, left: slashMenu.position.left, width: 260 }}
+          >
+            <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-neutral-500
+              border-b border-gray-100 dark:border-neutral-800 bg-gray-50/50 dark:bg-neutral-800/50">
+              Blocks {slashMenu.query && <span className="text-blue-500 normal-case">— "{slashMenu.query}"</span>}
+            </div>
+            <div className="overflow-y-auto max-h-[320px] py-1">
+              {filteredSlashOptions.map((opt, i) => (
+                <button
+                  key={opt.type}
+                  data-slash-selected={i === slashSelectedIndex ? 'true' : undefined}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Don't blur the editor
+                    if (onConvertBlock) onConvertBlock(opt.type);
+                    setSlashMenu(null);
+                  }}
+                  onMouseEnter={() => setSlashSelectedIndex(i)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-[13px] transition-colors ${
+                    i === slashSelectedIndex
+                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  <span className="w-7 h-7 flex items-center justify-center text-base bg-gray-100 dark:bg-neutral-800 rounded-md shrink-0">
+                    {opt.icon}
+                  </span>
+                  <span className="font-medium">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+        {slashMenu && filteredSlashOptions.length === 0 && createPortal(
+          <div
+            className="fixed z-[99990] bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700
+              rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: slashMenu.position.top, left: slashMenu.position.left, width: 260 }}
+          >
+            <div className="px-3 py-4 text-[13px] text-gray-400 dark:text-neutral-500 text-center">
+              No matching blocks
+            </div>
+          </div>,
+          document.body
         )}
 
         <style>{`
