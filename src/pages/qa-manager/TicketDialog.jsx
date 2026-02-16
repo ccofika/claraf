@@ -16,7 +16,7 @@ import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
 import MacroSuggestionsPanel from '../../components/MacroSuggestionsPanel';
 import ArchiveSearchPanel from '../../components/ArchiveSearchPanel';
 import ChooseMacroModal from '../../components/ChooseMacroModal';
-import { hasScorecard, getScorecardCategories } from '../../data/scorecardConfig';
+import { hasScorecard, getScorecardCategories, USE_NEW_SCORECARD, REOCCURRING_ERROR_OPTIONS } from '../../data/scorecardConfig';
 import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/scorecardCalculations';
 import { useMacros } from '../../hooks/useMacros';
 import { useMinimizedTicket } from '../../context/MinimizedTicketContext';
@@ -183,11 +183,11 @@ const TicketDialog = ({
 
   const selectedAgent = agents.find(a => a._id === formData.agent);
   const agentPosition = selectedAgent?.position || null;
-  const agentHasScorecard = agentPosition && hasScorecard(agentPosition);
+  const agentHasScorecard = USE_NEW_SCORECARD ? !!formData.agent : (agentPosition && hasScorecard(agentPosition));
 
   // Auto-calculate quality score when scorecard values change
   useEffect(() => {
-    if (agentPosition && supportsAutoQualityScore(agentPosition, formData.scorecardVariant)) {
+    if (supportsAutoQualityScore(agentPosition, formData.scorecardVariant)) {
       const calculatedScore = calculateQualityScore(agentPosition, formData.scorecardValues, formData.scorecardVariant);
       if (calculatedScore !== null) {
         setFormData(prev => ({
@@ -739,6 +739,58 @@ const TicketDialog = ({
                             />
                           )}
 
+                          {/* Reoccurring Error (V2 scorecard only) */}
+                          {USE_NEW_SCORECARD && agentHasScorecard && (
+                            <div className="mt-3">
+                              <div className="flex items-center gap-3 mb-2">
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reoccurring Error</Label>
+                                <select
+                                  value={formData.reoccurringError || 'unsure'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setFormData({
+                                      ...formData,
+                                      reoccurringError: val,
+                                      reoccurringErrorCategories: val === 'yes' ? formData.reoccurringErrorCategories : []
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                                >
+                                  <option value="unsure">Unsure</option>
+                                  <option value="yes">Yes</option>
+                                  <option value="no">No</option>
+                                </select>
+                              </div>
+                              {formData.reoccurringError === 'yes' && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {REOCCURRING_ERROR_OPTIONS.map((option) => {
+                                    const isSelected = (formData.reoccurringErrorCategories || []).includes(option);
+                                    return (
+                                      <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => {
+                                          const current = formData.reoccurringErrorCategories || [];
+                                          const updated = isSelected
+                                            ? current.filter(c => c !== option)
+                                            : [...current, option];
+                                          setFormData({ ...formData, reoccurringErrorCategories: updated });
+                                        }}
+                                        className={`px-3 py-1.5 text-xs rounded-full border transition-all duration-150 ${
+                                          isSelected
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'bg-gray-50 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                                        }`}
+                                      >
+                                        {option}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                             <div>
                               <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
@@ -1045,6 +1097,58 @@ const TicketDialog = ({
                     onChange={(values) => setFormData({ ...formData, scorecardValues: values })}
                     disabled={false}
                   />
+                )}
+
+                {/* Reoccurring Error (V2 scorecard only) - ZenMove/Edit layout */}
+                {USE_NEW_SCORECARD && agentHasScorecard && (
+                  <div className="mt-3">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reoccurring Error</Label>
+                      <select
+                        value={formData.reoccurringError || 'unsure'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({
+                            ...formData,
+                            reoccurringError: val,
+                            reoccurringErrorCategories: val === 'yes' ? formData.reoccurringErrorCategories : []
+                          });
+                        }}
+                        className="px-3 py-1.5 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                      >
+                        <option value="unsure">Unsure</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+                    {formData.reoccurringError === 'yes' && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {REOCCURRING_ERROR_OPTIONS.map((option) => {
+                          const isSelected = (formData.reoccurringErrorCategories || []).includes(option);
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => {
+                                const current = formData.reoccurringErrorCategories || [];
+                                const updated = isSelected
+                                  ? current.filter(c => c !== option)
+                                  : [...current, option];
+                                setFormData({ ...formData, reoccurringErrorCategories: updated });
+                              }}
+                              className={`px-3 py-1.5 text-xs rounded-full border transition-all duration-150 ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-gray-50 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <div className={`grid gap-3 sm:gap-4 ${isReviewMode ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>

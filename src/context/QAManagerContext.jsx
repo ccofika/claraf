@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
-import { getScorecardValues } from '../data/scorecardConfig';
+import { getScorecardValues, USE_NEW_SCORECARD } from '../data/scorecardConfig';
 
 const QAManagerContext = createContext();
 
@@ -217,7 +217,9 @@ export const QAManagerProvider = ({ children }) => {
     dateEntered: null,
     categories: [],
     scorecardVariant: null,
-    scorecardValues: {}
+    scorecardValues: {},
+    reoccurringError: null,
+    reoccurringErrorCategories: []
   });
   const hasUnsavedChangesRef = useRef(false);
   const originalFormDataRef = useRef(null);
@@ -717,7 +719,10 @@ export const QAManagerProvider = ({ children }) => {
         qualityScorePercent: formData.qualityScorePercent,
         categories: formData.categories,
         scorecardVariant: formData.scorecardVariant,
-        scorecardValues: formData.scorecardValues
+        scorecardValues: formData.scorecardValues,
+        ...(USE_NEW_SCORECARD && { scorecardVersion: 'v2' }),
+        reoccurringError: formData.reoccurringError || null,
+        reoccurringErrorCategories: formData.reoccurringErrorCategories || []
       };
       const response = await axios.post(`${API_URL}/api/qa/tickets`, requestBody, getAuthHeaders());
       setTickets(prev => [response.data, ...prev]);
@@ -745,7 +750,9 @@ export const QAManagerProvider = ({ children }) => {
         qualityScorePercent: formData.qualityScorePercent,
         categories: formData.categories,
         scorecardVariant: formData.scorecardVariant,
-        scorecardValues: formData.scorecardValues
+        scorecardValues: formData.scorecardValues,
+        reoccurringError: formData.reoccurringError || null,
+        reoccurringErrorCategories: formData.reoccurringErrorCategories || []
       };
       const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, requestBody, getAuthHeaders());
       setTickets(prev => prev.map(t => t._id === id ? response.data : t));
@@ -1354,6 +1361,7 @@ export const QAManagerProvider = ({ children }) => {
         maestroName: agent.maestroName,
         position: agent.position,
         rubricName: agent.position,
+        useNewScorecard: USE_NEW_SCORECARD,
         ticketCount: selectedTicketsList.length,
         csvContent: csvResponse.data,
         fileName: `${agent.name.replace(/\s+/g, '_')}_tickets.csv`,
@@ -1368,7 +1376,9 @@ export const QAManagerProvider = ({ children }) => {
           scorecardVariant: t.scorecardVariant,
           categories: t.categories,
           feedback: t.feedback,
-          notes: t.notes
+          notes: t.notes,
+          reoccurringError: t.reoccurringError || null,
+          reoccurringErrorCategories: t.reoccurringErrorCategories || []
         })),
         source
       };
@@ -1575,7 +1585,9 @@ export const QAManagerProvider = ({ children }) => {
         dateEntered: new Date().toISOString().split('T')[0],
         categories: [],
         scorecardVariant: null,
-        scorecardValues: {}
+        scorecardValues: {},
+        reoccurringError: null,
+        reoccurringErrorCategories: []
       };
     } else if (mode === 'edit' && data) {
       const scorecardValuesObj = data.scorecardValues && typeof data.scorecardValues === 'object'
@@ -1592,7 +1604,9 @@ export const QAManagerProvider = ({ children }) => {
         categories: data.categories || [],
         scorecardVariant: data.scorecardVariant || null,
         scorecardValues: scorecardValuesObj,
-        additionalNote: data.additionalNote || ''
+        additionalNote: data.additionalNote || '',
+        reoccurringError: data.reoccurringError || null,
+        reoccurringErrorCategories: data.reoccurringErrorCategories || []
       };
     }
     setTicketDialog({ open: true, mode, data, source });

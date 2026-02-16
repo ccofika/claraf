@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { useQAManager } from '../../context/QAManagerContext';
 import { Badge } from '../../components/ui/badge';
 import { TicketContentDisplay } from '../../components/TicketRichTextEditor';
-import { SCORE_COLORS, SHORT_LABELS, getScorecardValues } from '../../data/scorecardConfig';
+import { SCORE_COLORS, SHORT_LABELS, V2_SHORT_LABELS, getScorecardValues, getLegacyScorecardValues } from '../../data/scorecardConfig';
 
 const QACoachingDetail = () => {
   const { id } = useParams();
@@ -874,21 +874,27 @@ ${notes ? `\nBELESKE\n${notes}` : ''}
                         </h4>
                         <div className="bg-gray-50 dark:bg-neutral-800/50 rounded-lg p-4 border border-gray-200 dark:border-neutral-700 space-y-2">
                           {(() => {
+                            const isV2 = fullTicketData.scorecardVersion === 'v2';
                             const position = fullTicketData.agent?.position;
                             const variant = fullTicketData.scorecardVariant;
-                            const configValues = position ? getScorecardValues(position, variant) : [];
+                            const configValues = isV2
+                              ? getScorecardValues()
+                              : (position ? getLegacyScorecardValues(position, variant) : []);
                             const configMap = {};
                             configValues.forEach(v => { configMap[v.key] = v; });
+                            const labels = isV2 ? V2_SHORT_LABELS : SHORT_LABELS;
 
                             return Object.entries(fullTicketData.scorecardValues).map(([key, value]) => {
                               const configItem = configMap[key];
                               const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                              const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
-                                ? SHORT_LABELS[value]
+                              const displayLabel = value !== null && value !== undefined && labels[value]
+                                ? labels[value]
                                 : '-';
 
                               const getBgClass = (idx) => {
                                 if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-neutral-700';
+                                // For V2, index 3 = N/A (gray), for legacy index 3 = red, index 4 = N/A (gray)
+                                if (isV2 && idx === 3) return 'bg-gray-400';
                                 switch (idx) {
                                   case 0: return 'bg-green-500';
                                   case 1: return 'bg-yellow-400';

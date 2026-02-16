@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, XCircle, AlertTriangle, MessageSquare, User, Calendar, FileText, Save } from 'lucide-react';
 import { QualityScoreBadge, Button } from './index';
-import { getScorecardConfig, getScorecardValues } from '../../../data/scorecardConfig';
+import { getScorecardValues, getLegacyScorecardValues, REOCCURRING_ERROR_OPTIONS } from '../../../data/scorecardConfig';
 
 const ReviewTicketDialog = ({
   open,
@@ -20,7 +20,9 @@ const ReviewTicketDialog = ({
     categories: [],
     scorecardVariant: null,
     scorecardValues: {},
-    additionalNote: ''
+    additionalNote: '',
+    reoccurringError: null,
+    reoccurringErrorCategories: []
   });
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,7 +37,9 @@ const ReviewTicketDialog = ({
         categories: ticket.categories || [],
         scorecardVariant: ticket.scorecardVariant || null,
         scorecardValues: ticket.scorecardValues || {},
-        additionalNote: ticket.additionalNote || ''
+        additionalNote: ticket.additionalNote || '',
+        reoccurringError: ticket.reoccurringError || null,
+        reoccurringErrorCategories: ticket.reoccurringErrorCategories || []
       });
       setHasChanges(false);
     }
@@ -82,8 +86,11 @@ const ReviewTicketDialog = ({
   if (!open || !ticket) return null;
 
   const agentPosition = ticket.agent?.position || 'Medior';
-  const scorecardConfig = getScorecardConfig(agentPosition, formData.scorecardVariant);
-  const scorecardValueOptions = getScorecardValues();
+  const isV2Ticket = ticket.scorecardVersion === 'v2';
+  // Get the correct values array based on ticket version
+  const scorecardValuesConfig = isV2Ticket
+    ? getScorecardValues()
+    : getLegacyScorecardValues(agentPosition, formData.scorecardVariant);
 
   return (
     <AnimatePresence>
@@ -236,13 +243,13 @@ const ReviewTicketDialog = ({
               </div>
 
               {/* Scorecard */}
-              {scorecardConfig && scorecardConfig.length > 0 && (
+              {scorecardValuesConfig && scorecardValuesConfig.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
-                    Scorecard ({agentPosition})
+                    Scorecard {isV2Ticket ? '' : `(${agentPosition})`}
                   </label>
                   <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 space-y-3">
-                    {scorecardConfig.map((item) => (
+                    {scorecardValuesConfig.map((item) => (
                       <div key={item.key} className="flex items-center justify-between">
                         <span className="text-sm text-gray-700 dark:text-neutral-300">{item.label}</span>
                         {mode === 'edit' ? (
@@ -258,19 +265,93 @@ const ReviewTicketDialog = ({
                             className="px-2 py-1 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded text-sm"
                           >
                             <option value="">-</option>
-                            {scorecardValueOptions.map((opt, idx) => (
+                            {item.options.map((opt, idx) => (
                               <option key={idx} value={idx}>{opt}</option>
                             ))}
                           </select>
                         ) : (
                           <span className="text-sm font-medium text-gray-900 dark:text-white">
                             {formData.scorecardValues[item.key] !== undefined && formData.scorecardValues[item.key] !== null
-                              ? scorecardValueOptions[formData.scorecardValues[item.key]]
+                              ? (item.options[formData.scorecardValues[item.key]] || '-')
                               : '-'}
                           </span>
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reoccurring Error (V2 tickets only) */}
+              {isV2Ticket && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+                    Reoccurring Error
+                  </label>
+                  <div className="bg-gray-50 dark:bg-neutral-950 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700 dark:text-neutral-300">Status</span>
+                      {mode === 'edit' ? (
+                        <select
+                          value={formData.reoccurringError || ''}
+                          onChange={(e) => handleChange('reoccurringError', e.target.value || null)}
+                          className="px-2 py-1 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded text-sm"
+                        >
+                          <option value="">Unsure</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      ) : (
+                        <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                          {formData.reoccurringError || 'Unsure'}
+                        </span>
+                      )}
+                    </div>
+                    {formData.reoccurringError === 'yes' && formData.reoccurringErrorCategories?.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500 dark:text-neutral-400 mb-1 block">Categories</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {formData.reoccurringErrorCategories.map((cat) => (
+                            <span
+                              key={cat}
+                              className="px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {mode === 'edit' && formData.reoccurringError === 'yes' && (
+                      <div>
+                        <span className="text-xs text-gray-500 dark:text-neutral-400 mb-1 block">Select categories</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {REOCCURRING_ERROR_OPTIONS.map((cat) => {
+                            const isSelected = (formData.reoccurringErrorCategories || []).includes(cat);
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => {
+                                  const current = formData.reoccurringErrorCategories || [];
+                                  handleChange(
+                                    'reoccurringErrorCategories',
+                                    isSelected ? current.filter(c => c !== cat) : [...current, cat]
+                                  );
+                                }}
+                                className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                                  isSelected
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-gray-200 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300 hover:bg-gray-300 dark:hover:bg-neutral-600'
+                                }`}
+                              >
+                                {cat}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

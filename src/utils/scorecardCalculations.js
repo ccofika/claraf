@@ -1,4 +1,5 @@
 // Scorecard calculation utilities for automatic quality score calculation
+import { USE_NEW_SCORECARD } from '../data/scorecardConfig';
 
 // Junior Scorecard point values for each criterion
 // Index 0 = Nailed it (best), 1 = Almost there, 2 = Coach, 3 = You can do better, 4 = N/A
@@ -399,6 +400,74 @@ export function calculateSeniorUseThisOneQualityScore(scorecardValues) {
   return Math.round(normalizedScore);
 }
 
+// =============================================================================
+// V2 Scorecard calculation (unified for all agents)
+// =============================================================================
+
+// V2 point values matching MaestroQA rubric
+// Index 0 = Nailed it, 1 = Almost there, 2 = Coach, 3 = N/A (skip)
+const V2_POINT_VALUES = {
+  escalation: [35, 24, 13],   // max 35
+  process: [35, 24, 13],      // max 35
+  knowledge: [30, 23, 12]     // max 30
+};
+
+const V2_SECTIONS = {
+  escalation: { weight: 35, criteria: ['escalation'] },
+  process: { weight: 35, criteria: ['process'] },
+  knowledge: { weight: 30, criteria: ['knowledge'] }
+};
+
+/**
+ * Calculate quality score for V2 scorecard
+ * @param {Object} scorecardValues - { escalation: 0-3, process: 0-3, knowledge: 0-3 }
+ * @returns {number|null}
+ */
+export function calculateV2QualityScore(scorecardValues) {
+  if (!scorecardValues || Object.keys(scorecardValues).length === 0) {
+    return null;
+  }
+
+  let totalWeightedScore = 0;
+  let totalActiveWeight = 0;
+
+  for (const [sectionKey, section] of Object.entries(V2_SECTIONS)) {
+    let sectionEarnedPoints = 0;
+    let sectionMaxPoints = 0;
+    let hasAnyValue = false;
+
+    for (const criterionKey of section.criteria) {
+      const optionIndex = scorecardValues[criterionKey];
+
+      // Skip if no value selected or if N/A (index 3 in V2)
+      if (optionIndex === null || optionIndex === undefined || optionIndex === 3) {
+        continue;
+      }
+
+      hasAnyValue = true;
+      const pointValues = V2_POINT_VALUES[criterionKey];
+
+      if (pointValues && optionIndex >= 0 && optionIndex < pointValues.length) {
+        sectionEarnedPoints += pointValues[optionIndex];
+        sectionMaxPoints += pointValues[0]; // First option is always max
+      }
+    }
+
+    if (hasAnyValue && sectionMaxPoints > 0) {
+      const sectionPercentage = sectionEarnedPoints / sectionMaxPoints;
+      totalWeightedScore += sectionPercentage * section.weight;
+      totalActiveWeight += section.weight;
+    }
+  }
+
+  if (totalActiveWeight === 0) {
+    return null;
+  }
+
+  const normalizedScore = (totalWeightedScore / totalActiveWeight) * 100;
+  return Math.round(normalizedScore);
+}
+
 /**
  * Check if a position supports automatic quality score calculation
  * @param {string} position - Agent position
@@ -406,6 +475,7 @@ export function calculateSeniorUseThisOneQualityScore(scorecardValues) {
  * @returns {boolean}
  */
 export function supportsAutoQualityScore(position, variant = null) {
+  if (USE_NEW_SCORECARD) return true;
   if (position === 'Medior Scorecard' || position === 'Junior Scorecard') {
     return true;
   }
@@ -423,6 +493,9 @@ export function supportsAutoQualityScore(position, variant = null) {
  * @returns {number|null}
  */
 export function calculateQualityScore(position, scorecardValues, variant = null) {
+  if (USE_NEW_SCORECARD) {
+    return calculateV2QualityScore(scorecardValues);
+  }
   if (position === 'Medior Scorecard') {
     return calculateMediorQualityScore(scorecardValues);
   }
@@ -437,6 +510,5 @@ export function calculateQualityScore(position, scorecardValues, variant = null)
       return calculateSeniorUseThisOneQualityScore(scorecardValues);
     }
   }
-  // Add other position calculations here in the future
   return null;
 }

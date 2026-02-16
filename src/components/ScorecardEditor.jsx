@@ -7,18 +7,18 @@ import {
   hasScorecard
 } from '../data/scorecardConfig';
 
-// Short labels for each score index
+// Short labels for each score index (legacy 5-option scorecards)
 const SCORE_SHORT_LABELS = ['Best', 'Good', 'Coach', 'Improve', 'N/A'];
 
 // Individual score button with hover effect
 const ScoreButton = ({ index, isSelected, disabled, onClick, optionText }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const colors = SCORE_COLORS[index];
+  const isNA = optionText === 'N/A';
 
   // Get background color for different states
   const getBackgroundColor = () => {
     if (isSelected) {
-      // Selected state - full color
+      if (isNA) return '#9ca3af'; // gray-400 for N/A regardless of index
       switch (index) {
         case 0: return '#22c55e'; // green-500
         case 1: return '#facc15'; // yellow-400
@@ -29,7 +29,7 @@ const ScoreButton = ({ index, isSelected, disabled, onClick, optionText }) => {
       }
     }
     if (isHovered && !disabled) {
-      // Hover state - lighter color
+      if (isNA) return '#d1d5db'; // gray-300 for N/A
       switch (index) {
         case 0: return '#86efac'; // green-300
         case 1: return '#fef08a'; // yellow-200
@@ -45,6 +45,7 @@ const ScoreButton = ({ index, isSelected, disabled, onClick, optionText }) => {
 
   const getTextColor = () => {
     if (isSelected) {
+      if (isNA) return '#ffffff';
       return index === 1 ? '#1f2937' : '#ffffff'; // dark text for yellow, white for others
     }
     if (isHovered && !disabled) {
@@ -84,7 +85,7 @@ const ScoreButton = ({ index, isSelected, disabled, onClick, optionText }) => {
       </div>
       {/* Short label */}
       <span className="text-[9px] font-medium leading-tight">
-        {SCORE_SHORT_LABELS[index]}
+        {isNA ? 'N/A' : (SCORE_SHORT_LABELS[index] || optionText)}
       </span>
     </button>
   );
@@ -103,6 +104,12 @@ const ScorecardValueCard = ({
   const getCardStyle = () => {
     if (selectedIndex === null || selectedIndex === undefined) {
       return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+    }
+    // Check if the selected option is N/A (use gray regardless of index)
+    const selectedOption = options[selectedIndex];
+    if (selectedOption === 'N/A') {
+      const naColors = SCORE_COLORS[4]; // Always use gray for N/A
+      return `${naColors.bgLight} ${naColors.border} dark:bg-opacity-20`;
     }
     const colors = SCORE_COLORS[selectedIndex];
     return `${colors.bgLight} ${colors.border} dark:bg-opacity-20`;
