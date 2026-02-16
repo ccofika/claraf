@@ -122,6 +122,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
   const isInitialLoadRef = useRef(true);
   const retryCountRef = useRef(0);
   const isSavingRef = useRef(false);
+  const currentPageIdRef = useRef(page?._id);
 
   // Refs for always-fresh data - eliminates stale closure issues in autosave
   const dataRef = useRef({ title: title.trim(), icon, coverImage, blocks, dropdowns, pageSettings });
@@ -137,9 +138,11 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
     onAutoSaveRef.current = onAutoSave;
   }, [onAutoSave]);
 
-  // Initialize last saved data from page prop
+  // Initialize last saved data from page prop - only when page ID changes
+  // (not on every object reference change, which can happen during token refresh)
   useEffect(() => {
-    if (page) {
+    if (page && page._id !== currentPageIdRef.current) {
+      currentPageIdRef.current = page._id;
       setTitle(page.title || '');
       setIcon(page.icon || '📄');
       setCoverImage(page.coverImage || '');

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
@@ -102,11 +102,13 @@ export const KnowledgeBaseProvider = ({ children }) => {
   }, [API_URL]);
 
   // Check admin status on mount
+  const adminCheckedRef = useRef(false);
   useEffect(() => {
     const checkAdmin = async () => {
       if (!user) {
         setIsAdmin(false);
         setIsSuperAdmin(false);
+        adminCheckedRef.current = false;
         return;
       }
 
@@ -117,10 +119,15 @@ export const KnowledgeBaseProvider = ({ children }) => {
         });
         setIsAdmin(response.data.isAdmin);
         setIsSuperAdmin(response.data.isSuperAdmin);
+        adminCheckedRef.current = true;
       } catch (error) {
         console.error('Error checking admin status:', error);
-        setIsAdmin(false);
-        setIsSuperAdmin(false);
+        // Only reset admin status if we never had a successful check
+        // (transient 401s during token refresh should not revoke access)
+        if (!adminCheckedRef.current) {
+          setIsAdmin(false);
+          setIsSuperAdmin(false);
+        }
       }
     };
 
@@ -128,16 +135,22 @@ export const KnowledgeBaseProvider = ({ children }) => {
   }, [user, API_URL]);
 
   // Fetch page tree
+  const treeLoadedRef = useRef(false);
   const fetchPageTree = useCallback(async () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load, not on refetches
+      // (refetch during editing would unmount the editor otherwise)
+      if (!treeLoadedRef.current) {
+        setLoading(true);
+      }
       const token = localStorage.getItem('token');
       const response = await axios.get(`${API_URL}/api/knowledge-base/pages`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPageTree(response.data);
+      treeLoadedRef.current = true;
     } catch (error) {
       console.error('Error fetching page tree:', error);
       setPageTree([]);

@@ -71,8 +71,12 @@ const AdminSection = () => {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    loadAdmins();
-  }, []);
+    if (isSuperAdmin) {
+      loadAdmins();
+    } else {
+      setLoading(false);
+    }
+  }, [isSuperAdmin]);
 
   const loadAdmins = async () => {
     try {
@@ -659,6 +663,20 @@ const KBAdmin = () => {
     navigate('/knowledge-base/admin', { replace: true });
   };
 
+  // IMPORTANT: Editor check MUST come first - never unmount the editor
+  // due to transient loading/auth state (token refresh, fetchPageTree, etc.)
+  if (editingPage) {
+    return (
+      <PageEditor
+        page={editingPage}
+        onSave={handleSavePage}
+        onAutoSave={handleAutoSavePage}
+        onClose={handleCloseEditor}
+        onDelete={handleDeletePage}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -687,19 +705,6 @@ const KBAdmin = () => {
           Go Back
         </button>
       </div>
-    );
-  }
-
-  // Show page editor if editing
-  if (editingPage) {
-    return (
-      <PageEditor
-        page={editingPage}
-        onSave={handleSavePage}
-        onAutoSave={handleAutoSavePage}
-        onClose={handleCloseEditor}
-        onDelete={handleDeletePage}
-      />
     );
   }
 
