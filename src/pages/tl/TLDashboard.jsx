@@ -11,7 +11,7 @@ import {
 import { toast } from 'sonner';
 import { useTL } from './TLLayout';
 import { Badge } from '../../components/ui/badge';
-import { SHORT_LABELS, getScorecardValues } from '../../data/scorecardConfig';
+import { SHORT_LABELS, V2_SHORT_LABELS, getScorecardValues, getLegacyScorecardValues } from '../../data/scorecardConfig';
 import { TicketContentDisplay } from '../../components/TicketRichTextEditor';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -526,19 +526,24 @@ const CategoryTicketsPanel = ({ category, data, loading, onClose }) => {
                       <h4 className="text-sm font-medium text-gray-500 dark:text-[#6B6D77] mb-1.5">Scorecard</h4>
                       <div className="bg-gray-50 dark:bg-[#1A1A21] rounded p-3 border border-gray-100 dark:border-[#1E1E28] space-y-1.5">
                         {(() => {
+                          const isV2 = fullTicketData.scorecardVersion === 'v2';
                           const position = fullTicketData.agent?.position;
                           const variant = fullTicketData.scorecardVariant;
-                          const configValues = position ? getScorecardValues(position, variant) : [];
+                          const configValues = isV2
+                            ? getScorecardValues()
+                            : (position ? getLegacyScorecardValues(position, variant) : []);
                           const configMap = {};
                           configValues.forEach(v => { configMap[v.key] = v; });
+                          const labels = isV2 ? V2_SHORT_LABELS : SHORT_LABELS;
 
                           return Object.entries(fullTicketData.scorecardValues).map(([key, value]) => {
                             const configItem = configMap[key];
                             const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value] ? SHORT_LABELS[value] : '-';
+                            const displayLabel = value !== null && value !== undefined && labels[value] ? labels[value] : '-';
 
                             const getBgClass = (idx) => {
                               if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-[#252530]';
+                              if (isV2 && idx === 3) return 'bg-gray-400 dark:bg-gray-500';
                               switch (idx) {
                                 case 0: return 'bg-emerald-500';
                                 case 1: return 'bg-amber-400';

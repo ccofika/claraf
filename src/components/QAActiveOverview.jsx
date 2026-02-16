@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { TicketContentDisplay } from './TicketRichTextEditor';
-import { getScorecardValues, SHORT_LABELS } from '../data/scorecardConfig';
+import { getScorecardValues, getLegacyScorecardValues, SHORT_LABELS, V2_SHORT_LABELS } from '../data/scorecardConfig';
 
 // Sub-tab components
 const SubTabs = ({ activeTab, onTabChange }) => {
@@ -2217,8 +2217,8 @@ const QAActiveOverview = () => {
                         )}
                       </div>
                       <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700">
-                        {/* Scorecard Position Header */}
-                        {viewTicketDialog.ticket.agent?.position && (
+                        {/* Scorecard Position Header (hide for V2 - position irrelevant) */}
+                        {viewTicketDialog.ticket.agent?.position && viewTicketDialog.ticket.scorecardVersion !== 'v2' && (
                           <div className="mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-700">
                             <span className="text-[10px] sm:text-xs font-medium text-neutral-500 uppercase tracking-wider">
                               {viewTicketDialog.ticket.agent.position}
@@ -2228,14 +2228,19 @@ const QAActiveOverview = () => {
                         {/* Scorecard Values */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {(() => {
+                            const isV2 = viewTicketDialog.ticket.scorecardVersion === 'v2';
                             const position = viewTicketDialog.ticket.agent?.position;
                             const variant = viewTicketDialog.ticket.scorecardVariant;
-                            const configValues = position ? getScorecardValues(position, variant) : [];
+                            const configValues = isV2
+                              ? getScorecardValues()
+                              : (position ? getLegacyScorecardValues(position, variant) : []);
                             const configMap = {};
                             configValues.forEach(v => { configMap[v.key] = v; });
+                            const labels = isV2 ? V2_SHORT_LABELS : SHORT_LABELS;
 
                             const getBgClass = (idx) => {
                               if (idx === null || idx === undefined) return 'bg-neutral-100 dark:bg-neutral-700';
+                              if (isV2 && idx === 3) return 'bg-neutral-400';
                               switch (idx) {
                                 case 0: return 'bg-green-500';
                                 case 1: return 'bg-yellow-400';
@@ -2255,8 +2260,8 @@ const QAActiveOverview = () => {
                             return Object.entries(viewTicketDialog.ticket.scorecardValues).map(([key, value]) => {
                               const configItem = configMap[key];
                               const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                              const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
-                                ? SHORT_LABELS[value]
+                              const displayLabel = value !== null && value !== undefined && labels[value]
+                                ? labels[value]
                                 : '-';
 
                               return (
@@ -2271,6 +2276,33 @@ const QAActiveOverview = () => {
                           })()}
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Reoccurring Error (V2 only) */}
+                  {viewTicketDialog.ticket.scorecardVersion === 'v2' && viewTicketDialog.ticket.reoccurringError && (
+                    <div>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                        <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
+                        <h3 className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300">Reoccurring Error</h3>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] sm:text-[10px] ${
+                            viewTicketDialog.ticket.reoccurringError === 'yes' ? 'border-red-400 text-red-600 dark:text-red-400' :
+                            viewTicketDialog.ticket.reoccurringError === 'no' ? 'border-green-400 text-green-600 dark:text-green-400' :
+                            'border-neutral-400 text-neutral-600 dark:text-neutral-400'
+                          }`}
+                        >
+                          {viewTicketDialog.ticket.reoccurringError === 'yes' ? 'Yes' : viewTicketDialog.ticket.reoccurringError === 'no' ? 'No' : 'Unsure'}
+                        </Badge>
+                      </div>
+                      {viewTicketDialog.ticket.reoccurringError === 'yes' && viewTicketDialog.ticket.reoccurringErrorCategories?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                          {viewTicketDialog.ticket.reoccurringErrorCategories.map(cat => (
+                            <Badge key={cat} variant="secondary" className="text-[10px] sm:text-xs">{cat}</Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

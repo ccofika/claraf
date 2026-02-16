@@ -17,7 +17,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { SCORE_COLORS, SHORT_LABELS, getScorecardValues } from '../data/scorecardConfig';
+import { SCORE_COLORS, SHORT_LABELS, V2_SHORT_LABELS, getScorecardValues, getLegacyScorecardValues } from '../data/scorecardConfig';
 
 // Shared helper functions
 export const getScoreColor = (score) => {
@@ -472,21 +472,26 @@ export const TicketPreviewInline = ({
                   </div>
                   <div className="space-y-2">
                     {(() => {
+                      const isV2 = fullTicketData.scorecardVersion === 'v2';
                       const position = fullTicketData.agent?.position;
                       const variant = fullTicketData.scorecardVariant;
-                      const configValues = position ? getScorecardValues(position, variant) : [];
+                      const configValues = isV2
+                        ? getScorecardValues()
+                        : (position ? getLegacyScorecardValues(position, variant) : []);
                       const configMap = {};
                       configValues.forEach(v => { configMap[v.key] = v; });
+                      const labels = isV2 ? V2_SHORT_LABELS : SHORT_LABELS;
 
                       return Object.entries(fullTicketData.scorecardValues).map(([key, value]) => {
                         const configItem = configMap[key];
                         const label = configItem?.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                        const displayLabel = value !== null && value !== undefined && SHORT_LABELS[value]
-                          ? SHORT_LABELS[value]
+                        const displayLabel = value !== null && value !== undefined && labels[value]
+                          ? labels[value]
                           : '-';
 
                         const getBgClass = (idx) => {
                           if (idx === null || idx === undefined) return 'bg-gray-100 dark:bg-neutral-700';
+                          if (isV2 && idx === 3) return 'bg-gray-400';
                           switch (idx) {
                             case 0: return 'bg-green-500';
                             case 1: return 'bg-yellow-400';
@@ -513,6 +518,31 @@ export const TicketPreviewInline = ({
                         );
                       });
                     })()}
+                    {/* Reoccurring Error (V2 only) */}
+                    {fullTicketData.scorecardVersion === 'v2' && fullTicketData.reoccurringError && (
+                      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-neutral-700">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-500 dark:text-neutral-400">Reoccurring Error:</span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] ${
+                              fullTicketData.reoccurringError === 'yes' ? 'border-red-400 text-red-600 dark:text-red-400' :
+                              fullTicketData.reoccurringError === 'no' ? 'border-green-400 text-green-600 dark:text-green-400' :
+                              'border-gray-400 text-gray-600 dark:text-gray-400'
+                            }`}
+                          >
+                            {fullTicketData.reoccurringError === 'yes' ? 'Yes' : fullTicketData.reoccurringError === 'no' ? 'No' : 'Unsure'}
+                          </Badge>
+                        </div>
+                        {fullTicketData.reoccurringError === 'yes' && fullTicketData.reoccurringErrorCategories?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {fullTicketData.reoccurringErrorCategories.map(cat => (
+                              <Badge key={cat} variant="secondary" className="text-[9px]">{cat}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
