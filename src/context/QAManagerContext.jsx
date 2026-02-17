@@ -1211,9 +1211,11 @@ export const QAManagerProvider = ({ children }) => {
       missing.push('Ticket ID');
     }
 
-    const isSenior = agentPosition?.toLowerCase().includes('senior');
-    if (isSenior && !ticket.scorecardVariant) {
-      missing.push('Scorecard Type');
+    if (!USE_NEW_SCORECARD) {
+      const isSenior = agentPosition?.toLowerCase().includes('senior');
+      if (isSenior && !ticket.scorecardVariant) {
+        missing.push('Scorecard Type');
+      }
     }
 
     const expectedFields = getScorecardValues(agentPosition, ticket.scorecardVariant);
