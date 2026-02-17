@@ -7,12 +7,13 @@ import {
   Image as ImageIcon, Table, Minus, Settings, Pencil, Check, AlertTriangle,
   Play, Code2, Link, FileText, FunctionSquare, MousePointer, ListTree,
   Music, FileType, Navigation, RefreshCw, Columns, ChevronsDownUp, Palette, Copy,
-  ArrowUp, ArrowDown, Replace, AlignCenter, AlignLeft, AlignRight, Maximize
+  ArrowUp, ArrowDown, Replace, AlignCenter, AlignLeft, AlignRight, Maximize, Send
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import BlockRenderer from '../BlockRenderer';
+import CopyBlockToPageModal from './CopyBlockToPageModal';
 
 // Hook to calculate smart positioning for dropdowns/modals
 const useSmartPosition = (isOpen, triggerRef, menuHeight = 400) => {
@@ -232,7 +233,7 @@ const SortableBlock = ({
   showAddMenu, setShowAddMenu, addBlock,
   activeId, sideDropTarget, onAddToSide,
   onExtractFromColumns, onDeleteFromColumns, onDissolveColumns, onRemoveColumnFromColumns,
-  onDuplicateBlock, onUpdateProperties, onConvertBlock, onCreateBlockBelow, onDeleteEmptyBlock,
+  onDuplicateBlock, onCopyToPage, onUpdateProperties, onConvertBlock, onCreateBlockBelow, onDeleteEmptyBlock,
   onMoveBlock
 }) => {
   const addButtonRef = useRef(null);
@@ -460,6 +461,16 @@ const SortableBlock = ({
           title="Duplicate block"
         >
           <Copy size={11} />
+        </button>
+
+        {/* Copy to another page */}
+        <button
+          onClick={() => onCopyToPage(block)}
+          className="p-1 text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200
+            rounded hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          title="Copy to another page"
+        >
+          <Send size={11} />
         </button>
 
         {/* Delete */}
@@ -698,12 +709,13 @@ const InsertBlockLine = ({ showMenu, onToggleMenu, onAdd }) => {
   );
 };
 
-const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) => {
+const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants, currentPageId }) => {
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(null);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [sideDropTarget, setSideDropTarget] = useState(null);
+  const [copyBlockModalBlock, setCopyBlockModalBlock] = useState(null);
   const firstAddButtonRef = useRef(null);
   const bottomAddButtonRef = useRef(null);
 
@@ -1202,6 +1214,7 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
                 onDissolveColumns={dissolveColumnsBlock}
                 onRemoveColumnFromColumns={removeColumnFromColumns}
                 onDuplicateBlock={duplicateBlock}
+                onCopyToPage={setCopyBlockModalBlock}
                 onUpdateProperties={updateBlockProperties}
                 onConvertBlock={convertBlock}
                 onCreateBlockBelow={createBlockBelow}
@@ -1374,6 +1387,15 @@ const BlockEditor = ({ blocks = [], onChange, dropdowns = [], onOpenVariants }) 
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Copy Block to Page Modal */}
+      {copyBlockModalBlock && (
+        <CopyBlockToPageModal
+          block={copyBlockModalBlock}
+          excludePageId={currentPageId}
+          onClose={() => setCopyBlockModalBlock(null)}
+        />
       )}
     </div>
   );

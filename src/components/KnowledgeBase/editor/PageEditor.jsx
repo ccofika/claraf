@@ -526,6 +526,7 @@ const PageEditor = ({ page, onSave, onAutoSave, onClose, onDelete }) => {
               onChange={setBlocks}
               dropdowns={dropdowns}
               onOpenVariants={setVariantBlock}
+              currentPageId={page?._id}
             />
           </div>
         )}
