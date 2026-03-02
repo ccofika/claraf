@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FileText, CheckCircle, XCircle, Eye, Edit, BarChart2, MessageSquare
+  FileText, CheckCircle, XCircle, Eye, Edit, BarChart2, MessageSquare, History
 } from 'lucide-react';
 import { useQAManager } from '../../context/QAManagerContext';
 import { LoadingSkeleton, EmptyState, QualityScoreBadge, Button, Pagination, GlassActions, GlassActionButton, GlassActionDivider } from './components';
@@ -134,6 +134,15 @@ const QAReview = () => {
           >
             <BarChart2 className="w-4 h-4 sm:mr-1.5" />
             <span className="hidden sm:inline">Analytics</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="glass"
+            onClick={() => navigate('/qa-manager/review/history')}
+            className="text-purple-600 dark:text-purple-400"
+          >
+            <History className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">History</span>
           </Button>
         </div>
       </div>

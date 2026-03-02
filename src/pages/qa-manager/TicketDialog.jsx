@@ -692,7 +692,7 @@ const TicketDialog = ({
                         onChange={(html) => setFormData({ ...formData, notes: html })}
                         placeholder="Quick notes / moment extraction"
                         rows={5}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                        className="w-full text-sm border border-gray-200 dark:border-neutral-800 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px] focus-within:ring-2 focus-within:ring-gray-900 dark:focus-within:ring-gray-300"
                       />
                     </div>
 
@@ -943,7 +943,7 @@ const TicketDialog = ({
                               onChange={(html) => setFormData({ ...formData, feedback: html })}
                               placeholder="Feedback to agent after grading (type # to insert macro)"
                               rows={5}
-                              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                              className="w-full text-sm border border-gray-200 dark:border-neutral-800 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px] focus-within:ring-2 focus-within:ring-gray-900 dark:focus-within:ring-gray-300"
                               enableMacros={true}
                               agentPosition={agentPosition}
                               currentScorecardVariant={formData.scorecardVariant}
@@ -1071,7 +1071,7 @@ const TicketDialog = ({
                     onChange={(html) => setFormData({ ...formData, notes: html })}
                     placeholder="Internal notes for yourself"
                     rows={5}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                    className="w-full text-sm border border-gray-200 dark:border-neutral-800 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px] focus-within:ring-2 focus-within:ring-gray-900 dark:focus-within:ring-gray-300"
                   />
                 </div>
 
@@ -1330,7 +1330,7 @@ const TicketDialog = ({
                     onChange={(html) => setFormData({ ...formData, feedback: html })}
                     placeholder="Feedback to agent after grading (type # to insert macro)"
                     rows={5}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px]"
+                    className="w-full text-sm border border-gray-200 dark:border-neutral-800 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white resize-none min-h-[140px] focus-within:ring-2 focus-within:ring-gray-900 dark:focus-within:ring-gray-300"
                     enableMacros={true}
                     agentPosition={agentPosition}
                     currentScorecardVariant={formData.scorecardVariant}

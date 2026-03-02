@@ -52,7 +52,8 @@ import {
   QACoaching,
   QACoachingDetail,
   QAReview,
-  QAReviewAnalytics
+  QAReviewAnalytics,
+  QAReviewHistory
 } from './pages/qa-manager';
 import {
   KnowledgeBaseLayout,
@@ -205,6 +206,7 @@ function App() {
                           <Route path="archive/:ticketId/edit" element={<QAArchive />} />
                           <Route path="review" element={<QAReview />} />
                           <Route path="review/analytics" element={<QAReviewAnalytics />} />
+                          <Route path="review/history" element={<QAReviewHistory />} />
                           <Route path="review/:ticketId" element={<QAReview />} />
                           <Route path="review/:ticketId/edit" element={<QAReview />} />
                           <Route path="analytics" element={<QAAnalyticsDashboard />} />

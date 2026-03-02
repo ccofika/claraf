@@ -594,6 +594,68 @@ export const QAManagerProvider = ({ children }) => {
     }
   }, [API_URL, getAuthHeaders, isReviewer]);
 
+  // Fetch review history (paginated, server-side)
+  const fetchReviewHistory = useCallback(async (filters = {}) => {
+    if (!isReviewer) return null;
+    try {
+      const params = new URLSearchParams();
+      if (filters.reviewer) params.append('reviewer', filters.reviewer);
+      if (filters.agent) params.append('agent', filters.agent);
+      if (filters.grader) params.append('grader', filters.grader);
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      if (filters.page) params.append('page', filters.page);
+      if (filters.limit) params.append('limit', filters.limit);
+
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/history?${params.toString()}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching review history:', err);
+      toast.error('Failed to load review history');
+      return null;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Fetch review history KPI stats (aggregated, same filters as history)
+  const fetchReviewHistoryStats = useCallback(async (filters = {}) => {
+    if (!isReviewer) return null;
+    try {
+      const params = new URLSearchParams();
+      if (filters.reviewer) params.append('reviewer', filters.reviewer);
+      if (filters.agent) params.append('agent', filters.agent);
+      if (filters.grader) params.append('grader', filters.grader);
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/history/stats?${params.toString()}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching review history stats:', err);
+      return null;
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
+  // Fetch unique reviewers list (lightweight, load once)
+  const fetchReviewReviewers = useCallback(async () => {
+    if (!isReviewer) return [];
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/qa/review/reviewers`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching reviewers list:', err);
+      return [];
+    }
+  }, [API_URL, getAuthHeaders, isReviewer]);
+
   // ============================================
   // AGENT CRUD
   // ============================================
@@ -1963,6 +2025,9 @@ export const QAManagerProvider = ({ children }) => {
     handleApproveTicket,
     handleDenyTicket,
     fetchReviewAnalytics,
+    fetchReviewHistory,
+    fetchReviewHistoryStats,
+    fetchReviewReviewers,
 
     // Loading
     loading,

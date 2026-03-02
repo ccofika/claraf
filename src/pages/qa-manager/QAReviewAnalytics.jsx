@@ -209,7 +209,7 @@ const QAReviewAnalytics = () => {
                     <p className="text-xs text-gray-500 dark:text-neutral-400 truncate">{grader.graderEmail}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 sm:gap-6 ml-11 sm:ml-0">
+                <div className="flex items-center gap-4 sm:gap-6 ml-11 sm:ml-0 flex-wrap">
                   <div className="text-left sm:text-right">
                     <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400">Tickets Reviewed</p>
                     <p className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{grader.totalTickets}</p>
@@ -218,6 +218,16 @@ const QAReviewAnalytics = () => {
                     <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400">Avg Difference</p>
                     <p className={`text-base sm:text-lg font-semibold ${grader.avgScoreDifference > 5 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                       {grader.avgScoreDifference.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right border-l border-gray-200 dark:border-neutral-700 pl-4 sm:pl-6">
+                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400">Tickets Overall</p>
+                    <p className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{grader.totalOverallTickets ?? '-'}</p>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-neutral-400">Overall Difference</p>
+                    <p className={`text-base sm:text-lg font-semibold ${(grader.overallAvgDifference || 0) > 5 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                      {(grader.overallAvgDifference ?? 0).toFixed(1)}%
                     </p>
                   </div>
                 </div>

@@ -2,9 +2,10 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { uploadTicketImage, generateImageId } from '../utils/imageUpload';
 import { toast } from 'sonner';
-import { X, ZoomIn } from 'lucide-react';
+import { X } from 'lucide-react';
 import MacroTriggerDropdown from './MacroTriggerDropdown';
 import MacroInsertConfirmModal from './MacroInsertConfirmModal';
+import TicketEditorToolbar from './TicketEditorToolbar';
 
 // Image Lightbox Component for fullscreen view - uses Portal to render over everything
 const ImageLightbox = ({ src, alt, onClose }) => {
@@ -86,6 +87,7 @@ const TicketRichTextEditor = ({
   onMacroApply = null
 }) => {
   const editorRef = useRef(null);
+  const savedSelectionRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [macroTrigger, setMacroTrigger] = useState({
@@ -99,6 +101,21 @@ const TicketRichTextEditor = ({
     triggerText: ''
   });
 
+  // Active formatting state for toolbar
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    orderedList: false,
+    unorderedList: false,
+    formatBlock: '',
+    foreColor: '',
+    backColor: '',
+    isLink: false,
+    linkUrl: ''
+  });
+
   // Undo/Redo history with debouncing
   // History saves on: pause in typing (500ms), word boundaries (space/enter), paste, blur
   const historyRef = useRef([]);
@@ -108,6 +125,54 @@ const TicketRichTextEditor = ({
   const lastSavedContentRef = useRef('');
   const MAX_HISTORY = 50;
   const DEBOUNCE_DELAY = 500; // ms to wait before saving after typing stops
+
+  // Detect active formatting at cursor position
+  const detectActiveFormats = useCallback(() => {
+    if (!editorRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    // Make sure selection is within our editor
+    const range = selection.getRangeAt(0);
+    if (!editorRef.current.contains(range.commonAncestorContainer)) return;
+
+    // Detect link at cursor
+    let isLink = false;
+    let linkUrl = '';
+    const container = range.commonAncestorContainer;
+    let element = container.nodeType === 3 ? container.parentElement : container;
+    while (element && element !== editorRef.current) {
+      if (element.tagName === 'A') {
+        isLink = true;
+        linkUrl = element.getAttribute('href') || '';
+        break;
+      }
+      element = element.parentElement;
+    }
+
+    setActiveFormats({
+      bold: document.queryCommandState('bold'),
+      italic: document.queryCommandState('italic'),
+      underline: document.queryCommandState('underline'),
+      strikethrough: document.queryCommandState('strikeThrough'),
+      orderedList: document.queryCommandState('insertOrderedList'),
+      unorderedList: document.queryCommandState('insertUnorderedList'),
+      formatBlock: document.queryCommandValue('formatBlock'),
+      foreColor: document.queryCommandValue('foreColor'),
+      backColor: document.queryCommandValue('backColor'),
+      isLink,
+      linkUrl
+    });
+  }, []);
+
+  // Listen for selection changes when editor is focused
+  useEffect(() => {
+    if (isFocused) {
+      document.addEventListener('selectionchange', detectActiveFormats);
+      return () => document.removeEventListener('selectionchange', detectActiveFormats);
+    }
+  }, [isFocused, detectActiveFormats]);
 
   // Save state to history (internal function)
   const saveToHistoryInternal = useCallback((html) => {
@@ -936,12 +1001,93 @@ const TicketRichTextEditor = ({
     }
   };
 
+  // Handle toolbar execCommand - called from toolbar buttons
+  const handleExecCommand = useCallback((command, value) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+
+    if (command) {
+      document.execCommand(command, false, value || null);
+    }
+
+    const html = editorRef.current.innerHTML;
+    onChange?.(html);
+    saveToHistoryImmediate(html);
+    detectActiveFormats();
+  }, [onChange, saveToHistoryImmediate, detectActiveFormats]);
+
+  // Handle Ctrl+K link insertion
+  const handleLinkShortcut = useCallback(() => {
+    if (!editorRef.current) return;
+    const url = window.prompt('Enter URL:');
+    if (url) {
+      const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+      document.execCommand('createLink', false, normalizedUrl);
+      // Style the new link
+      const links = editorRef.current.querySelectorAll(`a[href="${normalizedUrl}"]`);
+      links.forEach(link => {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.style.cssText = 'color: #2563eb; text-decoration: underline; cursor: pointer;';
+      });
+      const html = editorRef.current.innerHTML;
+      onChange?.(html);
+      saveToHistoryImmediate(html);
+    }
+  }, [onChange, saveToHistoryImmediate]);
+
   const handleKeyDown = (e) => {
     // Ctrl+Enter or Cmd+Enter to blur (save)
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       editorRef.current?.blur();
       return;
+    }
+
+    // Formatting keyboard shortcuts
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+B for bold
+      if (e.key === 'b' && !e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('bold');
+        return;
+      }
+      // Ctrl+I for italic
+      if (e.key === 'i' && !e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('italic');
+        return;
+      }
+      // Ctrl+U for underline
+      if (e.key === 'u' && !e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('underline');
+        return;
+      }
+      // Ctrl+K for link
+      if (e.key === 'k' && !e.shiftKey) {
+        e.preventDefault();
+        handleLinkShortcut();
+        return;
+      }
+      // Ctrl+Shift+X for strikethrough
+      if (e.key === 'x' && e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('strikeThrough');
+        return;
+      }
+      // Ctrl+Shift+7 for ordered list
+      if (e.key === '7' && e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('insertOrderedList');
+        return;
+      }
+      // Ctrl+Shift+8 for unordered list
+      if (e.key === '8' && e.shiftKey) {
+        e.preventDefault();
+        handleExecCommand('insertUnorderedList');
+        return;
+      }
     }
 
     // Ctrl+Z for undo
@@ -970,12 +1116,31 @@ const TicketRichTextEditor = ({
 
   return (
     <>
-      <div style={{ position: 'relative' }}>
+      <div className={`ticket-editor-wrapper ${className}`} style={{ position: 'relative' }}>
+        {/* Formatting Toolbar */}
+        {!disabled && (
+          <TicketEditorToolbar
+            editorRef={editorRef}
+            activeFormats={activeFormats}
+            onExecCommand={handleExecCommand}
+            onImageUpload={handleImagePaste}
+            savedSelectionRef={savedSelectionRef}
+            disabled={disabled}
+          />
+        )}
+
+        {/* Editor Content Area */}
         <div
           ref={editorRef}
           contentEditable={!disabled}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => {
+          onBlur={(e) => {
+            // Don't blur if clicking within toolbar or its popovers
+            const relatedTarget = e.relatedTarget;
+            if (relatedTarget?.closest('.ticket-editor-toolbar') ||
+                relatedTarget?.closest('.ticket-editor-wrapper')) {
+              return;
+            }
             setIsFocused(false);
             // Save any pending changes to history on blur
             if (editorRef.current) {
@@ -992,14 +1157,15 @@ const TicketRichTextEditor = ({
           onPaste={handlePaste}
           onClick={handleClick}
           onKeyDown={handleKeyDown}
-          className={`ticket-rich-editor ${className}`}
+          className="ticket-rich-editor"
           style={{
             minHeight: `${rows * 24}px`,
             whiteSpace: 'pre-wrap',
             overflowWrap: 'break-word',
             cursor: disabled ? 'not-allowed' : 'text',
             opacity: disabled ? 0.6 : 1,
-            color: 'inherit'
+            color: 'inherit',
+            padding: '8px 12px'
           }}
           data-placeholder={placeholder}
           suppressContentEditableWarning
@@ -1040,11 +1206,11 @@ const TicketRichTextEditor = ({
       />
 
       <style>{`
+        .ticket-editor-wrapper {
+          border-radius: inherit;
+        }
         .ticket-rich-editor {
           position: relative;
-          color: inherit;
-        }
-        .ticket-rich-editor * {
           color: inherit;
         }
         .ticket-rich-editor:empty:before {
@@ -1073,6 +1239,54 @@ const TicketRichTextEditor = ({
         }
         .ticket-rich-editor a:hover {
           color: #1d4ed8 !important;
+        }
+        /* Rich text formatting styles */
+        .ticket-rich-editor h1 {
+          font-size: 1.5em;
+          font-weight: 700;
+          margin: 0.4em 0 0.2em;
+          line-height: 1.3;
+        }
+        .ticket-rich-editor h2 {
+          font-size: 1.25em;
+          font-weight: 600;
+          margin: 0.35em 0 0.15em;
+          line-height: 1.3;
+        }
+        .ticket-rich-editor h3 {
+          font-size: 1.1em;
+          font-weight: 600;
+          margin: 0.3em 0 0.1em;
+          line-height: 1.3;
+        }
+        .ticket-rich-editor blockquote {
+          border-left: 3px solid #d1d5db;
+          padding-left: 12px;
+          margin: 6px 0;
+          font-style: italic;
+          color: #6b7280;
+        }
+        .dark .ticket-rich-editor blockquote {
+          border-left-color: #525252;
+          color: #9ca3af;
+        }
+        .ticket-rich-editor ul {
+          list-style-type: disc;
+          padding-left: 24px;
+          margin: 4px 0;
+        }
+        .ticket-rich-editor ol {
+          list-style-type: decimal;
+          padding-left: 24px;
+          margin: 4px 0;
+        }
+        .ticket-rich-editor li {
+          margin: 2px 0;
+        }
+        .ticket-rich-editor s,
+        .ticket-rich-editor strike,
+        .ticket-rich-editor del {
+          text-decoration: line-through;
         }
       `}</style>
     </>
@@ -1170,6 +1384,54 @@ export const TicketContentDisplay = ({ content, className = '' }) => {
         }
         .ticket-content-display a:hover {
           color: #1d4ed8 !important;
+        }
+        /* Rich text display styles */
+        .ticket-content-display h1 {
+          font-size: 1.5em;
+          font-weight: 700;
+          margin: 0.4em 0 0.2em;
+          line-height: 1.3;
+        }
+        .ticket-content-display h2 {
+          font-size: 1.25em;
+          font-weight: 600;
+          margin: 0.35em 0 0.15em;
+          line-height: 1.3;
+        }
+        .ticket-content-display h3 {
+          font-size: 1.1em;
+          font-weight: 600;
+          margin: 0.3em 0 0.1em;
+          line-height: 1.3;
+        }
+        .ticket-content-display blockquote {
+          border-left: 3px solid #d1d5db;
+          padding-left: 12px;
+          margin: 6px 0;
+          font-style: italic;
+          color: #6b7280;
+        }
+        .dark .ticket-content-display blockquote {
+          border-left-color: #525252;
+          color: #9ca3af;
+        }
+        .ticket-content-display ul {
+          list-style-type: disc;
+          padding-left: 24px;
+          margin: 4px 0;
+        }
+        .ticket-content-display ol {
+          list-style-type: decimal;
+          padding-left: 24px;
+          margin: 4px 0;
+        }
+        .ticket-content-display li {
+          margin: 2px 0;
+        }
+        .ticket-content-display s,
+        .ticket-content-display strike,
+        .ticket-content-display del {
+          text-decoration: line-through;
         }
       `}</style>
     </>
