@@ -18,6 +18,7 @@ import { MinimizedTicketProvider } from './context/MinimizedTicketContext';
 import { ZenMoveProvider } from './context/ZenMoveContext';
 import MinimizedTicketDock from './components/MinimizedTicketDock';
 import MinimizeWarpAnimation from './components/MinimizeWarpAnimation';
+import MaintenanceOverlay from './components/MaintenanceOverlay';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Workspace from './pages/Workspace';
@@ -85,6 +86,7 @@ function App() {
                     <CommandPaletteProvider>
                       <TextFormattingProvider>
                         <Router>
+                          <MaintenanceOverlay />
                           <MinimizedTicketProvider>
                           <ZenMoveProvider>
                           <WheelNavigationWrapper />
