@@ -186,6 +186,12 @@ const QADashboard = () => {
                     <span className="text-gray-500 dark:text-neutral-400">Graded:</span>
                     <span className="ml-1 text-gray-900 dark:text-white font-medium">{stat.gradedCount || 0}</span>
                   </div>
+                  {(stat.noteCount > 0) && (
+                    <div className="text-xs">
+                      <span className="text-amber-600 dark:text-amber-400">Notes:</span>
+                      <span className="ml-1 text-amber-700 dark:text-amber-300 font-medium">{stat.gradedNoteCount || 0}/{stat.noteCount}</span>
+                    </div>
+                  )}
                   <div className="flex-1 bg-gray-100 dark:bg-neutral-800 rounded-full h-1.5">
                     <div
                       className="bg-black dark:bg-white h-1.5 rounded-full transition-all"
@@ -234,6 +240,7 @@ const QADashboard = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Agent</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Tickets</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Notes</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Graded</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Avg Score</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">Actions</th>
@@ -257,6 +264,15 @@ const QADashboard = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{stat.ticketCount || 0}</td>
+                    <td className="px-6 py-4">
+                      {stat.noteCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-full">
+                          {stat.gradedNoteCount || 0}/{stat.noteCount}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-neutral-600">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-gray-100 dark:bg-neutral-800 rounded-full h-1.5 max-w-[80px]">

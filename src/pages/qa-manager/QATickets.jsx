@@ -384,6 +384,8 @@ const QATickets = () => {
                       className={`p-3 ${
                         hasValidationError
                           ? 'bg-red-50 dark:bg-red-900/20'
+                          : ticket.isNote
+                          ? 'bg-amber-50 dark:bg-amber-900/10'
                           : focusedTicketIndex === index
                           ? 'bg-blue-50 dark:bg-blue-900/20'
                           : ''
@@ -419,6 +421,11 @@ const QATickets = () => {
                             <span className="text-xs font-mono text-gray-500 dark:text-neutral-400">
                               #{ticket.ticketId || ticket._id.slice(-6)}
                             </span>
+                            {ticket.isNote && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                                Note
+                              </span>
+                            )}
                             <span className="text-xs text-gray-400">•</span>
                             <span className="text-xs text-gray-500 dark:text-neutral-400">
                               {new Date(ticket.dateEntered || ticket.createdAt || ticket.reviewDate).toLocaleDateString()}
@@ -502,6 +509,8 @@ const QATickets = () => {
                         className={`group transition-colors cursor-pointer relative ${
                           hasValidationError
                             ? 'bg-red-50 dark:bg-red-900/20'
+                            : ticket.isNote
+                            ? 'bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100/60 dark:hover:bg-amber-900/20'
                             : focusedTicketIndex === index
                             ? 'bg-blue-50 dark:bg-blue-900/20'
                             : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'
@@ -540,7 +549,16 @@ const QATickets = () => {
                           className="rounded border-gray-300 dark:border-neutral-600 cursor-pointer"
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-neutral-400" onClick={(e) => e.stopPropagation()}>{ticket.ticketId || ticket._id.slice(-6)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-neutral-400" onClick={(e) => e.stopPropagation()}>
+                        <span className="flex items-center gap-1.5">
+                          {ticket.ticketId || ticket._id.slice(-6)}
+                          {ticket.isNote && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-sans font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                              Note
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-900 dark:text-white" onClick={(e) => e.stopPropagation()}>
                         {ticket.agent?.name || ticket.agentName || 'Unknown'}
                       </td>

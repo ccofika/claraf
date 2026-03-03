@@ -9,11 +9,11 @@ import {
   MessageSquare, Users, Sparkles, ExternalLink, Trash2, Plus, Play,
   ChevronDown, Wand2, GraduationCap, Menu, Home, Calculator, Link2,
   CheckCircle, Globe, LayoutDashboard, Archive, UserCheck, LogOut,
-  BookOpen, LineChart, PieChart, History, Zap
+  BookOpen, LineChart, PieChart, History, Zap, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 // Tabs components replaced with custom sliding tabs implementation
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { QAManagerProvider, useQAManager } from '../../context/QAManagerContext';
 import { duration, easing } from '../../utils/animations';
 import ThrowbackPanel from '../../components/ThrowbackPanel';
@@ -128,6 +128,23 @@ const QAManagerLayoutInner = () => {
     fetchExtractionCounts,
     incrementExtractionCount,
   } = useZenMove();
+
+  // Update announcement modal (versioned — bump CURRENT_UPDATE_VERSION to show new announcements)
+  const CURRENT_UPDATE_VERSION = 'notes-scorecard-v2';
+  const [showUpdateModal, setShowUpdateModal] = useState(() => {
+    const dismissed = localStorage.getItem('clara_dismissed_updates');
+    const dismissedSet = dismissed ? JSON.parse(dismissed) : [];
+    return !dismissedSet.includes(CURRENT_UPDATE_VERSION);
+  });
+  const dismissUpdateModal = () => {
+    setShowUpdateModal(false);
+    const dismissed = localStorage.getItem('clara_dismissed_updates');
+    const dismissedSet = dismissed ? JSON.parse(dismissed) : [];
+    if (!dismissedSet.includes(CURRENT_UPDATE_VERSION)) {
+      dismissedSet.push(CURRENT_UPDATE_VERSION);
+      localStorage.setItem('clara_dismissed_updates', JSON.stringify(dismissedSet));
+    }
+  };
 
   // Local state for modals and UI
   const [throwbackOpen, setThrowbackOpen] = useState(false);
@@ -1334,6 +1351,51 @@ const QAManagerLayoutInner = () => {
           navigate('/qa-manager/review');
         }}
       />
+
+      {/* Update Announcement Modal */}
+      <Dialog open={showUpdateModal} onOpenChange={(open) => { if (!open) dismissUpdateModal(); }}>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-white dark:bg-neutral-900">
+          {/* Image Section */}
+          <div className="relative w-full h-64 bg-white dark:bg-neutral-900 overflow-hidden">
+            <img
+              src="/note-update.png"
+              alt="Notes Scorecard Feature"
+              className="w-full h-full object-cover animate-modal-zoom"
+            />
+          </div>
+
+          {/* Content Section */}
+          <div className="px-6 pb-6 pt-4 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                Notes Scorecard Added to Clara and Extension!
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 dark:text-neutral-400 mt-2">
+                You can now create <span className="font-semibold text-amber-500">Note</span> tickets - no categories, just feedback. Toggle the <span className="font-semibold text-amber-500">Note</span> button in the Grading Information section when creating a ticket. Notes are graded via the extension using a dedicated scorecard. <br /><br /> Have a nice grading session! :D
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href="https://drive.google.com/drive/u/0/folders/1tRIFuCGWfafcu4k10FM5Hc8K2FaDWmaY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm transition-colors"
+                onClick={dismissUpdateModal}
+              >
+                <Download className="w-4 h-4" />
+                Download Updated Extension
+              </a>
+              <button
+                onClick={dismissUpdateModal}
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Bug Report Floating Button */}
       <BugReportButton getAuthHeaders={getAuthHeaders} />

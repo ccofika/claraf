@@ -1246,9 +1246,12 @@ const QAActiveOverview = () => {
                               </div>
 
                               <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs ml-6 sm:ml-0">
-                                <span className="text-neutral-600 dark:text-neutral-400"><strong>{agent.tickets.length}</strong> tkts</span>
+                                <span className="text-neutral-600 dark:text-neutral-400"><strong>{agent.stats?.total || agent.tickets.filter(t => !t.isNote).length}</strong> tkts</span>
                                 <span className="text-green-600 dark:text-green-400"><strong>{agent.filteredStats?.graded || agent.stats?.graded || 0}</strong> graded</span>
                                 <span className={getScoreColor(agent.stats?.avgScore)}><strong>{agent.stats?.avgScore || '-'}%</strong></span>
+                                {(agent.stats?.noteCount > 0 || agent.tickets.some(t => t.isNote)) && (
+                                  <span className="text-amber-600 dark:text-amber-400"><strong>{agent.stats?.noteCount || agent.tickets.filter(t => t.isNote).length}</strong> notes</span>
+                                )}
                               </div>
                             </div>
 
@@ -1264,14 +1267,17 @@ const QAActiveOverview = () => {
                                       {agent.tickets.map((ticket, ticketIndex) => {
                                         const isSelected = selectedTickets.includes(ticket._id);
                                         return (
-                                          <div key={ticket._id || `ticket-${ticketIndex}`} className={`p-2.5 ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                          <div key={ticket._id || `ticket-${ticketIndex}`} className={`p-2.5 ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ticket.isNote ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}>
                                             <div className="flex items-start gap-2">
                                               <button onClick={() => toggleTicketSelection(ticket._id)} className="p-0.5 mt-0.5">
                                                 {isSelected ? <CheckSquare className="w-4 h-4 text-purple-600" /> : <Square className="w-4 h-4 text-neutral-400" />}
                                               </button>
                                               <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-2 mb-1">
-                                                  <span className="font-mono text-[10px] text-neutral-500 truncate">{ticket.ticketId || '-'}</span>
+                                                  <span className="font-mono text-[10px] text-neutral-500 truncate">
+                                                    {ticket.ticketId || '-'}
+                                                    {ticket.isNote && <span className="ml-1 px-1 py-0.5 text-[9px] font-sans font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">Note</span>}
+                                                  </span>
                                                   <span className={`font-semibold text-xs ${getScoreColor(ticket.qualityScorePercent)}`}>
                                                     {ticket.qualityScorePercent !== null && ticket.qualityScorePercent !== undefined ? `${ticket.qualityScorePercent}%` : '-'}
                                                   </span>
@@ -1315,13 +1321,16 @@ const QAActiveOverview = () => {
                                         {agent.tickets.map((ticket, ticketIndex) => {
                                           const isSelected = selectedTickets.includes(ticket._id);
                                           return (
-                                            <tr key={ticket._id || `ticket-${ticketIndex}`} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                            <tr key={ticket._id || `ticket-${ticketIndex}`} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/10' : ticket.isNote ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}>
                                               <td className="px-3 py-2">
                                                 <button onClick={() => toggleTicketSelection(ticket._id)} className="p-0.5">
                                                   {isSelected ? <CheckSquare className="w-4 h-4 text-purple-600" /> : <Square className="w-4 h-4 text-neutral-400" />}
                                                 </button>
                                               </td>
-                                              <td className="px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">{ticket.ticketId || '-'}</td>
+                                              <td className="px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+                                                {ticket.ticketId || '-'}
+                                                {ticket.isNote && <span className="ml-1 px-1 py-0.5 text-[9px] font-sans font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">Note</span>}
+                                              </td>
                                               <td className="px-3 py-2 text-neutral-900 dark:text-white max-w-xs truncate">{ticket.shortDescription || '-'}</td>
                                               <td className="px-3 py-2 text-neutral-500 text-xs">{formatDate(ticket.dateEntered)}</td>
                                               <td className="px-3 py-2">{getStatusBadge(ticket.status)}</td>
@@ -2096,7 +2105,12 @@ const QAActiveOverview = () => {
                   <div className="min-w-0">
                     <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2 flex-wrap">
                       <span className="truncate">{viewTicketDialog.ticket?.ticketId}</span>
-                      {viewTicketDialog.ticket?.qualityScorePercent !== null && (
+                      {viewTicketDialog.ticket?.isNote && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg flex-shrink-0">
+                          Note
+                        </span>
+                      )}
+                      {!viewTicketDialog.ticket?.isNote && viewTicketDialog.ticket?.qualityScorePercent !== null && (
                         <span className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-xs sm:text-sm font-medium flex-shrink-0 ${
                           viewTicketDialog.ticket.qualityScorePercent >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
                           viewTicketDialog.ticket.qualityScorePercent >= 80 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
@@ -2154,8 +2168,8 @@ const QAActiveOverview = () => {
                     </div>
                   </div>
 
-                  {/* Categories */}
-                  {viewTicketDialog.ticket.categories && viewTicketDialog.ticket.categories.length > 0 && (
+                  {/* Categories (hidden for note tickets) */}
+                  {!viewTicketDialog.ticket.isNote && viewTicketDialog.ticket.categories && viewTicketDialog.ticket.categories.length > 0 && (
                     <div>
                       <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
                         <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />

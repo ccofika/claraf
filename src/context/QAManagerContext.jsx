@@ -219,7 +219,8 @@ export const QAManagerProvider = ({ children }) => {
     scorecardVariant: null,
     scorecardValues: {},
     reoccurringError: null,
-    reoccurringErrorCategories: []
+    reoccurringErrorCategories: [],
+    isNote: false
   });
   const hasUnsavedChangesRef = useRef(false);
   const originalFormDataRef = useRef(null);
@@ -784,7 +785,8 @@ export const QAManagerProvider = ({ children }) => {
         scorecardValues: formData.scorecardValues,
         ...(USE_NEW_SCORECARD && { scorecardVersion: 'v2' }),
         reoccurringError: formData.reoccurringError || null,
-        reoccurringErrorCategories: formData.reoccurringErrorCategories || []
+        reoccurringErrorCategories: formData.reoccurringErrorCategories || [],
+        isNote: formData.isNote || false
       };
       const response = await axios.post(`${API_URL}/api/qa/tickets`, requestBody, getAuthHeaders());
       setTickets(prev => [response.data, ...prev]);
@@ -814,7 +816,8 @@ export const QAManagerProvider = ({ children }) => {
         scorecardVariant: formData.scorecardVariant,
         scorecardValues: formData.scorecardValues,
         reoccurringError: formData.reoccurringError || null,
-        reoccurringErrorCategories: formData.reoccurringErrorCategories || []
+        reoccurringErrorCategories: formData.reoccurringErrorCategories || [],
+        isNote: formData.isNote || false
       };
       const response = await axios.put(`${API_URL}/api/qa/tickets/${id}`, requestBody, getAuthHeaders());
       setTickets(prev => prev.map(t => t._id === id ? response.data : t));
@@ -1273,6 +1276,14 @@ export const QAManagerProvider = ({ children }) => {
       missing.push('Ticket ID');
     }
 
+    // Note tickets only need ticketId and feedback
+    if (ticket.isNote) {
+      if (!ticket.feedback || ticket.feedback.trim() === '') {
+        missing.push('Feedback');
+      }
+      return missing;
+    }
+
     if (!USE_NEW_SCORECARD) {
       const isSenior = agentPosition?.toLowerCase().includes('senior');
       if (isSenior && !ticket.scorecardVariant) {
@@ -1442,7 +1453,8 @@ export const QAManagerProvider = ({ children }) => {
           feedback: t.feedback,
           notes: t.notes,
           reoccurringError: t.reoccurringError || null,
-          reoccurringErrorCategories: t.reoccurringErrorCategories || []
+          reoccurringErrorCategories: t.reoccurringErrorCategories || [],
+          isNote: t.isNote || false
         })),
         source
       };
@@ -1651,7 +1663,8 @@ export const QAManagerProvider = ({ children }) => {
         scorecardVariant: null,
         scorecardValues: {},
         reoccurringError: USE_NEW_SCORECARD ? 'unsure' : null,
-        reoccurringErrorCategories: []
+        reoccurringErrorCategories: [],
+        isNote: false
       };
     } else if (mode === 'edit' && data) {
       const scorecardValuesObj = data.scorecardValues && typeof data.scorecardValues === 'object'
@@ -1670,7 +1683,8 @@ export const QAManagerProvider = ({ children }) => {
         scorecardValues: scorecardValuesObj,
         additionalNote: data.additionalNote || '',
         reoccurringError: data.reoccurringError || (USE_NEW_SCORECARD ? 'unsure' : null),
-        reoccurringErrorCategories: data.reoccurringErrorCategories || []
+        reoccurringErrorCategories: data.reoccurringErrorCategories || [],
+        isNote: data.isNote || false
       };
     }
     setTicketDialog({ open: true, mode, data, source });
@@ -1694,7 +1708,8 @@ export const QAManagerProvider = ({ children }) => {
       categories: formData.categories || [],
       scorecardVariant: formData.scorecardVariant || null,
       scorecardValues: formData.scorecardValues || {},
-      additionalNote: formData.additionalNote || ''
+      additionalNote: formData.additionalNote || '',
+      isNote: formData.isNote || false
     };
 
     // Find the ticket in the loaded tickets list for the dialog data
@@ -1955,6 +1970,17 @@ export const QAManagerProvider = ({ children }) => {
               console.log(`Ticket ${data.ticketId} updated with score ${data.qualityScore}% and status Graded`);
             } catch (gradeErr) {
               console.error('Failed to update ticket score:', gradeErr);
+            }
+          } else if (data.ticketObjectId && data.isNote) {
+            try {
+              await axios.put(
+                `${API_URL}/api/qa/tickets/${data.ticketObjectId}`,
+                { status: 'Graded', isNote: true },
+                getAuthHeaders()
+              );
+              console.log(`Note ticket ${data.ticketId} marked as Graded`);
+            } catch (noteErr) {
+              console.error('Failed to update note ticket status:', noteErr);
             }
           }
 

@@ -719,14 +719,25 @@ const TicketDialog = ({
                             <div className="absolute inset-0 flex items-center">
                               <div className="w-full border-t border-gray-300 dark:border-neutral-700"></div>
                             </div>
-                            <div className="relative flex justify-center">
+                            <div className="relative flex items-center justify-center gap-3">
                               <span className="px-3 bg-white dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Grading Information
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, isNote: !formData.isNote })}
+                                className={`px-3 py-1 text-xs font-medium rounded-full border transition-all duration-200 bg-white dark:bg-neutral-900 ${
+                                  formData.isNote
+                                    ? 'border-amber-400 text-amber-700 dark:text-amber-400 ring-2 ring-amber-200 dark:ring-amber-500/30'
+                                    : 'border-gray-300 dark:border-neutral-600 text-gray-500 dark:text-neutral-400 hover:border-amber-300 hover:text-amber-600'
+                                }`}
+                              >
+                                Note
+                              </button>
                             </div>
                           </div>
 
-                          {agentHasScorecard && (
+                          {!formData.isNote && agentHasScorecard && (
                             <ScorecardEditor
                               agentPosition={agentPosition}
                               variant={formData.scorecardVariant}
@@ -740,7 +751,7 @@ const TicketDialog = ({
                           )}
 
                           {/* Reoccurring Error (V2 scorecard only) */}
-                          {USE_NEW_SCORECARD && agentHasScorecard && (
+                          {!formData.isNote && USE_NEW_SCORECARD && agentHasScorecard && (
                             <div className="mt-3">
                               <div className="flex items-center gap-3 mb-2">
                                 <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reoccurring Error</Label>
@@ -791,6 +802,7 @@ const TicketDialog = ({
                             </div>
                           )}
 
+                          {!formData.isNote && (
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                             <div>
                               <Label className="text-xs text-gray-600 dark:text-neutral-400 mb-1.5 block">Status</Label>
@@ -902,6 +914,7 @@ const TicketDialog = ({
                               )}
                             </div>
                           </div>
+                          )}
 
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
@@ -1079,14 +1092,25 @@ const TicketDialog = ({
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-300 dark:border-neutral-700"></div>
                   </div>
-                  <div className="relative flex justify-center">
+                  <div className="relative flex items-center justify-center gap-3">
                     <span className="px-3 bg-white dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
                       Grading Information
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, isNote: !formData.isNote })}
+                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-all duration-200 bg-white dark:bg-neutral-900 ${
+                        formData.isNote
+                          ? 'border-amber-400 text-amber-700 dark:text-amber-400 ring-2 ring-amber-200 dark:ring-amber-500/30'
+                          : 'border-gray-300 dark:border-neutral-600 text-gray-500 dark:text-neutral-400 hover:border-amber-300 hover:text-amber-600'
+                      }`}
+                    >
+                      Note
+                    </button>
                   </div>
                 </div>
 
-                {agentHasScorecard && (
+                {!formData.isNote && agentHasScorecard && (
                   <ScorecardEditor
                     agentPosition={agentPosition}
                     variant={formData.scorecardVariant}
@@ -1100,7 +1124,7 @@ const TicketDialog = ({
                 )}
 
                 {/* Reoccurring Error (V2 scorecard only) - ZenMove/Edit layout */}
-                {USE_NEW_SCORECARD && agentHasScorecard && (
+                {!formData.isNote && USE_NEW_SCORECARD && agentHasScorecard && (
                   <div className="mt-3">
                     <div className="flex items-center gap-3 mb-2">
                       <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reoccurring Error</Label>
@@ -1151,6 +1175,7 @@ const TicketDialog = ({
                   </div>
                 )}
 
+                {!formData.isNote && (
                 <div className={`grid gap-3 sm:gap-4 ${isReviewMode ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
                   {!isReviewMode && (
                     <div>
@@ -1289,6 +1314,7 @@ const TicketDialog = ({
                     )}
                   </div>
                 </div>
+                )}
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">

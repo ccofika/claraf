@@ -264,6 +264,18 @@ const QAManager = () => {
             } catch (gradeErr) {
               console.error('Failed to update ticket score:', gradeErr);
             }
+          } else if (data.ticketObjectId && data.isNote) {
+            // Note ticket — no quality score, but still mark as Graded
+            try {
+              await axios.put(
+                `${API_URL}/api/qa/tickets/${data.ticketObjectId}`,
+                { status: 'Graded', isNote: true },
+                getAuthHeaders()
+              );
+              console.log(`Note ticket ${data.ticketId} marked as Graded`);
+            } catch (noteErr) {
+              console.error('Failed to update note ticket status:', noteErr);
+            }
           } else {
             console.log('Missing ticketObjectId or qualityScore, skipping ticket update');
           }

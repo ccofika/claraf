@@ -17,6 +17,33 @@
   animation: slide-up 0.3s ease-out;
 }
 
+@keyframes modal-zoom {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  65% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  82% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+}
+
+.animate-modal-zoom {
+  animation: modal-zoom 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
