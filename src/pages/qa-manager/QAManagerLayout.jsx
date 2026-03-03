@@ -129,21 +129,60 @@ const QAManagerLayoutInner = () => {
     incrementExtractionCount,
   } = useZenMove();
 
-  // Update announcement modal (versioned — bump CURRENT_UPDATE_VERSION to show new announcements)
-  const CURRENT_UPDATE_VERSION = 'notes-scorecard-v2';
-  const [showUpdateModal, setShowUpdateModal] = useState(() => {
-    const dismissed = localStorage.getItem('clara_dismissed_updates');
-    const dismissedSet = dismissed ? JSON.parse(dismissed) : [];
-    return !dismissedSet.includes(CURRENT_UPDATE_VERSION);
+  // ─── Update Announcements Carousel ───
+  // To add a new update: push a new entry to CLARA_UPDATES array below.
+  // Each entry needs: id (unique string), image, title, description (JSX), action (optional).
+  // The carousel shows all unseen updates. An update is "seen" only when the user
+  // navigates to that specific carousel page. Dismissing closes the modal but only
+  // marks the currently visible page as seen.
+  const CLARA_UPDATES = [
+    {
+      id: 'notes-scorecard-v2',
+      image: '/note-update.png',
+      title: 'Notes Scorecard Added to Clara and Extension!',
+      description: (
+        <>You can now create <span className="font-semibold text-amber-500">Note</span> tickets - no categories, just feedback. Toggle the <span className="font-semibold text-amber-500">Note</span> button in the Grading Information section when creating a ticket. Notes are graded via the extension using a dedicated scorecard. <br /><br /> Have a nice grading session! :D</>
+      ),
+      action: {
+        label: 'Download Updated Extension',
+        href: 'https://drive.google.com/drive/u/0/folders/1tRIFuCGWfafcu4k10FM5Hc8K2FaDWmaY',
+      },
+    },
+    // Add future updates here:
+    // { id: 'feature-xyz-v1', image: '/xyz-update.png', title: '...', description: (<>...</>), action: { label: '...', href: '...' } },
+  ];
+
+  const getSeenUpdates = () => {
+    try {
+      return JSON.parse(localStorage.getItem('clara_seen_updates') || '[]');
+    } catch { return []; }
+  };
+  const markUpdateSeen = (updateId) => {
+    const seen = getSeenUpdates();
+    if (!seen.includes(updateId)) {
+      seen.push(updateId);
+      localStorage.setItem('clara_seen_updates', JSON.stringify(seen));
+    }
+  };
+
+  // Snapshot unseen updates once on mount so marking seen doesn't empty the list mid-display
+  const [unseenUpdates] = useState(() => {
+    const seen = getSeenUpdates();
+    return CLARA_UPDATES.filter(u => !seen.includes(u.id));
   });
+  const [showUpdateModal, setShowUpdateModal] = useState(() => unseenUpdates.length > 0);
+  const [updateCarouselIndex, setUpdateCarouselIndex] = useState(0);
+
+  // Mark current carousel page as seen when user navigates to it
+  useEffect(() => {
+    if (showUpdateModal && unseenUpdates[updateCarouselIndex]) {
+      markUpdateSeen(unseenUpdates[updateCarouselIndex].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateCarouselIndex, showUpdateModal]);
+
   const dismissUpdateModal = () => {
     setShowUpdateModal(false);
-    const dismissed = localStorage.getItem('clara_dismissed_updates');
-    const dismissedSet = dismissed ? JSON.parse(dismissed) : [];
-    if (!dismissedSet.includes(CURRENT_UPDATE_VERSION)) {
-      dismissedSet.push(CURRENT_UPDATE_VERSION);
-      localStorage.setItem('clara_dismissed_updates', JSON.stringify(dismissedSet));
-    }
   };
 
   // Local state for modals and UI
@@ -1352,48 +1391,91 @@ const QAManagerLayoutInner = () => {
         }}
       />
 
-      {/* Update Announcement Modal */}
+      {/* Update Announcements Carousel Modal */}
       <Dialog open={showUpdateModal} onOpenChange={(open) => { if (!open) dismissUpdateModal(); }}>
         <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-white dark:bg-neutral-900">
-          {/* Image Section */}
-          <div className="relative w-full h-64 bg-white dark:bg-neutral-900 overflow-hidden">
-            <img
-              src="/note-update.png"
-              alt="Notes Scorecard Feature"
-              className="w-full h-full object-cover animate-modal-zoom"
-            />
-          </div>
+          {unseenUpdates.length > 0 && (() => {
+            const update = unseenUpdates[updateCarouselIndex] || unseenUpdates[0];
+            return (
+              <>
+                {/* Image Section */}
+                <div className="relative w-full h-64 bg-white dark:bg-neutral-900 overflow-hidden">
+                  <img
+                    key={update.id}
+                    src={update.image}
+                    alt={update.title}
+                    className="w-full h-full object-cover animate-modal-zoom"
+                  />
+                </div>
 
-          {/* Content Section */}
-          <div className="px-6 pb-6 pt-4 space-y-4">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                Notes Scorecard Added to Clara and Extension!
-              </DialogTitle>
-              <DialogDescription className="text-sm text-gray-600 dark:text-neutral-400 mt-2">
-                You can now create <span className="font-semibold text-amber-500">Note</span> tickets - no categories, just feedback. Toggle the <span className="font-semibold text-amber-500">Note</span> button in the Grading Information section when creating a ticket. Notes are graded via the extension using a dedicated scorecard. <br /><br /> Have a nice grading session! :D
-              </DialogDescription>
-            </DialogHeader>
+                {/* Content Section */}
+                <div className="px-6 pb-6 pt-4 space-y-4">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {update.title}
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-gray-600 dark:text-neutral-400 mt-2">
+                      {update.description}
+                    </DialogDescription>
+                  </DialogHeader>
 
-            <div className="flex items-center gap-3 pt-2">
-              <a
-                href="https://drive.google.com/drive/u/0/folders/1tRIFuCGWfafcu4k10FM5Hc8K2FaDWmaY"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm transition-colors"
-                onClick={dismissUpdateModal}
-              >
-                <Download className="w-4 h-4" />
-                Download Updated Extension
-              </a>
-              <button
-                onClick={dismissUpdateModal}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
+                  {/* Carousel dots + navigation */}
+                  {unseenUpdates.length > 1 && (
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => setUpdateCarouselIndex(i => Math.max(0, i - 1))}
+                        disabled={updateCarouselIndex === 0}
+                        className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 disabled:opacity-30 transition-colors"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {unseenUpdates.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setUpdateCarouselIndex(i)}
+                            className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                              i === updateCarouselIndex
+                                ? 'bg-amber-500 w-4'
+                                : 'bg-gray-300 dark:bg-neutral-600 hover:bg-gray-400'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setUpdateCarouselIndex(i => Math.min(unseenUpdates.length - 1, i + 1))}
+                        disabled={updateCarouselIndex === unseenUpdates.length - 1}
+                        className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 disabled:opacity-30 transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-2">
+                    {update.action && (
+                      <a
+                        href={update.action.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm transition-colors"
+                        onClick={dismissUpdateModal}
+                      >
+                        <Download className="w-4 h-4" />
+                        {update.action.label}
+                      </a>
+                    )}
+                    <button
+                      onClick={dismissUpdateModal}
+                      className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
