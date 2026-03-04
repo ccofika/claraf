@@ -1649,16 +1649,16 @@ export const QAManagerProvider = ({ children }) => {
   // ============================================
   // DIALOG HELPERS
   // ============================================
-  const openTicketDialog = useCallback((mode, data = null, source = 'tickets', prefilledAgent = null) => {
+  const openTicketDialog = useCallback((mode, data = null, source = 'tickets', prefilledAgent = null, prefilledData = {}) => {
     if (mode === 'create') {
       ticketFormDataRef.current = {
         agent: prefilledAgent || '',
-        ticketId: '',
+        ticketId: prefilledData.ticketId || '',
         status: 'Selected',
         qualityScorePercent: '',
         notes: '',
         feedback: '',
-        dateEntered: new Date().toISOString().split('T')[0],
+        dateEntered: prefilledData.dateEntered || new Date().toISOString().split('T')[0],
         categories: [],
         scorecardVariant: null,
         scorecardValues: {},

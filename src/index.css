@@ -19,29 +19,31 @@
 
 @keyframes modal-zoom {
   0% {
-    transform: scale(0.8);
+    transform: scale(1);
     opacity: 1;
   }
   30% {
-    transform: scale(1.2);
+    transform: scale(1.6);
     opacity: 1;
   }
   65% {
-    transform: scale(1.2);
+    transform: scale(1.6);
     opacity: 1;
   }
   82% {
-    transform: scale(0.8);
+    transform: scale(1);
     opacity: 0;
   }
   100% {
-    transform: scale(0.8);
+    transform: scale(1);
     opacity: 1;
   }
 }
 
 .animate-modal-zoom {
   animation: modal-zoom 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  object-position: top right;
+  transform-origin: top right;
 }
 
 @layer base {

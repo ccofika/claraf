@@ -8,7 +8,7 @@ import { cn } from '../../lib/utils';
 // Ensure portal root exists
 const PORTAL_ID = 'datepicker-portal';
 
-export function DatePicker({ value, onChange, placeholder = "Select date", className, size = "default" }) {
+export function DatePicker({ value, onChange, placeholder = "Select date", className, size = "default", disablePortal = false }) {
   // Create portal container on mount
   useEffect(() => {
     if (!document.getElementById(PORTAL_ID)) {
@@ -49,7 +49,7 @@ export function DatePicker({ value, onChange, placeholder = "Select date", class
         wrapperClassName="w-full"
         calendarClassName="custom-calendar"
         popperPlacement="bottom-start"
-        portalId={PORTAL_ID}
+        {...(!disablePortal ? { portalId: PORTAL_ID } : {})}
       />
       <CalendarIcon className={cn(
         "absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none",

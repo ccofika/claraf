@@ -15,6 +15,7 @@ import SimilarFeedbacksPanel from '../../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
 import MacroSuggestionsPanel from '../../components/MacroSuggestionsPanel';
 import ArchiveSearchPanel from '../../components/ArchiveSearchPanel';
+import ConversationPanel from '../../components/ConversationPanel';
 import ChooseMacroModal from '../../components/ChooseMacroModal';
 import { hasScorecard, getScorecardCategories, USE_NEW_SCORECARD, REOCCURRING_ERROR_OPTIONS } from '../../data/scorecardConfig';
 import { calculateQualityScore, supportsAutoQualityScore } from '../../utils/scorecardCalculations';
@@ -1456,7 +1457,7 @@ const TicketDialog = ({
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('ai')}
-                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'ai'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
@@ -1468,7 +1469,7 @@ const TicketDialog = ({
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('related')}
-                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'related'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
@@ -1480,7 +1481,7 @@ const TicketDialog = ({
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('macros')}
-                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'macros'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
@@ -1492,7 +1493,7 @@ const TicketDialog = ({
                   <button
                     type="button"
                     onClick={() => setRightPanelMode('archive')}
-                    className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                       rightPanelMode === 'archive'
                         ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
@@ -1500,6 +1501,18 @@ const TicketDialog = ({
                   >
                     <Archive className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     <span className="hidden xs:inline">Archive</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode('conversation')}
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
+                      rightPanelMode === 'conversation'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden xs:inline">Chat</span>
                   </button>
                 </div>
               </div>
@@ -1629,6 +1642,11 @@ const TicketDialog = ({
                         setFormData(prev => ({ ...prev, ...updates }));
                       }
                     }}
+                  />
+                )}
+                {rightPanelMode === 'conversation' && (
+                  <ConversationPanel
+                    ticketId={formData.ticketId}
                   />
                 )}
               </div>

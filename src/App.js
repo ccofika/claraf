@@ -54,7 +54,8 @@ import {
   QACoachingDetail,
   QAReview,
   QAReviewAnalytics,
-  QAReviewHistory
+  QAReviewHistory,
+  QAReport
 } from './pages/qa-manager';
 import {
   KnowledgeBaseLayout,
@@ -220,6 +221,7 @@ function App() {
                           <Route path="import-tickets" element={<QAImportTickets />} />
                           <Route path="active-overview" element={<QAActiveOverview />} />
                           <Route path="bugs" element={<QABugsPage />} />
+                          <Route path="report" element={<QAReport />} />
                         </Route>
 
                         {/* Knowledge Base routes with nested routing */}

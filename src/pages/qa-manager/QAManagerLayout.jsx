@@ -27,6 +27,7 @@ import BugReportButton from '../../components/BugReportButton';
 import { TicketContentDisplay } from '../../components/TicketRichTextEditor';
 import SimilarFeedbacksPanel from '../../components/SimilarFeedbacksPanel';
 import RelatedTicketsPanel from '../../components/RelatedTicketsPanel';
+import ConversationPanel from '../../components/ConversationPanel';
 import ScorecardEditor from '../../components/ScorecardEditor';
 import { hasScorecard } from '../../data/scorecardConfig';
 import { Button, StatusBadge, QualityScoreBadge, ReviewNotificationBanner } from './components';
@@ -132,9 +133,7 @@ const QAManagerLayoutInner = () => {
   // ─── Update Announcements Carousel ───
   // To add a new update: push a new entry to CLARA_UPDATES array below.
   // Each entry needs: id (unique string), image, title, description (JSX), action (optional).
-  // The carousel shows all unseen updates. An update is "seen" only when the user
-  // navigates to that specific carousel page. Dismissing closes the modal but only
-  // marks the currently visible page as seen.
+  // Seen state is stored per-account in the database (not localStorage).
   const CLARA_UPDATES = [
     {
       id: 'notes-scorecard-v2',
@@ -148,35 +147,76 @@ const QAManagerLayoutInner = () => {
         href: 'https://drive.google.com/drive/u/0/folders/1tRIFuCGWfafcu4k10FM5Hc8K2FaDWmaY',
       },
     },
+    {
+      id: 'chat-in-ticket-v1',
+      image: '/chat-update.png',
+      title: 'Chat Now Available in Ticket View!',
+      description: (
+        <>You don't need Intercom anymore! :D<br /><br />We implemented <span className="font-semibold text-amber-500">Chat</span> into the edit ticket function where you can follow the conversation and agent messages while grading a ticket. It can be found on the right side of the ticket window.<br /><br />We wish you the best chat reading!<br /><span className="text-xs text-red-500 mt-1 inline-block">There is also a Report page, but please do not use it for now. Thank you!</span></>
+      ),
+      action: {
+        label: 'Try It',
+        to: '/qa-manager/tickets',
+      },
+    },
     // Add future updates here:
     // { id: 'feature-xyz-v1', image: '/xyz-update.png', title: '...', description: (<>...</>), action: { label: '...', href: '...' } },
   ];
 
-  const getSeenUpdates = () => {
-    try {
-      return JSON.parse(localStorage.getItem('clara_seen_updates') || '[]');
-    } catch { return []; }
-  };
-  const markUpdateSeen = (updateId) => {
-    const seen = getSeenUpdates();
-    if (!seen.includes(updateId)) {
-      seen.push(updateId);
-      localStorage.setItem('clara_seen_updates', JSON.stringify(seen));
-    }
-  };
-
-  // Snapshot unseen updates once on mount so marking seen doesn't empty the list mid-display
-  const [unseenUpdates] = useState(() => {
-    const seen = getSeenUpdates();
-    return CLARA_UPDATES.filter(u => !seen.includes(u.id));
-  });
-  const [showUpdateModal, setShowUpdateModal] = useState(() => unseenUpdates.length > 0);
+  const [unseenUpdates, setUnseenUpdates] = useState([]);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateCarouselIndex, setUpdateCarouselIndex] = useState(0);
 
-  // Mark current carousel page as seen when user navigates to it
+  // Helpers: read/write seen updates — tries backend first, falls back to localStorage
+  const getLocalSeen = () => {
+    try { return JSON.parse(localStorage.getItem('clara_seen_updates') || '[]'); } catch { return []; }
+  };
+  const seenSourceRef = useRef('local'); // 'api' or 'local'
+
+  // Fetch seen updates on mount
+  useEffect(() => {
+    const fetchSeenUpdates = async () => {
+      let seen = [];
+      try {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/user/seen-updates`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          seen = data.seenUpdates || [];
+          seenSourceRef.current = 'api';
+        } else {
+          seen = getLocalSeen();
+        }
+      } catch {
+        seen = getLocalSeen();
+      }
+      const unseen = CLARA_UPDATES.filter(u => !seen.includes(u.id));
+      if (unseen.length > 0) {
+        setUnseenUpdates(unseen);
+        setShowUpdateModal(true);
+      }
+    };
+    fetchSeenUpdates();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mark current carousel page as seen
   useEffect(() => {
     if (showUpdateModal && unseenUpdates[updateCarouselIndex]) {
-      markUpdateSeen(unseenUpdates[updateCarouselIndex].id);
+      const updateId = unseenUpdates[updateCarouselIndex].id;
+      // Always persist to localStorage as fallback
+      const localSeen = getLocalSeen();
+      if (!localSeen.includes(updateId)) {
+        localSeen.push(updateId);
+        localStorage.setItem('clara_seen_updates', JSON.stringify(localSeen));
+      }
+      // Also persist to backend if available
+      fetch(`${process.env.REACT_APP_API_URL}/api/user/seen-updates`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateId }),
+      }).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateCarouselIndex, showUpdateModal]);
@@ -475,6 +515,7 @@ const QAManagerLayoutInner = () => {
                   { value: 'agents', label: 'Agents' },
                   { value: 'tickets', label: 'Tickets' },
                   ...(!zenMoveActive ? [
+                    { value: 'report', label: 'Report' },
                     { value: 'archive', label: 'Archive' },
                     ...(isReviewer ? [{ value: 'review', label: 'Review', badge: reviewPendingCount > 0 ? reviewPendingCount : null }] : []),
                     { value: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -949,12 +990,12 @@ const QAManagerLayoutInner = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Main content area */}
         <motion.div
-          className="overflow-y-auto"
+          className={`${activeTab === 'report' ? 'overflow-hidden' : 'overflow-y-auto'}`}
           animate={{ width: throwbackOpen ? '70%' : '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           style={{ width: throwbackOpen ? '70%' : '100%' }}
         >
-          <div className={`mx-auto px-3 sm:px-6 py-4 sm:py-6 ${throwbackOpen ? '' : 'max-w-7xl'}`}>
+          <div className={`${activeTab === 'report' ? 'h-full' : 'mx-auto px-3 sm:px-6 py-4 sm:py-6'} ${throwbackOpen ? '' : activeTab === 'report' ? '' : 'max-w-7xl'}`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -962,8 +1003,9 @@ const QAManagerLayoutInner = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: duration.normal, ease: easing.smooth }}
+                className={activeTab === 'report' ? 'h-full' : undefined}
               >
-                <ReviewNotificationBanner />
+                {activeTab !== 'report' && <ReviewNotificationBanner />}
                 <Outlet />
               </motion.div>
             </AnimatePresence>
@@ -1453,7 +1495,15 @@ const QAManagerLayoutInner = () => {
                   )}
 
                   <div className="flex items-center gap-3 pt-2">
-                    {update.action && (
+                    {update.action && update.action.to ? (
+                      <button
+                        onClick={() => { dismissUpdateModal(); navigate(update.action.to); }}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm transition-colors"
+                      >
+                        {update.action.icon || <Download className="w-4 h-4" />}
+                        {update.action.label}
+                      </button>
+                    ) : update.action && (
                       <a
                         href={update.action.href}
                         target="_blank"
@@ -2127,22 +2177,40 @@ const ViewTicketDialog = ({
                   <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Related
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelMode('conversation')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                    rightPanelMode === 'conversation'
+                      ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  Chat
+                </button>
               </div>
             </div>
 
             {/* Panel Content */}
             <div className="flex-1 overflow-hidden relative z-10">
-              {rightPanelMode === 'ai' ? (
+              {rightPanelMode === 'ai' && (
                 <SimilarFeedbacksPanel
                   notes={ticket.notes}
                   ticketId={ticket._id}
                   categories={ticket.categories || []}
                 />
-              ) : (
+              )}
+              {rightPanelMode === 'related' && (
                 <RelatedTicketsPanel
                   agentId={ticket.agent?._id || ticket.agent}
                   categories={ticket.categories || []}
                   currentTicketId={ticket._id}
+                />
+              )}
+              {rightPanelMode === 'conversation' && (
+                <ConversationPanel
+                  ticketId={ticket.ticketId}
                 />
               )}
             </div>

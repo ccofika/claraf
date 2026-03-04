@@ -9,6 +9,7 @@ export { default as QACoachingDetail } from './QACoachingDetail';
 export { default as QAReview } from './QAReview';
 export { default as QAReviewAnalytics } from './QAReviewAnalytics';
 export { default as QAReviewHistory } from './QAReviewHistory';
+export { default as QAReport } from './QAReport';
 
 // Re-export existing components that don't need refactoring
 export { default as QAAnalyticsDashboard } from '../../components/QAAnalyticsDashboard';
