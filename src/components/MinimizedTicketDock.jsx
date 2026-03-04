@@ -29,8 +29,9 @@ const MinimizedTicketDock = () => {
   }, [minimizedTicket, dockAppearance]);
 
   const isOnEditPage = location.pathname.includes('/qa-manager/tickets/') && location.pathname.endsWith('/edit');
+  const isOnReportDrillIn = location.pathname.includes('/qa-manager') && location.search.includes('drill=');
 
-  if (!mounted || !minimizedTicket || isOnEditPage) return null;
+  if (!mounted || !minimizedTicket || isOnEditPage || isOnReportDrillIn) return null;
 
   const agentName = minimizedTicket.agentName || 'Unknown';
   const truncatedName = agentName.length > 16 ? agentName.substring(0, 16) + '...' : agentName;

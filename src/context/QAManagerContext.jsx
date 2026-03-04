@@ -1920,6 +1920,7 @@ export const QAManagerProvider = ({ children }) => {
   useEffect(() => {
     const handleExtensionMessage = async (event) => {
       if (event.data && event.data.type === 'CLARA_EXTENSION_LOG') {
+        console.log('%c[EXT]', 'color:#a78bfa;font-weight:bold', event.data.message);
         const logEntry = {
           timestamp: new Date().toLocaleTimeString(),
           message: event.data.message,

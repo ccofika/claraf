@@ -398,7 +398,7 @@ const TicketDialog = ({
 
     // Close dialog instantly (phantom covers the close)
     setTicketDialog({ ...ticketDialog, open: false });
-    if (routerNavigate) {
+    if (routerNavigate && source !== 'report') {
       routerNavigate(basePath);
     }
   }, [ticketDialog, formData, source, minimizeTicket, setTicketDialog, routerNavigate, basePath, getAgentNameForDock, warpAnimation, startWarpAnimation]);
@@ -490,7 +490,8 @@ const TicketDialog = ({
 
     const closeAndNavigate = () => {
       setTicketDialog({ ...ticketDialog, open: false });
-      if (routerNavigate) {
+      // Don't navigate away from report drill-in — just close the dialog
+      if (routerNavigate && source !== 'report') {
         routerNavigate(basePath);
       }
     };

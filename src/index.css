@@ -152,6 +152,27 @@
   scrollbar-color: #525252 transparent; /* thumb track for dark mode */
 }
 
+/* ACP Sidebar - fade scrollbar in/out */
+.acp-sidebar-collapsed {
+  scrollbar-width: none;
+}
+.acp-sidebar-collapsed::-webkit-scrollbar {
+  width: 0;
+}
+.acp-sidebar-expanded::-webkit-scrollbar-thumb {
+  background: transparent;
+  animation: acp-scrollbar-fade-in 200ms 200ms forwards;
+}
+@keyframes acp-scrollbar-fade-in {
+  to { background: #9ca3af; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+}
+.dark .acp-sidebar-expanded::-webkit-scrollbar-thumb {
+  animation-name: acp-scrollbar-fade-in-dark;
+}
+@keyframes acp-scrollbar-fade-in-dark {
+  to { background: #525252; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+}
+
 /* Title Navigation Scrollbar - smaller height */
 .title-navigation-scroll::-webkit-scrollbar {
   height: 5px;

@@ -93,15 +93,6 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
     fetchConversation();
   }, [fetchConversation]);
 
-  // Scroll to bottom on load
-  useEffect(() => {
-    if (conversation && bottomRef.current) {
-      setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 300);
-    }
-  }, [conversation]);
-
   // Track scroll position for "scroll to bottom" button
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
@@ -119,84 +110,31 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
     return (msg.body && msg.body.trim().length > 0) || (msg.contentBlocks && msg.contentBlocks.length > 0) || (msg.attachments && msg.attachments.length > 0);
   }) || [];
 
-  // ── Loading State ──
-  if (loading) {
-    return (
-      <div className="flex flex-col h-full p-3 sm:p-4 gap-3">
-        <div className="flex items-center gap-2 text-gray-500 dark:text-neutral-400 text-xs">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>Loading conversation...</span>
-        </div>
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-            <div
-              className={`rounded-2xl h-12 animate-pulse ${
-                i % 2 === 0
-                  ? 'w-3/4 bg-gray-200 dark:bg-neutral-800 rounded-bl-sm'
-                  : 'w-2/3 bg-blue-100 dark:bg-blue-900/30 rounded-br-sm'
-              }`}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // ── Error State ──
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 gap-3 text-center">
-        <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-          <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
-        </div>
-        <p className="text-sm text-gray-600 dark:text-neutral-400">{error}</p>
-        <button
-          onClick={() => fetchConversation(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-neutral-300 bg-gray-100 dark:bg-neutral-800 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  // ── Empty State ──
-  if (!conversation || visibleMessages.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 gap-3 text-center">
-        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
-          <MessageSquare className="w-5 h-5 text-gray-400 dark:text-neutral-500" />
-        </div>
-        <p className="text-sm text-gray-500 dark:text-neutral-400">No conversation found</p>
-        <p className="text-xs text-gray-400 dark:text-neutral-500">Enter a valid ticket ID to view the conversation</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header bar */}
+      {/* Header bar — always visible */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm">
         <div className="flex items-center gap-2 min-w-0">
-          {conversation.channel === 'email' ? (
+          {conversation?.channel === 'email' ? (
             <Mail className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 flex-shrink-0" />
           ) : (
             <MessageSquare className="w-3.5 h-3.5 text-gray-400 dark:text-neutral-500 flex-shrink-0" />
           )}
           <span className="text-xs font-medium text-gray-700 dark:text-neutral-300 truncate">
-            #{conversation.id}
+            #{ticketId}
           </span>
-          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-            conversation.state === 'open'
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : conversation.state === 'closed'
-              ? 'bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-neutral-400'
-              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-          }`}>
-            {conversation.state}
-          </span>
-          {conversation.channel === 'email' && (
+          {conversation && (
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              conversation.state === 'open'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : conversation.state === 'closed'
+                ? 'bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-neutral-400'
+                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+            }`}>
+              {conversation.state}
+            </span>
+          )}
+          {conversation?.channel === 'email' && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
               Email
             </span>
@@ -213,6 +151,50 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
           </button>
         </div>
       </div>
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex-1 p-3 sm:p-4 space-y-3">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-neutral-400 text-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Loading conversation...</span>
+          </div>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+              <div
+                className={`rounded-2xl h-12 animate-pulse ${
+                  i % 2 === 0
+                    ? 'w-3/4 bg-gray-200 dark:bg-neutral-800 rounded-bl-sm'
+                    : 'w-2/3 bg-blue-100 dark:bg-blue-900/30 rounded-br-sm'
+                }`}
+              />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3 text-center">
+          <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
+          </div>
+          <p className="text-sm text-gray-600 dark:text-neutral-400">{error}</p>
+          <button
+            onClick={() => fetchConversation(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-neutral-300 bg-gray-100 dark:bg-neutral-800 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry
+          </button>
+        </div>
+      ) : !conversation || visibleMessages.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3 text-center">
+          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-gray-400 dark:text-neutral-500" />
+          </div>
+          <p className="text-sm text-gray-500 dark:text-neutral-400">No conversation found</p>
+          <p className="text-xs text-gray-400 dark:text-neutral-500">Enter a valid ticket ID to view the conversation</p>
+        </div>
+      ) : (
+        <>
 
       {/* Email subject line */}
       {conversation.channel === 'email' && conversation.subject && (
@@ -500,6 +482,8 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
           </motion.div>
         )}
       </AnimatePresence>
+      </>
+      )}
     </div>
   );
 };

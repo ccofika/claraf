@@ -1529,8 +1529,8 @@ const QAManagerLayoutInner = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Bug Report Floating Button */}
-      <BugReportButton getAuthHeaders={getAuthHeaders} />
+      {/* Bug Report Floating Button — hidden during report drill-in */}
+      {!location.search.includes('drill=') && <BugReportButton getAuthHeaders={getAuthHeaders} />}
 
       {/* Mobile App Sidebar Menu */}
       <AnimatePresence>
