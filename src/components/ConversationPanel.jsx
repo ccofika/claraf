@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Loader2, AlertCircle, RefreshCw, Bot,
   Paperclip, ArrowDown, UserRound, ShieldCheck, Info,
-  Image as ImageIcon, X, Download
+  Image as ImageIcon, X, Download, Mail
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -116,7 +116,7 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
   // Filter messages: only show messages with body content + system events
   const visibleMessages = conversation?.messages?.filter(msg => {
     if (SYSTEM_TYPES.has(msg.type)) return true;
-    return msg.body && msg.body.trim().length > 0;
+    return (msg.body && msg.body.trim().length > 0) || (msg.contentBlocks && msg.contentBlocks.length > 0) || (msg.attachments && msg.attachments.length > 0);
   }) || [];
 
   // ── Loading State ──
@@ -179,7 +179,11 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
       {/* Header bar */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm">
         <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-3.5 h-3.5 text-gray-400 dark:text-neutral-500 flex-shrink-0" />
+          {conversation.channel === 'email' ? (
+            <Mail className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 flex-shrink-0" />
+          ) : (
+            <MessageSquare className="w-3.5 h-3.5 text-gray-400 dark:text-neutral-500 flex-shrink-0" />
+          )}
           <span className="text-xs font-medium text-gray-700 dark:text-neutral-300 truncate">
             #{conversation.id}
           </span>
@@ -192,6 +196,11 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
           }`}>
             {conversation.state}
           </span>
+          {conversation.channel === 'email' && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+              Email
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {headerExtra}
@@ -204,6 +213,16 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
           </button>
         </div>
       </div>
+
+      {/* Email subject line */}
+      {conversation.channel === 'email' && conversation.subject && (
+        <div className="flex-shrink-0 px-3 sm:px-4 py-1.5 border-b border-purple-100 dark:border-purple-900/30 bg-purple-50/50 dark:bg-purple-900/10">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase text-purple-500 dark:text-purple-400">Subject:</span>
+            <span className="text-[11px] text-purple-700 dark:text-purple-300 truncate">{conversation.subject}</span>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -219,7 +238,13 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
         >
           {visibleMessages.map((msg, idx) => {
             // ── System message ──
-            if (SYSTEM_TYPES.has(msg.type)) {
+            // Check if this system event also carries a user message (e.g. "open" with body)
+            const hasSystemBody = SYSTEM_TYPES.has(msg.type) && (
+              (msg.body && msg.body.trim().length > 0) ||
+              (msg.contentBlocks && msg.contentBlocks.some(b => b.type === 'text' || b.type === 'image'))
+            );
+
+            if (SYSTEM_TYPES.has(msg.type) && !hasSystemBody) {
               const label = msg.type.replace(/_/g, ' ');
               return (
                 <motion.div
@@ -279,85 +304,128 @@ const ConversationPanel = ({ ticketId, headerExtra }) => {
                   </div>
                 )}
 
-                {/* Images - rendered outside bubble, no background */}
-                {msg.attachments?.filter(att =>
-                  att.content_type?.startsWith('image/') ||
-                  /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
-                ).map((att, ai) => (
-                  <div key={`img-${ai}`} className="relative max-w-[85%]">
-                    <img
-                      src={att.url}
-                      alt={att.name || 'image'}
-                      loading="lazy"
-                      onClick={() => setLightbox({ url: att.url, name: att.name })}
-                      className={`max-w-full max-h-52 rounded-xl object-cover cursor-pointer transition-all hover:opacity-90 hover:shadow-lg border border-gray-200 dark:border-neutral-700 ${
-                        isRight ? 'ml-auto' : ''
-                      }`}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
-                      }}
-                    />
-                    <a
-                      href={att.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'none' }}
-                      className="items-center gap-1 text-[11px] py-0.5 text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      <ImageIcon className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{att.name || 'image'}</span>
-                    </a>
-                  </div>
-                ))}
+                {/* Message content: text + inline images rendered in order */}
+                {(() => {
+                  const isNote = msg.type === 'note';
+                  const blocks = msg.contentBlocks || [];
+                  const hasBlocks = blocks.length > 0;
+                  // Fallback: use body + attachments if no contentBlocks
+                  const cleanBody = !hasBlocks && msg.body ? msg.body.replace(/\[image[^\]]*\]/gi, '').trim() : '';
+                  const imageAtts = msg.attachments?.filter(att =>
+                    att.content_type?.startsWith('image/') ||
+                    /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
+                  ) || [];
+                  const nonImageAtts = msg.attachments?.filter(att =>
+                    !att.content_type?.startsWith('image/') &&
+                    !/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
+                  ) || [];
 
-                {/* Text bubble - only if there's text AND no images (images replace the bubble entirely) */}
-                {msg.body && msg.body.trim() && !msg.attachments?.some(att =>
-                  att.content_type?.startsWith('image/') ||
-                  /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
-                ) && (
-                  <div
-                    className={`relative max-w-[85%] px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
-                      isRight
-                        ? `bg-blue-500 dark:bg-blue-600 text-white ${sameSender && !msg.attachments?.some(a => a.content_type?.startsWith('image/')) ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl rounded-br-sm'}`
-                        : isBot
-                        ? `bg-amber-50 dark:bg-amber-900/20 text-gray-800 dark:text-neutral-200 border border-amber-200/50 dark:border-amber-800/30 ${sameSender && !msg.attachments?.some(a => a.content_type?.startsWith('image/')) ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl rounded-bl-sm'}`
-                        : `bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 ${sameSender && !msg.attachments?.some(a => a.content_type?.startsWith('image/')) ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl rounded-bl-sm'}`
-                    }`}
-                  >
-                    {msg.body}
+                  const hasText = hasBlocks ? blocks.some(b => b.type === 'text') : !!cleanBody;
+                  const hasImages = hasBlocks ? blocks.some(b => b.type === 'image') : imageAtts.length > 0;
+                  const hasContent = hasText || hasImages;
 
-                    {/* Non-image attachments inside bubble */}
-                    {msg.attachments?.filter(att =>
-                      !att.content_type?.startsWith('image/') &&
-                      !/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
-                    ).length > 0 && (
-                      <div className={`mt-1.5 pt-1.5 space-y-0.5 border-t ${
-                        isRight ? 'border-blue-400/30' : 'border-gray-200 dark:border-neutral-700'
-                      }`}>
-                        {msg.attachments.filter(att =>
-                          !att.content_type?.startsWith('image/') &&
-                          !/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name || att.url || '')
-                        ).map((att, ai) => (
-                          <a
-                            key={ai}
-                            href={att.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex items-center gap-1 text-[11px] py-0.5 ${
-                              isRight
-                                ? 'text-blue-100 hover:text-white'
-                                : 'text-blue-600 dark:text-blue-400 hover:underline'
-                            }`}
-                          >
-                            <Paperclip className="w-3 h-3 flex-shrink-0" />
-                            <span className="truncate">{att.name || 'attachment'}</span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  if (!hasContent) return null;
+
+                  // Bubble color logic: notes → amber, email → card style, admin → blue, bot → amber, user → gray
+                  const isEmailConvo = conversation.channel === 'email';
+                  const bubbleBg = isNote
+                    ? `bg-amber-50 dark:bg-amber-900/20 text-gray-800 dark:text-neutral-200 border border-amber-200/50 dark:border-amber-800/30`
+                    : isEmailConvo
+                    ? (isRight
+                      ? `bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 border border-purple-200 dark:border-purple-800/40 shadow-sm`
+                      : isBot
+                      ? `bg-amber-50 dark:bg-amber-900/20 text-gray-800 dark:text-neutral-200 border border-amber-200/50 dark:border-amber-800/30`
+                      : `bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 border border-gray-200 dark:border-neutral-700 shadow-sm`)
+                    : isRight
+                    ? `bg-blue-500 dark:bg-blue-600 text-white`
+                    : isBot
+                    ? `bg-amber-50 dark:bg-amber-900/20 text-gray-800 dark:text-neutral-200 border border-amber-200/50 dark:border-amber-800/30`
+                    : `bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200`;
+                  const rounding = isEmailConvo
+                    ? 'rounded-xl'
+                    : isRight
+                    ? (sameSender ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl rounded-br-sm')
+                    : (sameSender ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl rounded-bl-sm');
+
+                  // Only images, no text → render outside bubble (no background)
+                  if (!hasText && hasImages) {
+                    const imgs = hasBlocks ? blocks.filter(b => b.type === 'image') : imageAtts;
+                    return imgs.map((item, ai) => {
+                      const url = item.url || item.url;
+                      return (
+                        <div key={`img-${ai}`} className="relative max-w-[85%]">
+                          <img src={url} alt="image" loading="lazy"
+                            onClick={() => setLightbox({ url, name: 'image' })}
+                            className={`max-w-full max-h-52 rounded-xl object-cover cursor-pointer transition-all hover:opacity-90 hover:shadow-lg border border-gray-200 dark:border-neutral-700 ${isRight ? 'ml-auto' : ''}`}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        </div>
+                      );
+                    });
+                  }
+
+                  // Has text (and possibly images) → render in bubble
+                  return (
+                    <div className={`relative ${isEmailConvo && !isNote ? 'max-w-[92%]' : 'max-w-[85%]'} px-2.5 py-1.5 text-[13px] leading-relaxed break-words ${bubbleBg} ${rounding} overflow-hidden`}>
+                      {isNote && (
+                        <div className={`text-[9px] font-semibold uppercase tracking-wider mb-1 ${isRight ? 'text-amber-300' : 'text-amber-500 dark:text-amber-400'}`}>
+                          Note
+                        </div>
+                      )}
+                      {/* Email header inside bubble */}
+                      {isEmailConvo && !isNote && !isBot && (
+                        <div className="flex items-center gap-1.5 mb-1.5 pb-1.5 border-b border-gray-100 dark:border-neutral-700">
+                          <Mail className="w-3 h-3 text-purple-400 dark:text-purple-500 flex-shrink-0" />
+                          <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">{msg.authorName}</span>
+                          {msg.authorEmail && (
+                            <span className="text-[9px] text-gray-400 dark:text-neutral-500 truncate">&lt;{msg.authorEmail}&gt;</span>
+                          )}
+                        </div>
+                      )}
+                      {/* Render content blocks in order (text + images inline) */}
+                      {hasBlocks ? blocks.map((block, bi) => {
+                        if (block.type === 'text') {
+                          return <div key={`b-${bi}`} className="whitespace-pre-wrap">{block.content}</div>;
+                        }
+                        if (block.type === 'image') {
+                          return (
+                            <img key={`b-${bi}`} src={block.url} alt="image" loading="lazy"
+                              onClick={() => setLightbox({ url: block.url, name: 'image' })}
+                              className="max-w-full max-h-52 rounded-lg object-cover cursor-pointer transition-all hover:opacity-90 hover:shadow-lg border border-gray-200 dark:border-neutral-700 my-1.5"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          );
+                        }
+                        return null;
+                      }) : (
+                        <>
+                          <div className="whitespace-pre-wrap">{cleanBody}</div>
+                          {imageAtts.map((att, ai) => (
+                            <img key={`bimg-${ai}`} src={att.url} alt={att.name || 'image'} loading="lazy"
+                              onClick={() => setLightbox({ url: att.url, name: att.name })}
+                              className="max-w-full max-h-52 rounded-lg object-cover cursor-pointer transition-all hover:opacity-90 hover:shadow-lg border border-gray-200 dark:border-neutral-700 my-1.5"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ))}
+                        </>
+                      )}
+                      {/* Non-image attachments */}
+                      {nonImageAtts.length > 0 && (
+                        <div className={`mt-1.5 pt-1.5 space-y-0.5 border-t ${
+                          isRight ? 'border-blue-400/30' : 'border-gray-200 dark:border-neutral-700'
+                        }`}>
+                          {nonImageAtts.map((att, ai) => (
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer"
+                              className={`flex items-center gap-1 text-[11px] py-0.5 ${isRight ? 'text-blue-100 hover:text-white' : 'text-blue-600 dark:text-blue-400 hover:underline'}`}>
+                              <Paperclip className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{att.name || 'attachment'}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Timestamp */}
                 <span className={`text-[10px] text-gray-400 dark:text-neutral-600 mt-0.5 px-1 ${isRight ? 'text-right' : ''}`}>
