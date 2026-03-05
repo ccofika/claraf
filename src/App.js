@@ -66,6 +66,8 @@ import {
 } from './pages/knowledge-base';
 import KYCAgentStats from './pages/KYCAgentStats';
 import KYCGoals from './pages/KYCGoals';
+import KYCActivityFeed from './pages/KYCActivityFeed';
+import KYCAgentDetail from './pages/KYCAgentDetail';
 import ActiveIssues from './pages/ActiveIssues';
 import {
   TLLayout,
@@ -276,6 +278,26 @@ function App() {
                             <PrivateRoute>
                               <PageLayout activeSection="kyc-goals">
                                 <KYCGoals />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/kyc-goals/activity"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="kyc-goals">
+                                <KYCActivityFeed />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/kyc-goals/agent/:agentId"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="kyc-goals">
+                                <KYCAgentDetail />
                               </PageLayout>
                             </PrivateRoute>
                           }

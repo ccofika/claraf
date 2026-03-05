@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import axios from 'axios';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, Users, Clock, TrendingUp, TrendingDown, ChevronDown, ChevronRight,
   Activity, Hash, Filter, X, RefreshCw, Target, ArrowUpRight, ArrowDownRight,
   Sun, Sunset, Moon, Radio, Calendar, Search, CheckCircle2, AlertCircle,
-  Zap, Trophy, ChevronUp, Loader2, Eye
+  Zap, Trophy, ChevronUp, Loader2, Eye, ExternalLink
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
@@ -474,9 +475,13 @@ const TopPerformersPodium = ({ agents }) => {
           if (!agent) return null;
           return (
             <div key={agent._id} className="flex flex-col items-center">
-              <div className={`${sizes[i]} rounded-full flex items-center justify-center font-bold ${getInitialColor(agent.name)}`}>
-                {getInitials(agent.name)}
-              </div>
+              {agent.slackAvatarUrl ? (
+                <img src={agent.slackAvatarUrl} alt="" className={`${sizes[i]} rounded-full object-cover`} />
+              ) : (
+                <div className={`${sizes[i]} rounded-full flex items-center justify-center font-bold ${getInitialColor(agent.name)}`}>
+                  {getInitials(agent.name)}
+                </div>
+              )}
               <p className="text-xs font-medium text-gray-900 dark:text-[#E8E9ED] mt-2 text-center max-w-[80px] truncate">{agent.name}</p>
               <p className="text-[10px] text-gray-500 dark:text-[#6B6D77] tabular-nums">{agent.totalCases} cases</p>
               <p className={`text-[10px] tabular-nums ${getResponseColor(agent.avgResponseTime)}`}>{formatTimeShort(agent.avgResponseTime)}</p>
@@ -599,7 +604,7 @@ const AgentDetailRow = ({ agent }) => {
 // AGENTS VIEW
 // ============================================
 
-const AgentsView = ({ agents, loading, expandedAgent, setExpandedAgent }) => {
+const AgentsView = ({ agents, loading, expandedAgent, setExpandedAgent, navigate }) => {
   const [sortBy, setSortBy] = useState('cases');
   const [sortDir, setSortDir] = useState('desc');
 
@@ -696,9 +701,13 @@ const AgentsView = ({ agents, loading, expandedAgent, setExpandedAgent }) => {
                       <td className="px-4 py-3 text-gray-400 dark:text-[#5B5D67] text-xs tabular-nums">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${getInitialColor(agent.name)}`}>
-                            {getInitials(agent.name)}
-                          </div>
+                          {agent.slackAvatarUrl ? (
+                            <img src={agent.slackAvatarUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${getInitialColor(agent.name)}`}>
+                              {getInitials(agent.name)}
+                            </div>
+                          )}
                           <span className="font-medium text-gray-900 dark:text-[#E8E9ED] truncate max-w-[140px]">{agent.name}</span>
                         </div>
                       </td>
@@ -735,9 +744,18 @@ const AgentsView = ({ agents, loading, expandedAgent, setExpandedAgent }) => {
                         <ShiftBar distribution={agent.shiftDistribution || {}} total={agent.totalCases} />
                       </td>
                       <td className="px-2 py-3">
+                        <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/kyc-goals/agent/${agent._id}`); }}
+                          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#252530] transition-colors"
+                          title="View full profile"
+                        >
+                          <ExternalLink className="w-3 h-3 text-gray-400 dark:text-[#5B5D67]" />
+                        </button>
                         {expandedAgent === agent._id
                           ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-[#5B5D67]" />
                           : <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-[#3A3A45]" />}
+                      </div>
                       </td>
                     </tr>
                     <AnimatePresence>
@@ -1166,6 +1184,7 @@ const LiveView = ({ overview, agents, channels }) => {
 // ============================================
 
 const KYCGoals = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('agents');
   const [period, setPeriod] = useState('7d');
@@ -1310,6 +1329,14 @@ const KYCGoals = () => {
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate('/kyc-goals/activity')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors text-gray-500 dark:text-[#6B6D77] hover:bg-gray-100 dark:hover:bg-[#1E1E28] mr-1"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Feed</span>
+            </button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-[#1E1E28] mr-1" />
             {TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -1412,6 +1439,7 @@ const KYCGoals = () => {
                   loading={loading}
                   expandedAgent={expandedAgent}
                   setExpandedAgent={setExpandedAgent}
+                  navigate={navigate}
                 />
               )}
               {view === 'channels' && (
