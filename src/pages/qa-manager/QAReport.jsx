@@ -830,7 +830,6 @@ const QAReport = () => {
   // ============================================
 
   const checkAcpStatus = useCallback(async () => {
-    // Check via extension — ask if CF_Authorization cookie exists
     try {
       const requestId = 'acp_status_' + Date.now();
       const result = await new Promise((resolve) => {
@@ -902,7 +901,6 @@ const QAReport = () => {
         }`;
       const gqlVariables = { userId: externalId };
 
-      console.log('[ACP] Querying for externalId:', externalId);
       // Route query through extension (bypasses Cloudflare challenge)
       const requestId = 'acp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
       const data = await new Promise((resolve, reject) => {
@@ -933,7 +931,6 @@ const QAReport = () => {
         }, '*');
       });
 
-      console.log('[ACP] Extension query result:', JSON.stringify(data).substring(0, 500));
       setAcpData(data);
     } catch (err) {
       console.error('[ACP] Extension query error:', err);
