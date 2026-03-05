@@ -65,6 +65,7 @@ import {
   KBLearn
 } from './pages/knowledge-base';
 import KYCAgentStats from './pages/KYCAgentStats';
+import KYCGoals from './pages/KYCGoals';
 import ActiveIssues from './pages/ActiveIssues';
 import {
   TLLayout,
@@ -264,6 +265,17 @@ function App() {
                             <PrivateRoute>
                               <PageLayout activeSection="kyc-agent-stats">
                                 <KYCAgentStats />
+                              </PageLayout>
+                            </PrivateRoute>
+                          }
+                        />
+
+                        <Route
+                          path="/kyc-goals"
+                          element={
+                            <PrivateRoute>
+                              <PageLayout activeSection="kyc-goals">
+                                <KYCGoals />
                               </PageLayout>
                             </PrivateRoute>
                           }

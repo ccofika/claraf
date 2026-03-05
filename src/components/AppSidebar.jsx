@@ -97,8 +97,8 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
       'tl': ['workspaces', 'tools', 'chat', 'knowledge-base', 'tl'],
       'qa': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
       'qa-admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'qa-manager'],
-      'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl'],
-      'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'tl']
+      'developer': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'kyc-goals', 'tl'],
+      'admin': ['workspaces', 'tools', 'chat', 'knowledge-base', 'developer-dashboard', 'qa-manager', 'kyc-agent-stats', 'kyc-goals', 'tl']
     };
 
     // Get default pages for role
@@ -155,6 +155,7 @@ function IconNavigation({ activeSection, onSectionChange, onOpenProfile }) {
     { id: 'developer-dashboard', icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'Developer Dashboard' },
     { id: 'qa-manager', icon: <Task size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'QA Manager', isExternal: true },
     { id: 'kyc-agent-stats', icon: <Analytics size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Agent Stats', isExternal: true },
+    { id: 'kyc-goals', icon: <ChartLine size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'KYC Goals', isExternal: true },
     { id: 'tl', icon: <UserMultiple size={16} className="text-gray-900 dark:text-neutral-50" />, label: 'TLs', isExternal: true },
   ];
 
