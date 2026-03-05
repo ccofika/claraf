@@ -528,6 +528,7 @@ const QAReport = () => {
   const [acpData, setAcpData] = useState(null);
   const [acpLoading, setAcpLoading] = useState(false);
   const [acpError, setAcpError] = useState(null);
+  const [acpApiToken, setAcpApiToken] = useState(null);
   const [acpSidebarHover, setAcpSidebarHover] = useState(false);
   const [acpVisibleSections, setAcpVisibleSections] = useState([]); // ordered list of added section ids
   const [acpExpandedSections, setAcpExpandedSections] = useState(new Set());
@@ -829,13 +830,29 @@ const QAReport = () => {
   // ============================================
 
   const checkAcpStatus = useCallback(async () => {
+    // Check via extension — ask if CF_Authorization cookie exists
     try {
-      const { data } = await axios.get(`${API_URL}/api/qa/acp/status`, getAuthHeaders());
-      setAcpStatus(data);
+      const requestId = 'acp_status_' + Date.now();
+      const result = await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handler);
+          resolve({ connected: false, expired: false });
+        }, 3000);
+        const handler = (event) => {
+          if (event.data?.type === 'CLARA_ACP_STATUS_RESULT' && event.data.requestId === requestId) {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            resolve(event.data.status);
+          }
+        };
+        window.addEventListener('message', handler);
+        window.postMessage({ type: 'CLARA_ACP_STATUS_CHECK', requestId }, '*');
+      });
+      setAcpStatus(result);
     } catch {
       setAcpStatus({ connected: false, expired: false });
     }
-  }, [getAuthHeaders]);
+  }, []);
 
   const fetchAcpData = useCallback(async (externalId) => {
     if (!externalId) {
@@ -863,8 +880,7 @@ const QAReport = () => {
         `${p.alias}: snapshotSummary(dayCount: ${p.days}) { ${ssFields} }`
       ).join('\n            ');
 
-      const { data } = await axios.post(`${API_URL}/api/qa/acp/query`, {
-        query: `query UserLookup($userId: String!) {
+      const gqlQuery = `query UserLookup($userId: String!) {
           user(userId: $userId) {
             id name email createdAt lastLoginAt
             isBanned hasEmailVerified hasPhoneNumberVerified hasTfaEnabled hasEmailSubscribed hasPassword oauthProvider
@@ -883,20 +899,50 @@ const QAReport = () => {
             snapshotSummary { ${ssFields} }
             ${snapAliases}
           }
-        }`,
-        variables: { userId: externalId }
-      }, getAuthHeaders());
+        }`;
+      const gqlVariables = { userId: externalId };
+
+      console.log('[ACP] Querying for externalId:', externalId);
+      // Route query through extension (bypasses Cloudflare challenge)
+      const requestId = 'acp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const data = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handler);
+          reject(new Error('ACP query timed out — make sure the extension is installed and ACP is accessible'));
+        }, 30000);
+
+        const handler = (event) => {
+          if (event.data?.type === 'CLARA_ACP_QUERY_RESULT' && event.data.requestId === requestId) {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            if (event.data.error) {
+              reject(new Error(event.data.error));
+            } else {
+              resolve(event.data.data);
+            }
+          }
+        };
+        window.addEventListener('message', handler);
+
+        window.postMessage({
+          type: 'CLARA_ACP_QUERY',
+          query: gqlQuery,
+          variables: gqlVariables,
+          requestId,
+          apiToken: acpApiToken
+        }, '*');
+      });
+
+      console.log('[ACP] Extension query result:', JSON.stringify(data).substring(0, 500));
       setAcpData(data);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to fetch ACP data';
+      console.error('[ACP] Extension query error:', err);
+      const msg = err.message || 'Failed to fetch ACP data';
       setAcpError(msg);
-      if (err.response?.status === 401) {
-        setAcpStatus({ connected: false, expired: true });
-      }
     } finally {
       setAcpLoading(false);
     }
-  }, [getAuthHeaders]);
+  }, [acpApiToken]);
 
   const startAcpAuth = useCallback(() => {
     window.postMessage({ type: 'CLARA_START_ACP_AUTH' }, '*');
@@ -913,10 +959,14 @@ const QAReport = () => {
     }
   }, [getAuthHeaders]);
 
-  // Check ACP status on mount
+  // Check ACP status and fetch API token on mount
   useEffect(() => {
     checkAcpStatus();
-  }, [checkAcpStatus]);
+    // Fetch the Stake API token for extension-based ACP queries
+    axios.get(`${API_URL}/api/qa/acp/api-token`, getAuthHeaders())
+      .then(({ data }) => setAcpApiToken(data.token))
+      .catch(() => {});
+  }, [checkAcpStatus, getAuthHeaders]);
 
   // Fetch ACP data when conversation changes and connected
   useEffect(() => {
@@ -933,9 +983,9 @@ const QAReport = () => {
   useEffect(() => {
     const handleAcpToken = async (event) => {
       if (event.data?.type === 'CLARA_ACP_TOKEN_RECEIVED' && event.data.token) {
-        toast.success('ACP token captured!');
-        const saved = await saveAcpToken(event.data.token);
-        if (saved && view === 'drill-in') {
+        toast.success('ACP connected!');
+        setAcpStatus({ connected: true, expired: false });
+        if (view === 'drill-in') {
           const conv = reportResults[currentIndex];
           const extId = conversationMeta?.contactExternalId || conv?.contactExternalId;
           if (extId) fetchAcpData(extId);
@@ -944,7 +994,7 @@ const QAReport = () => {
     };
     window.addEventListener('message', handleAcpToken);
     return () => window.removeEventListener('message', handleAcpToken);
-  }, [saveAcpToken, view, currentIndex, reportResults, conversationMeta, fetchAcpData]);
+  }, [view, currentIndex, reportResults, conversationMeta, fetchAcpData]);
 
   // ============================================
   // KEYBOARD NAV (drill-in)
