@@ -533,6 +533,45 @@ const QAReport = () => {
   const [acpVisibleSections, setAcpVisibleSections] = useState([]); // ordered list of added section ids
   const [acpExpandedSections, setAcpExpandedSections] = useState(new Set());
 
+  // Casino section state
+  const [casinoTab, setCasinoTab] = useState('bets');
+  const [casinoBets, setCasinoBets] = useState([]);
+  const [casinoBetsLoading, setCasinoBetsLoading] = useState(false);
+  const [casinoBetsPage, setCasinoBetsPage] = useState(0);
+  const [casinoBetsHasMore, setCasinoBetsHasMore] = useState(false);
+  const [casinoGames, setCasinoGames] = useState([]);
+  const [casinoGamesLoading, setCasinoGamesLoading] = useState(false);
+  const [casinoGamesSort, setCasinoGamesSort] = useState('wagered');
+  const [casinoActiveOrig, setCasinoActiveOrig] = useState(null);
+  const [casinoActiveOrigLoading, setCasinoActiveOrigLoading] = useState(false);
+  const [casinoActive3p, setCasinoActive3p] = useState(null);
+  const [casinoActive3pLoading, setCasinoActive3pLoading] = useState(false);
+
+  // Deposit Limits
+  const [depLimitTab, setDepLimitTab] = useState('active');
+  const [depLimitHistory, setDepLimitHistory] = useState([]);
+  const [depLimitHistoryLoading, setDepLimitHistoryLoading] = useState(false);
+
+  // Gambling Limits
+  const [gambLimitTab, setGambLimitTab] = useState('active');
+  const [gambLimitHistory, setGambLimitHistory] = useState([]);
+  const [gambLimitHistoryLoading, setGambLimitHistoryLoading] = useState(false);
+
+  // Notes (ACP)
+  const [acpNotes, setAcpNotes] = useState([]);
+  const [acpNotesLoading, setAcpNotesLoading] = useState(false);
+  const [acpNotesPage, setAcpNotesPage] = useState(0);
+  const [acpNotesHasMore, setAcpNotesHasMore] = useState(false);
+  const [acpNotesType, setAcpNotesType] = useState('all');
+
+  // Money Laundering
+  const [mlTab, setMlTab] = useState('outstanding');
+  const [mlLogsByCurrency, setMlLogsByCurrency] = useState({}); // { currency: [...logs] }
+  const [mlLogsLoading, setMlLogsLoading] = useState(false);
+  const [mlLogsCurrency, setMlLogsCurrency] = useState('');
+  const [mlAvailableCurrencies, setMlAvailableCurrencies] = useState([]); // currencies that have logs
+  const [mlLogsDiscovered, setMlLogsDiscovered] = useState(false); // whether we've scanned all currencies
+
   // Ticket search
   const [ticketSearchOpen, setTicketSearchOpen] = useState(false);
   const [ticketSearchValue, setTicketSearchValue] = useState('');
@@ -797,12 +836,12 @@ const QAReport = () => {
     }
   }, [getAuthHeaders]);
 
-  // Fetch meta when currentIndex changes
+  // Fetch meta when currentIndex or searchedTicketId changes
   useEffect(() => {
-    if (view === 'drill-in' && reportResults[currentIndex]) {
-      fetchConversationMeta(reportResults[currentIndex].id);
-    }
-  }, [view, currentIndex, reportResults, fetchConversationMeta]);
+    if (view !== 'drill-in') return;
+    const convId = searchedTicketId || reportResults[currentIndex]?.id;
+    if (convId) fetchConversationMeta(convId);
+  }, [view, currentIndex, reportResults, searchedTicketId, fetchConversationMeta]);
 
   // Sync URL with current drill-in index
   useEffect(() => {
@@ -893,8 +932,12 @@ const QAReport = () => {
             depositAddressList(limit: 50, offset: 0) { id address currency createdAt active }
             adjustmentList(limit: 50, offset: 0) { message createdAt authId { id name } amount currency type value }
             campaignDefaultCommission { comission }
-            campaignList(limit: 50, offset: 0) { id code offerCode name hitCount referCount uniqueDepositors depositCount comission type createdAt lastUpdatedBy { id name } balances { comission { currency amount value } available { currency amount value } } }
+            campaignList(limit: 50, offset: 0) { id code offerCode name hitCount referCount uniqueDepositors depositCount comission type createdAt lastUpdatedBy { id name } balances { available { currency amount value } comission { currency amount value } } }
             referredCampaign { name comission code hitCount referCount uniqueDepositors depositCount type createdAt }
+            bonusList(limit: 50, offset: 0) { id name sendBy { id name } amount value currency createdAt playerSnapshot }
+            responsibleGamblingDepositLimit { id period limit active progress expireAt createdAt actionBy { id name } newLimit pendingAction coolingOff }
+            responsibleGamblingLimits { id period progress type value coolingOff currency }
+            outstandingWagerAmount { amount currency updatedAt }
             snapshotSummary { ${ssFields} }
             ${snapAliases}
           }
@@ -932,6 +975,13 @@ const QAReport = () => {
       });
 
       setAcpData(data);
+      // Reset casino section state for new user
+      setCasinoBets([]); setCasinoBetsPage(0); setCasinoBetsHasMore(false);
+      setCasinoGames([]); setCasinoActiveOrig(null); setCasinoActive3p(null);
+      setDepLimitHistory([]); setDepLimitTab('active');
+      setGambLimitHistory([]); setGambLimitTab('active');
+      setAcpNotes([]); setAcpNotesPage(0); setAcpNotesHasMore(false); setAcpNotesType('all');
+      setMlLogsByCurrency({}); setMlLogsCurrency(''); setMlTab('outstanding'); setMlAvailableCurrencies([]); setMlLogsDiscovered(false);
     } catch (err) {
       console.error('[ACP] Extension query error:', err);
       const msg = err.message || 'Failed to fetch ACP data';
@@ -940,6 +990,258 @@ const QAReport = () => {
       setAcpLoading(false);
     }
   }, [acpApiToken]);
+
+  // Helper to run ACP GraphQL query via extension
+  const acpQuery = useCallback((query, variables) => {
+    const requestId = 'acp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('ACP query timed out')); }, 30000);
+      const handler = (event) => {
+        if (event.data?.type === 'CLARA_ACP_QUERY_RESULT' && event.data.requestId === requestId) {
+          clearTimeout(timeout); window.removeEventListener('message', handler);
+          event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.data);
+        }
+      };
+      window.addEventListener('message', handler);
+      window.postMessage({ type: 'CLARA_ACP_QUERY', query, variables, requestId, apiToken: acpApiToken }, '*');
+    });
+  }, [acpApiToken]);
+
+  const fetchCasinoBets = useCallback(async (userId, page = 0) => {
+    setCasinoBetsLoading(true);
+    try {
+      const data = await acpQuery(`query UserHouseBetList($userId: String, $limit: Int, $offset: Int) {
+        user(userId: $userId) { id houseBetList(limit: $limit, offset: $offset) { id iid type bet {
+          __typename
+          ... on CasinoBet { createdAt currency amount value payoutMultiplier payout user { name } game }
+          ... on MultiplayerCrashBet { createdAt currency amount value payoutMultiplier payout user { name } }
+          ... on MultiplayerSlideBet { createdAt currency amount value payoutMultiplier payout user { name } }
+          ... on SoftswissBet { createdAt currency amount value payoutMultiplier payout user { name } softswissGame: game { name } }
+          ... on ThirdPartyBet { createdAt currency amount value payoutMultiplier payout user { name } thirdPartyGame: game { name } }
+          ... on EvolutionBet { createdAt currency amount value payoutMultiplier payout user { name } evolutionGame: game { name } }
+          ... on SportBet { createdAt currency amount value payoutMultiplier payout user { name } status }
+          ... on SwishBet { createdAt currency amount value payoutMultiplier payout user { name } status }
+          ... on RacingBet { createdAt currency amount value payoutMultiplier payout user { name } }
+          ... on SportsbookXMultiBet { createdAt currency amount value payoutMultiplier payout user { name } }
+        } } } }`, { userId, limit: 50, offset: page * 50 });
+      const bets = data?.data?.user?.houseBetList || [];
+      setCasinoBets(bets);
+      setCasinoBetsHasMore(bets.length >= 50);
+      setCasinoBetsPage(page);
+    } catch (err) { console.error('[ACP Casino Bets]', err); }
+    finally { setCasinoBetsLoading(false); }
+  }, [acpQuery]);
+
+  const fetchCasinoGames = useCallback(async (userId, sort = 'wagered') => {
+    setCasinoGamesLoading(true);
+    try {
+      const gamesQuery = `query UserGameStatistics($userId: String!, $limit: Int, $offset: Int, $sort: UserStatisticSortEnum) {
+        user(userId: $userId) { id statisticList(limit: $limit, offset: $offset, sort: $sort) {
+          currency game gameDetails { id provider { name } type } profitAmount profitValue betAmount betValue bets wins losses
+        } } }`;
+      // Fetch all pages
+      let allStats = [];
+      let offset = 0;
+      while (true) {
+        const data = await acpQuery(gamesQuery, { userId, limit: 50, offset, sort });
+        const page = data?.data?.user?.statisticList || [];
+        allStats = allStats.concat(page);
+        if (page.length < 50) break;
+        offset += 50;
+      }
+      // Merge duplicates by game name
+      const merged = {};
+      for (const g of allStats) {
+        const key = (g.game || '').toLowerCase();
+        if (!merged[key]) {
+          merged[key] = { ...g, profitValue: Number(g.profitValue || 0), betValue: Number(g.betValue || 0), bets: g.bets || 0, wins: g.wins || 0, losses: g.losses || 0 };
+        } else {
+          merged[key].profitValue += Number(g.profitValue || 0);
+          merged[key].betValue += Number(g.betValue || 0);
+          merged[key].bets += g.bets || 0;
+          merged[key].wins += g.wins || 0;
+          merged[key].losses += g.losses || 0;
+        }
+      }
+      // Sort merged results
+      const sorted = Object.values(merged).sort((a, b) => sort === 'profit' ? b.profitValue - a.profitValue : b.betValue - a.betValue);
+      setCasinoGames(sorted);
+    } catch (err) { console.error('[ACP Casino Games]', err); }
+    finally { setCasinoGamesLoading(false); }
+  }, [acpQuery]);
+
+  const fetchCasinoActiveOriginals = useCallback(async (userId) => {
+    setCasinoActiveOrigLoading(true);
+    try {
+      const data = await acpQuery(`query ActiveCasinoBetsAcp($userId: String) {
+        user(userId: $userId) { id activeCasinoBets { id amount currency game createdAt } activeServerSeed { id nextSeedHash } } }`, { userId });
+      setCasinoActiveOrig(data?.data?.user?.activeCasinoBets || []);
+    } catch (err) { console.error('[ACP Casino Active Originals]', err); }
+    finally { setCasinoActiveOrigLoading(false); }
+  }, [acpQuery]);
+
+  const fetchCasinoActive3p = useCallback(async (userId) => {
+    setCasinoActive3pLoading(true);
+    try {
+      const providers = ['beter','evenbet','evolutionOss','hacksaw','hub88','massive','pragmatic','softswiss','twist'];
+      const allBets = [];
+      for (const provider of providers) {
+        const data = await acpQuery(`query UserThirdPartyActiveBets($userId: String, $provider: GameTypeEnum!, $limit: Int, $offset: Int) {
+          user(userId: $userId) { id thirdPartyActiveBets(provider: $provider, limit: $limit, offset: $offset) {
+            id active amount currency value payoutMultiplier payout createdAt
+            thirdPartyGame: game { id name provider { id name } }
+            session { id sourceCurrency targetCurrency }
+          } } }`, { userId, provider, limit: 50, offset: 0 });
+        const bets = data?.data?.user?.thirdPartyActiveBets || [];
+        allBets.push(...bets);
+      }
+      // Batch lookup IIDs for all found bets
+      if (allBets.length > 0) {
+        const aliases = allBets.map((b, i) => `b${i}: bet(betId: "${b.id}") { iid }`).join('\n');
+        try {
+          const iidData = await acpQuery(`query LookupBetIIDs { ${aliases} }`, {});
+          allBets.forEach((b, i) => { b._iid = iidData?.data?.[`b${i}`]?.iid || b.id; });
+        } catch { /* fallback to UUID */ }
+      }
+      setCasinoActive3p(allBets);
+    } catch (err) { console.error('[ACP Casino Active 3P]', err); setCasinoActive3p([]); }
+    finally { setCasinoActive3pLoading(false); }
+  }, [acpQuery]);
+
+  // Fetch deposit limit history
+  const fetchDepLimitHistory = useCallback(async (userId) => {
+    setDepLimitHistoryLoading(true);
+    try {
+      const data = await acpQuery(`query GetUserResponsibleGamblingDepositLimitHistoryList($userId: String, $limit: Int, $offset: Int) {
+        user(userId: $userId) {
+          id
+          responsibleGamblingDepositLimitHistoryList(limit: $limit, offset: $offset) {
+            id action actionBy { id name } createdAt limit period reason
+          }
+        }
+      }`, { userId, limit: 50, offset: 0 });
+      setDepLimitHistory(data?.data?.user?.responsibleGamblingDepositLimitHistoryList || []);
+    } catch (err) { console.error('[ACP Deposit Limit History]', err); setDepLimitHistory([]); }
+    finally { setDepLimitHistoryLoading(false); }
+  }, [acpQuery]);
+
+  // Fetch gambling limit history
+  const fetchGambLimitHistory = useCallback(async (userId) => {
+    setGambLimitHistoryLoading(true);
+    try {
+      const data = await acpQuery(`query GetUserGamblingLimitHistoryList($userId: String) {
+        user(userId: $userId) {
+          id
+          responsibleGamblingLimitHistoryList {
+            id period progress type value coolingOff currency
+            active expireAt createdAt updatedAt removedAt
+            createdBy { id name }
+            updatedBy { id name }
+            removedBy { id name }
+          }
+        }
+      }`, { userId });
+      setGambLimitHistory(data?.data?.user?.responsibleGamblingLimitHistoryList || []);
+    } catch (err) { console.error('[ACP Gambling Limit History]', err); setGambLimitHistory([]); }
+    finally { setGambLimitHistoryLoading(false); }
+  }, [acpQuery]);
+
+  // Fetch ACP notes
+  const fetchAcpNotes = useCallback(async (userId, page = 0, type = 'all') => {
+    setAcpNotesLoading(true);
+    try {
+      const vars = { userId, limit: 50, offset: page * 50 };
+      if (type && type !== 'all') vars.type = type;
+      const data = await acpQuery(`query UserNextNoteList($userId: String, $limit: Int, $offset: Int, $type: NoteTypeEnum) {
+        user(userId: $userId) {
+          id
+          nextNoteList(limit: $limit, offset: $offset, type: $type) {
+            type refType targetId createdAt
+            data {
+              ... on NextNoteAddRoleData { ip user { id name } role roleMessage: message expireAt }
+              ... on NextNoteRemoveRoleData { ip user { id name } role roleMessage: message }
+              ... on NextNoteLoginData { ip }
+              ... on NextNoteRegisterData { ip country }
+              ... on NextNoteMuteUserData { ip action expireAt message }
+              ... on NextNoteEventData { status data }
+              ... on NextNoteFailedAccountAccessData { ip user { id name } optionalCreatedAt: createdAt }
+              ... on NextNoteActionData { action }
+              ... on NextNoteRecordData { reason }
+              ... on NextNoteUpdatePasswordData { ip user { id name } }
+              ... on NextNoteResetLinkPasswordData { ip user { id name } }
+              ... on NextNoteAdminUpdatePasswordData { ip admin: adminId { id name } user { id name } }
+              ... on NextNoteUpdateEmailData { ip user { id name } }
+              ... on NextNoteUpdateUnconfirmedEmailData { ip message user { id name } }
+              ... on NextNoteStaffOffboardedData { ip note user { id name } admin: authId { id name } createdAt: offboardAt }
+              ... on NextNoteAdminUpdateEmailData { ip message admin: adminId { id name } user { id name } }
+              ... on NextNoteRevealApiKeyData { ip user { id name } }
+              ... on NextNoteEnableTfaData { ip user { id name } }
+              ... on NextNoteDisableTfaData { ip user { id name } }
+              ... on NextNoteRequestSelfExclusionData { expireAt ip message user { id name } }
+              ... on NextNoteAdminDisableTfaData { ip admin: adminId { id name } user { id name } }
+              ... on NextNoteAutoSuspensionData { reason rejectedAt rejectedBy role user { id name } }
+              ... on NextNoteConfirmSelfExclusionData { expireAt ip message user { id name } }
+              ... on NextNoteConfirmSelfExclusionStageTwoData { expireAt ip message user { id name } }
+              ... on NoteCustomData { ip note sessionId type user { id name } }
+              ... on NextNoteRequestResetLinkPasswordData { ip email user { id name } }
+              ... on NextNoteBreakInPlayData { expireAt ip breakInPlayMessage: message user { id name } }
+              ... on NextNoteImmediateSelfExclusionData { expireAt ip immediateSelfExclusionMessage: message user { id name } }
+              ... on NextNoteAssignCampaignOwnerData { code type campaignOwnerMessage: message user { id name } }
+              ... on NextNoteRakebackData { user { id name } action type balances }
+              ... on NextNoteAdminAuthTransferOauthToPasswordData { ip admin: adminId { id name } user { id name } }
+              ... on NextNoteAdminDisableUserOauthIdentityData { ip admin: adminId { id name } user { id name } }
+              ... on NextNoteEmailConfirmedData { ip message user { id name } type }
+              ... on NextNoteVeriffUserStatusUpdateData { ip message admin: adminId { id name } user { id name } optionalCreatedAt: createdAt }
+              ... on NextNoteVeriffBiometricStatusUpdateData { ip note: message admin: adminId { id name } user { id name } optionalCreatedAt: createdAt }
+              ... on NextNoteAddTagData { note: message admin: adminId { id name } user { id name } type }
+              ... on NextNoteRemoveTagData { note: message admin: adminId { id name } user { id name } type }
+              ... on NextNoteVipHostStatusUpdateData { ip note: message admin: adminId { id name } user { id name } type action }
+              ... on NextNoteKycData { ip note: message admin: adminId { id name } user { id name } type action }
+              ... on NextNotePasskeyDeletionData { ip user { id name } }
+              ... on NextNoteVerifyPasskeyAuthenticationData { ip user { id name } }
+              ... on NextNoteVerifyPasskeyRegistrationData { ip user { id name } }
+              ... on NextNoteAddCampaignUserData { user { id name } action note: message ip country }
+              ... on NextNoteRemoveCampaignUserData { user { id name } action note: message ip country }
+              ... on NextNoteMigratedStakeUserData { user { id name } type note: message createdAt }
+              ... on NextNoteVeriffAddRoleData { note: message user { id name } role createdAt }
+              ... on NextNoteVeriffRemoveRoleData { note: message user { id name } role createdAt }
+              ... on NextNoteSessionLimitChangeData { ip sessionId action note: message user { id name } }
+            }
+          }
+        }
+      }`, vars);
+      const notes = data?.data?.user?.nextNoteList || [];
+      setAcpNotes(notes);
+      setAcpNotesPage(page);
+      setAcpNotesHasMore(notes.length >= 50);
+    } catch (err) { console.error('[ACP Notes]', err); setAcpNotes([]); }
+    finally { setAcpNotesLoading(false); }
+  }, [acpQuery]);
+
+  // Discover all currencies that have ML logs by querying all known currencies in parallel
+  const discoverMlLogs = useCallback(async (userId) => {
+    setMlLogsLoading(true);
+    const allCurrencies = ['usdt','btc','eth','ltc','sol','doge','bch','xrp','trx','eos','bnb','usdc','busd','matic','ada','dot','shib','avax','link','uni','cad','usd','eur','gbp','aud','jpy','brl','inr','krw','try','mxn','php','pln','czk','clp','pen','cop'];
+    const mlQuery = `query UserEventLogList($userId: String!, $currency: CurrencyEnum!, $endDate: Date, $offset: Int, $limit: Int) {
+      user(userId: $userId) { id coinMixingEventLogList(currency: $currency, endDate: $endDate, offset: $offset, limit: $limit) { id eventType currency outstanding data date } }
+    }`;
+    const endDate = new Date().toISOString().slice(0, 16);
+    const results = {};
+    const found = [];
+    await Promise.all(allCurrencies.map(async (cur) => {
+      try {
+        const data = await acpQuery(mlQuery, { userId, currency: cur, endDate, offset: 0, limit: 50 });
+        const logs = data?.data?.user?.coinMixingEventLogList || [];
+        if (logs.length > 0) { results[cur] = logs; found.push(cur); }
+      } catch { /* currency not in enum or no data */ }
+    }));
+    const sorted = found.sort();
+    setMlLogsByCurrency(results);
+    setMlAvailableCurrencies(sorted);
+    setMlLogsDiscovered(true);
+    if (sorted.length > 0) setMlLogsCurrency(sorted[0]);
+    setMlLogsLoading(false);
+  }, [acpQuery]);
 
   const startAcpAuth = useCallback(() => {
     window.postMessage({ type: 'CLARA_START_ACP_AUTH' }, '*');
@@ -968,13 +1270,13 @@ const QAReport = () => {
   // Fetch ACP data when conversation changes and connected
   useEffect(() => {
     if (view === 'drill-in' && acpStatus?.connected) {
-      const conv = reportResults[currentIndex];
+      const conv = searchedTicketId ? null : reportResults[currentIndex];
       const extId = conversationMeta?.contactExternalId || conv?.contactExternalId;
       if (extId) {
         fetchAcpData(extId);
       }
     }
-  }, [view, currentIndex, reportResults, conversationMeta?.contactExternalId, acpStatus?.connected, fetchAcpData]);
+  }, [view, currentIndex, reportResults, searchedTicketId, conversationMeta?.contactExternalId, acpStatus?.connected, fetchAcpData]);
 
   // Listen for ACP token from extension
   useEffect(() => {
@@ -983,7 +1285,7 @@ const QAReport = () => {
         toast.success('ACP connected!');
         setAcpStatus({ connected: true, expired: false });
         if (view === 'drill-in') {
-          const conv = reportResults[currentIndex];
+          const conv = searchedTicketId ? null : reportResults[currentIndex];
           const extId = conversationMeta?.contactExternalId || conv?.contactExternalId;
           if (extId) fetchAcpData(extId);
         }
@@ -1544,12 +1846,12 @@ const QAReport = () => {
                       { id: 'search', label: 'Search', icon: Search },
                     ];
 
-                    const addSection = (id) => {
+                    const toggleSection = (id) => {
                       setAcpVisibleSections(prev => {
-                        if (prev.includes(id)) return prev;
+                        if (prev.includes(id)) return prev.filter(s => s !== id);
                         return [...prev, id];
                       });
-                      // New sections are collapsed by default
+                      setAcpExpandedSections(prev => { const n = new Set(prev); n.delete(id); return n; });
                     };
 
                     return acpPages.map((page, i) => {
@@ -1561,7 +1863,7 @@ const QAReport = () => {
                       return (
                         <button
                           key={page.id}
-                          onClick={() => !page.isDefault && addSection(page.id)}
+                          onClick={() => !page.isDefault && toggleSection(page.id)}
                           className={`flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors whitespace-nowrap ${
                             isActive
                               ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/[0.08]'
@@ -1959,10 +2261,10 @@ const QAReport = () => {
                                     const d = new Date(/^\d+$/.test(ts) ? Number(ts) : ts);
                                     return isNaN(d) ? '—' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                                   };
-                                  const fmtBal = (balArr) => {
-                                    if (!balArr) return '—';
-                                    if (!balArr.length) return '$0.00';
-                                    return balArr.map(b => `$${Number(b.value ?? 0).toFixed(2)} ${b.currency}`).join(', ');
+                                  const sumBal = (balances, field) => {
+                                    if (!balances?.length) return '—';
+                                    const total = balances.reduce((sum, b) => sum + Number(b[field]?.value ?? 0), 0);
+                                    return `$${total.toFixed(2)} USD`;
                                   };
                                   return (
                                     <div className="max-h-[400px] overflow-y-auto flex flex-col gap-4">
@@ -1989,8 +2291,8 @@ const QAReport = () => {
                                                   <th className="text-right pb-2 font-medium">Deposits</th>
                                                   <th className="text-left pb-2 pl-2 font-medium">Type</th>
                                                   <th className="text-right pb-2 font-medium">Comm.</th>
-                                                  <th className="text-right pb-2 font-medium">Bal. Comm.</th>
-                                                  <th className="text-right pb-2 font-medium">Bal. Avail.</th>
+                                                  <th className="text-right pb-2 font-medium">Balances</th>
+                                                  <th className="text-right pb-2 font-medium">Commission</th>
                                                   <th className="text-right pb-2 font-medium whitespace-nowrap">Created</th>
                                                   <th className="text-right pb-2 pr-1 font-medium whitespace-nowrap">Updated By</th>
                                                 </tr>
@@ -2007,8 +2309,8 @@ const QAReport = () => {
                                                     <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50">{c.depositCount?.toLocaleString() ?? '—'}</td>
                                                     <td className="py-1.5 pl-2 text-gray-500 dark:text-white/35">{c.type || '—'}</td>
                                                     <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50">{c.comission ?? '—'}</td>
-                                                    <td className="py-1.5 text-right text-gray-500 dark:text-white/35 text-[10px] whitespace-nowrap">{fmtBal(c.balances?.comission)}</td>
-                                                    <td className="py-1.5 text-right text-gray-500 dark:text-white/35 text-[10px] whitespace-nowrap">{fmtBal(c.balances?.available)}</td>
+                                                    <td className="py-1.5 text-right text-gray-500 dark:text-white/35 text-[10px] whitespace-nowrap">{sumBal(c.balances, 'available')}</td>
+                                                    <td className="py-1.5 text-right text-gray-500 dark:text-white/35 text-[10px] whitespace-nowrap">{sumBal(c.balances, 'comission')}</td>
                                                     <td className="py-1.5 text-right text-gray-400 dark:text-white/25 whitespace-nowrap">{fmtDate(c.createdAt)}</td>
                                                     <td className="py-1.5 pr-1 text-right text-gray-500 dark:text-white/40 whitespace-nowrap">{c.lastUpdatedBy?.name || '—'}</td>
                                                   </tr>
@@ -2057,6 +2359,883 @@ const QAReport = () => {
                                           </div>
                                         )}
                                       </div>
+                                    </div>
+                                  );
+                                })() : sectionId === 'bonuses' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  if (!u) return <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No data</span>;
+                                  const bonuses = u.bonusList || [];
+                                  const fmtDate = (ts) => {
+                                    if (!ts) return '—';
+                                    const d = new Date(/^\d+$/.test(ts) ? Number(ts) : ts);
+                                    return isNaN(d) ? '—' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                                  };
+                                  const cryptoIcon = (c) => `https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/32/color/${c.toLowerCase()}.png`;
+                                  const fmtSnap = (snap) => {
+                                    if (!snap) return '—';
+                                    try {
+                                      const s = typeof snap === 'string' ? JSON.parse(snap) : snap;
+                                      const m = s.margin != null ? `M: ${(Number(s.margin) * 100).toFixed(2)}%` : null;
+                                      const rp = s.realProfit != null ? `RP: $${Number(s.realProfit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
+                                      const w = s.wagered != null ? `W: $${Number(s.wagered).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
+                                      const ev = s.expectedValue != null ? `EV: $${Number(s.expectedValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
+                                      return [m, rp, w, ev].filter(Boolean).join(' | ') || '—';
+                                    } catch { return '—'; }
+                                  };
+                                  return (
+                                    <div className="max-h-[400px] overflow-y-auto flex flex-col gap-4">
+                                      {/* Received */}
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <span className="text-[11px] font-semibold text-gray-600 dark:text-white/50 tracking-wide">Received</span>
+                                          <span className="text-[9px] text-gray-400 dark:text-white/20 ml-auto">{bonuses.length} result{bonuses.length !== 1 ? 's' : ''}</span>
+                                        </div>
+                                        {bonuses.length === 0 ? (
+                                          <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No bonuses</span>
+                                        ) : (
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-[11px]">
+                                              <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                  <th className="text-left pb-2 pl-1 font-medium">Note</th>
+                                                  <th className="text-right pb-2 font-medium">Amount</th>
+                                                  <th className="text-right pb-2 font-medium">Value</th>
+                                                  <th className="text-right pb-2 font-medium whitespace-nowrap">Created At</th>
+                                                  <th className="text-right pb-2 font-medium whitespace-nowrap">Sent By</th>
+                                                  <th className="text-left pb-2 pl-2 font-medium">Snapshot</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {bonuses.map((b, i) => (
+                                                  <tr key={b.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                    <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60 break-words min-w-[140px]">{b.name || '—'}</td>
+                                                    <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">
+                                                      {b.amount != null ? (
+                                                        <span className="inline-flex items-center gap-1 justify-end">
+                                                          {Number(b.amount).toFixed(8)}
+                                                          {b.currency && <>
+                                                            <img src={cryptoIcon(b.currency)} alt="" className="w-3.5 h-3.5 rounded-full inline-block" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                            <span className="w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden shrink-0">{b.currency.slice(0,2).toUpperCase()}</span>
+                                                          </>}
+                                                        </span>
+                                                      ) : '—'}
+                                                    </td>
+                                                    <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">{b.value != null ? `$${Number(b.value).toFixed(2)}` : '—'}</td>
+                                                    <td className="py-1.5 text-right text-gray-400 dark:text-white/25 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
+                                                    <td className="py-1.5 text-right text-gray-500 dark:text-white/40 whitespace-nowrap">{b.sendBy?.name || '—'}</td>
+                                                    <td className="py-1.5 pl-2 text-gray-400 dark:text-white/25 text-[10px] whitespace-nowrap">{fmtSnap(b.playerSnapshot)}</td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Sent */}
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-gray-600 dark:text-white/50 tracking-wide mb-2 block">Sent</span>
+                                        <span className="text-[11px] text-gray-400 dark:text-white/25 italic">Coming soon</span>
+                                      </div>
+
+                                      {/* Deposit Bonuses */}
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-gray-600 dark:text-white/50 tracking-wide mb-2 block">Deposit Bonuses</span>
+                                        <span className="text-[11px] text-gray-400 dark:text-white/25 italic">Coming soon</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })() : sectionId === 'casino' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  if (!u) return <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No data</span>;
+                                  const userId = u.id;
+                                  const casinoTabs = [
+                                    { id: 'bets', label: 'Bets' },
+                                    { id: 'games', label: 'Games' },
+                                    { id: 'active-originals', label: 'Active Originals' },
+                                    { id: 'active-3p', label: 'Active Thirdparty' },
+                                  ];
+                                  const cryptoIcon = (c) => `https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/32/color/${c.toLowerCase()}.png`;
+                                  const fmtDate = (ts) => {
+                                    if (!ts) return '—';
+                                    const d = new Date(/^\d+$/.test(ts) ? Number(ts) : ts);
+                                    return isNaN(d) ? '—' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                                  };
+                                  const getBetGame = (bet) => {
+                                    if (!bet) return '—';
+                                    const b = bet;
+                                    if (b.game && typeof b.game === 'string') return b.game;
+                                    if (b.softswissGame?.name) return b.softswissGame.name;
+                                    if (b.thirdPartyGame?.name) return b.thirdPartyGame.name;
+                                    if (b.evolutionGame?.name) return b.evolutionGame.name;
+                                    if (b.__typename) return b.__typename.replace('Bet', '').replace(/([A-Z])/g, ' $1').trim();
+                                    return '—';
+                                  };
+                                  const CryptoAmount = ({ amount, currency }) => (
+                                    <span className="inline-flex items-center gap-1 justify-end">
+                                      {Number(amount).toFixed(8)}
+                                      {currency && <>
+                                        <img src={cryptoIcon(currency)} alt="" className="w-3.5 h-3.5 rounded-full inline-block" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                        <span className="w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden shrink-0">{currency.slice(0,2).toUpperCase()}</span>
+                                      </>}
+                                    </span>
+                                  );
+                                  return (
+                                    <div>
+                                      {/* Mini navbar */}
+                                      <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-white/[0.06] mb-3">
+                                        {casinoTabs.map(t => (
+                                          <button
+                                            key={t.id}
+                                            onClick={() => {
+                                              setCasinoTab(t.id);
+                                              if (t.id === 'bets' && casinoBets.length === 0 && !casinoBetsLoading) fetchCasinoBets(userId, 0);
+                                              if (t.id === 'games' && casinoGames.length === 0 && !casinoGamesLoading) fetchCasinoGames(userId, casinoGamesSort);
+                                              if (t.id === 'active-originals' && casinoActiveOrig === null && !casinoActiveOrigLoading) fetchCasinoActiveOriginals(userId);
+                                              if (t.id === 'active-3p' && casinoActive3p === null && !casinoActive3pLoading) fetchCasinoActive3p(userId);
+                                            }}
+                                            className={`px-2.5 py-1.5 text-[10px] font-medium border-b-2 transition-colors ${
+                                              casinoTab === t.id
+                                                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                                                : 'border-transparent text-gray-400 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/40'
+                                            }`}
+                                          >{t.label}</button>
+                                        ))}
+                                      </div>
+
+                                      {/* Bets tab */}
+                                      {casinoTab === 'bets' && (
+                                        <div>
+                                          {casinoBets.length === 0 && !casinoBetsLoading && (
+                                            <button onClick={() => fetchCasinoBets(userId, 0)} className="text-[10px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                                              Load bets
+                                            </button>
+                                          )}
+                                          {casinoBetsLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/20" /></div>}
+                                          {!casinoBetsLoading && casinoBets.length > 0 && (
+                                            <div className="max-h-[400px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">IID</th>
+                                                    <th className="text-left pb-2 font-medium">User</th>
+                                                    <th className="text-right pb-2 font-medium whitespace-nowrap">Placed At</th>
+                                                    <th className="text-left pb-2 pl-2 font-medium">Type</th>
+                                                    <th className="text-left pb-2 font-medium">Game</th>
+                                                    <th className="text-right pb-2 font-medium whitespace-nowrap">Bet Amount</th>
+                                                    <th className="text-right pb-2 font-medium whitespace-nowrap">Bet Value</th>
+                                                    <th className="text-right pb-2 font-medium">Multi.</th>
+                                                    <th className="text-right pb-2 font-medium">Payout</th>
+                                                    <th className="text-right pb-2 pr-1 font-medium whitespace-nowrap">Payout Val.</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {casinoBets.map((item, i) => {
+                                                    const b = item.bet || {};
+                                                    const pVal = b.payout != null ? (b.payout * (b.value && b.amount ? b.value / b.amount : 1)) : null;
+                                                    return (
+                                                      <tr key={item.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                        <td className="py-1.5 pl-1 text-gray-500 dark:text-white/35 font-mono text-[10px] whitespace-nowrap">{item.iid || item.id || '—'}</td>
+                                                        <td className="py-1.5 text-gray-600 dark:text-white/50 whitespace-nowrap">{b.user?.name || '—'}</td>
+                                                        <td className="py-1.5 text-right text-gray-400 dark:text-white/25 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
+                                                        <td className="py-1.5 pl-2 text-gray-500 dark:text-white/35">{item.type || '—'}</td>
+                                                        <td className="py-1.5 text-gray-600 dark:text-white/50 capitalize">{getBetGame(b)}</td>
+                                                        <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">
+                                                          {b.amount != null ? <CryptoAmount amount={b.amount} currency={b.currency} /> : '—'}
+                                                        </td>
+                                                        <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">{b.value != null ? `$${Number(b.value).toFixed(2)}` : '—'}</td>
+                                                        <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">{b.payoutMultiplier != null ? `${Number(b.payoutMultiplier).toFixed(2)}×` : '—'}</td>
+                                                        <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">
+                                                          {b.payout != null ? <CryptoAmount amount={b.payout} currency={b.currency} /> : '—'}
+                                                        </td>
+                                                        <td className="py-1.5 pr-1 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">{b.payout != null && b.value != null && b.amount ? `$${(b.payout * b.value / b.amount).toFixed(2)}` : '—'}</td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                              {/* Pagination */}
+                                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-white/[0.04]">
+                                                <span className="text-[10px] text-gray-400 dark:text-white/20">Page {casinoBetsPage + 1}</span>
+                                                <div className="flex items-center gap-1">
+                                                  <button
+                                                    disabled={casinoBetsPage === 0}
+                                                    onClick={() => fetchCasinoBets(userId, casinoBetsPage - 1)}
+                                                    className="px-2 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-gray-200 dark:hover:bg-white/[0.1] disabled:opacity-30 transition-colors"
+                                                  >Prev</button>
+                                                  <button
+                                                    disabled={!casinoBetsHasMore}
+                                                    onClick={() => fetchCasinoBets(userId, casinoBetsPage + 1)}
+                                                    className="px-2 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-gray-200 dark:hover:bg-white/[0.1] disabled:opacity-30 transition-colors"
+                                                  >Next</button>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Games tab */}
+                                      {casinoTab === 'games' && (
+                                        <div>
+                                          <div className="flex items-center gap-2 mb-2">
+                                            {casinoGames.length === 0 && !casinoGamesLoading && (
+                                              <button onClick={() => fetchCasinoGames(userId, casinoGamesSort)} className="text-[10px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                                                Load games
+                                              </button>
+                                            )}
+                                            {casinoGames.length > 0 && (
+                                              <select
+                                                value={casinoGamesSort}
+                                                onChange={(e) => { setCasinoGamesSort(e.target.value); fetchCasinoGames(userId, e.target.value); }}
+                                                className="text-[10px] bg-gray-100 dark:bg-[#1a1a1a] text-gray-600 dark:text-white/50 rounded px-1.5 py-0.5 border-0 outline-none [&>option]:bg-white [&>option]:dark:bg-[#1a1a1a] [&>option]:dark:text-white/60"
+                                              >
+                                                <option value="wagered">Sort: Wagered</option>
+                                                <option value="profit">Sort: Profit</option>
+                                              </select>
+                                            )}
+                                          </div>
+                                          {casinoGamesLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/20" /></div>}
+                                          {!casinoGamesLoading && casinoGames.length > 0 && (
+                                            <div className="max-h-[400px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Game</th>
+                                                    <th className="text-left pb-2 font-medium">Provider</th>
+                                                    <th className="text-left pb-2 font-medium">Aggregator</th>
+                                                    <th className="text-right pb-2 font-medium">Bets</th>
+                                                    <th className="text-right pb-2 font-medium">Wins</th>
+                                                    <th className="text-right pb-2 font-medium">Losses</th>
+                                                    <th className="text-right pb-2 font-medium">Profit</th>
+                                                    <th className="text-right pb-2 pr-1 font-medium">Wagered</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {casinoGames.map((g, i) => (
+                                                    <tr key={i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                      <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60 font-medium capitalize">{g.game || '—'}</td>
+                                                      <td className="py-1.5 text-gray-500 dark:text-white/35">{g.gameDetails?.provider?.name || '—'}</td>
+                                                      <td className="py-1.5 text-gray-500 dark:text-white/35">{g.gameDetails?.type || '—'}</td>
+                                                      <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50">{g.bets?.toLocaleString() ?? '—'}</td>
+                                                      <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50">{g.wins?.toLocaleString() ?? '—'}</td>
+                                                      <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50">{g.losses?.toLocaleString() ?? '—'}</td>
+                                                      <td className={`py-1.5 text-right font-mono whitespace-nowrap ${Number(g.profitValue) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                        {g.profitValue != null ? `$${Number(g.profitValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                                                      </td>
+                                                      <td className="py-1.5 pr-1 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">
+                                                        {g.betValue != null ? `$${Number(g.betValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Active Originals tab */}
+                                      {casinoTab === 'active-originals' && (
+                                        <div>
+                                          {casinoActiveOrig === null && !casinoActiveOrigLoading && (
+                                            <button onClick={() => fetchCasinoActiveOriginals(userId)} className="text-[10px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                                              Load active originals
+                                            </button>
+                                          )}
+                                          {casinoActiveOrigLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/20" /></div>}
+                                          {!casinoActiveOrigLoading && casinoActiveOrig !== null && (
+                                            casinoActiveOrig.length === 0 ? (
+                                              <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No active original bets</span>
+                                            ) : (
+                                              <div className="max-h-[400px] overflow-y-auto">
+                                                <table className="w-full text-[11px]">
+                                                  <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                    <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                      <th className="text-left pb-2 pl-1 font-medium">Game</th>
+                                                      <th className="text-right pb-2 font-medium">Amount</th>
+                                                      <th className="text-right pb-2 pr-1 font-medium">Date</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {casinoActiveOrig.map((bet, i) => (
+                                                      <tr key={bet.id || i} className="border-t border-gray-50 dark:border-white/[0.03]">
+                                                        <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60 font-medium capitalize">{bet.game || '—'}</td>
+                                                        <td className="py-1.5 text-right font-mono text-gray-600 dark:text-white/50 whitespace-nowrap">
+                                                          {bet.amount != null ? (
+                                                            <span className="inline-flex items-center gap-1 justify-end">
+                                                              {Number(bet.amount).toFixed(8)}
+                                                              {bet.currency && <>
+                                                                <img src={cryptoIcon(bet.currency)} alt="" className="w-3.5 h-3.5 rounded-full inline-block" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                                <span className="w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden shrink-0">{bet.currency.slice(0,2).toUpperCase()}</span>
+                                                              </>}
+                                                            </span>
+                                                          ) : '—'}
+                                                        </td>
+                                                        <td className="py-1.5 pr-1 text-right text-gray-400 dark:text-white/25 whitespace-nowrap">{fmtDate(bet.createdAt)}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Active Thirdparty tab */}
+                                      {casinoTab === 'active-3p' && (
+                                        <div>
+                                          {casinoActive3p === null && !casinoActive3pLoading && (
+                                            <button onClick={() => fetchCasinoActive3p(userId)} className="text-[10px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                                              Load active thirdparty bets
+                                            </button>
+                                          )}
+                                          {casinoActive3pLoading && (
+                                            <div className="flex items-center gap-2 justify-center py-4">
+                                              <Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/20" />
+                                              <span className="text-[10px] text-gray-400 dark:text-white/20">Checking all providers...</span>
+                                            </div>
+                                          )}
+                                          {!casinoActive3pLoading && casinoActive3p !== null && (
+                                            casinoActive3p.length === 0 ? (
+                                              <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No active thirdparty bets</span>
+                                            ) : (
+                                              <div className="max-h-[400px] overflow-y-auto">
+                                                <table className="w-full text-[11px]">
+                                                  <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                    <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                      <th className="text-left pb-2 pl-1 font-medium">ID</th>
+                                                      <th className="text-left pb-2 font-medium">Provider</th>
+                                                      <th className="text-left pb-2 font-medium">Game</th>
+                                                      <th className="text-right pb-2 font-medium whitespace-nowrap">Created At</th>
+                                                      <th className="text-left pb-2 pl-2 font-medium whitespace-nowrap">Session ID</th>
+                                                      <th className="text-center pb-2 font-medium">Source</th>
+                                                      <th className="text-center pb-2 pr-1 font-medium">Target</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {casinoActive3p.map((bet, i) => (
+                                                      <tr key={bet.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                        <td className="py-1.5 pl-1 text-gray-500 dark:text-white/35 font-mono text-[10px]" title={bet.id}>{bet._iid || bet.id || '—'}</td>
+                                                        <td className="py-1.5 text-gray-600 dark:text-white/50">{bet.thirdPartyGame?.provider?.name || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 font-medium">{bet.thirdPartyGame?.name || '—'}</td>
+                                                        <td className="py-1.5 text-right text-gray-400 dark:text-white/25 whitespace-nowrap">{fmtDate(bet.createdAt)}</td>
+                                                        <td className="py-1.5 pl-2 text-gray-500 dark:text-white/35 font-mono text-[10px]">{bet.session?.id || '—'}</td>
+                                                        <td className="py-1.5 text-center">
+                                                          {bet.session?.sourceCurrency ? (
+                                                            <span className="inline-flex items-center gap-1">
+                                                              <img src={cryptoIcon(bet.session.sourceCurrency)} alt="" className="w-4 h-4 rounded-full" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                              <span className="w-4 h-4 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden">{bet.session.sourceCurrency.slice(0,3).toUpperCase()}</span>
+                                                            </span>
+                                                          ) : '—'}
+                                                        </td>
+                                                        <td className="py-1.5 pr-1 text-center">
+                                                          {bet.session?.targetCurrency ? (
+                                                            <span className="inline-flex items-center gap-1">
+                                                              <img src={cryptoIcon(bet.session.targetCurrency)} alt="" className="w-4 h-4 rounded-full" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                              <span className="w-4 h-4 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden">{bet.session.targetCurrency.slice(0,3).toUpperCase()}</span>
+                                                            </span>
+                                                          ) : '—'}
+                                                        </td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })() : sectionId === 'deposit-limits' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  const userId = u?.id;
+                                  const activeLimits = u?.responsibleGamblingDepositLimit || [];
+                                  const depLimitTabs = [
+                                    { id: 'active', label: 'Active' },
+                                    { id: 'history', label: 'History' },
+                                  ];
+                                  const fmtDate = (ts) => { if (!ts) return '—'; const d = new Date(/^\d+$/.test(String(ts)) ? Number(ts) : ts); return isNaN(d) ? '—' : d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric' }); };
+                                  const fmtMoney = (v) => { if (v == null || v === '') return '—'; const n = Number(v); return isNaN(n) ? v : `$${n.toFixed(2)}`; };
+                                  return (
+                                    <div>
+                                      {/* Mini navbar */}
+                                      <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-white/[0.06] mb-3">
+                                        {depLimitTabs.map(t => (
+                                          <button key={t.id} onClick={() => {
+                                            setDepLimitTab(t.id);
+                                            if (t.id === 'history' && depLimitHistory.length === 0 && !depLimitHistoryLoading && userId) fetchDepLimitHistory(userId);
+                                          }}
+                                            className={`px-2.5 py-1.5 text-[10px] font-medium border-b-2 transition-colors ${
+                                              depLimitTab === t.id ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-400 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/40'
+                                            }`}>{t.label}</button>
+                                        ))}
+                                      </div>
+
+                                      {depLimitTab === 'active' && (
+                                        <div>
+                                          {activeLimits.length === 0 ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No active deposit limits</span>
+                                          ) : (
+                                            <div className="max-h-[320px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Action By</th>
+                                                    <th className="text-left pb-2 font-medium">Period</th>
+                                                    <th className="text-left pb-2 font-medium">Limit</th>
+                                                    <th className="text-left pb-2 font-medium">New Limit</th>
+                                                    <th className="text-left pb-2 font-medium">Progress</th>
+                                                    <th className="text-left pb-2 font-medium">Pending</th>
+                                                    <th className="text-left pb-2 font-medium">Created</th>
+                                                    <th className="text-left pb-2 font-medium">Expires</th>
+                                                    <th className="text-left pb-2 font-medium">Cooling Off</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {activeLimits.map((lim, i) => {
+                                                    const limitVal = Number(lim.limit || 0);
+                                                    const progressVal = Number(lim.progress || 0);
+                                                    const remaining = limitVal - progressVal;
+                                                    const pct = limitVal > 0 ? ((progressVal / limitVal) * 100).toFixed(1) : 0;
+                                                    return (
+                                                      <tr key={lim.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                        <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60">{lim.actionBy?.name || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 capitalize">{lim.period || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{fmtMoney(lim.limit)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{lim.newLimit ? fmtMoney(lim.newLimit) : '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">
+                                                          <div className="font-mono">{fmtMoney(remaining)} left</div>
+                                                          <div className="text-[9px] text-gray-400 dark:text-white/20">{pct}%</div>
+                                                        </td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{lim.pendingAction || '—'}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(lim.createdAt)}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(lim.expireAt)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{lim.coolingOff ? 'Yes' : '—'}</td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {depLimitTab === 'history' && (
+                                        <div>
+                                          {depLimitHistoryLoading ? (
+                                            <div className="flex items-center justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/15" /></div>
+                                          ) : depLimitHistory.length === 0 ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No deposit limit history</span>
+                                          ) : (
+                                            <div className="max-h-[320px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Action By</th>
+                                                    <th className="text-left pb-2 font-medium">Limit</th>
+                                                    <th className="text-left pb-2 font-medium">Period</th>
+                                                    <th className="text-left pb-2 font-medium">Action</th>
+                                                    <th className="text-left pb-2 font-medium">Updated</th>
+                                                    <th className="text-left pb-2 font-medium">Reason</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {depLimitHistory.map((h, i) => (
+                                                    <tr key={h.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                      <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60">{h.actionBy?.name || '—'}</td>
+                                                      <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{fmtMoney(h.limit)}</td>
+                                                      <td className="py-1.5 text-gray-700 dark:text-white/60 capitalize">{h.period || '—'}</td>
+                                                      <td className="py-1.5 text-gray-700 dark:text-white/60">{h.action || '—'}</td>
+                                                      <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(h.createdAt)}</td>
+                                                      <td className="py-1.5 text-gray-700 dark:text-white/60">{h.reason || '—'}</td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })() : sectionId === 'gambling-limits' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  const userId = u?.id;
+                                  const activeLimits = u?.responsibleGamblingLimits || [];
+                                  const gambTabs = [
+                                    { id: 'active', label: 'Active' },
+                                    { id: 'history', label: 'History' },
+                                  ];
+                                  const fmtDate = (ts) => { if (!ts) return '—'; const d = new Date(/^\d+$/.test(String(ts)) ? Number(ts) : ts); return isNaN(d) ? '—' : d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric' }); };
+                                  const fmtMoney = (v, cur) => { if (v == null || v === '') return '—'; const n = Number(v); if (isNaN(n)) return v; const sym = (cur && cur !== 'USD') ? cur + ' ' : '$'; return `${sym}${n.toFixed(2)}`; };
+                                  return (
+                                    <div>
+                                      {/* Mini navbar */}
+                                      <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-white/[0.06] mb-3">
+                                        {gambTabs.map(t => (
+                                          <button key={t.id} onClick={() => {
+                                            setGambLimitTab(t.id);
+                                            if (t.id === 'history' && gambLimitHistory.length === 0 && !gambLimitHistoryLoading && userId) fetchGambLimitHistory(userId);
+                                          }}
+                                            className={`px-2.5 py-1.5 text-[10px] font-medium border-b-2 transition-colors ${
+                                              gambLimitTab === t.id ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-400 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/40'
+                                            }`}>{t.label}</button>
+                                        ))}
+                                      </div>
+
+                                      {gambLimitTab === 'active' && (
+                                        <div>
+                                          {activeLimits.length === 0 ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No active gambling limits</span>
+                                          ) : (
+                                            <div className="max-h-[320px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Type</th>
+                                                    <th className="text-left pb-2 font-medium">Amount</th>
+                                                    <th className="text-left pb-2 font-medium">Period</th>
+                                                    <th className="text-left pb-2 font-medium">Progress</th>
+                                                    <th className="text-left pb-2 font-medium">Cooling Off</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {activeLimits.map((lim, i) => {
+                                                    const limitVal = Number(lim.value || 0);
+                                                    const progressVal = Number(lim.progress || 0);
+                                                    const remaining = limitVal - progressVal;
+                                                    const pct = limitVal > 0 ? ((progressVal / limitVal) * 100).toFixed(1) : 0;
+                                                    return (
+                                                      <tr key={lim.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                        <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60 capitalize">{lim.type || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{fmtMoney(lim.value, lim.currency)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 capitalize">{lim.period || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 min-w-[120px]">
+                                                          <div className="font-mono text-[10px]">{fmtMoney(remaining, lim.currency)} left</div>
+                                                          <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
+                                                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 90 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#22c55e' }} />
+                                                          </div>
+                                                          <div className="text-[9px] text-gray-400 dark:text-white/20 mt-0.5">{pct}%</div>
+                                                        </td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{lim.coolingOff ? 'Yes' : '—'}</td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {gambLimitTab === 'history' && (
+                                        <div>
+                                          {gambLimitHistoryLoading ? (
+                                            <div className="flex items-center justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/15" /></div>
+                                          ) : gambLimitHistory.length === 0 ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No gambling limit history</span>
+                                          ) : (
+                                            <div className="max-h-[320px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Type</th>
+                                                    <th className="text-left pb-2 font-medium">Period</th>
+                                                    <th className="text-left pb-2 font-medium">Amount</th>
+                                                    <th className="text-left pb-2 font-medium">Active</th>
+                                                    <th className="text-left pb-2 font-medium">Created</th>
+                                                    <th className="text-left pb-2 font-medium">Created By</th>
+                                                    <th className="text-left pb-2 font-medium">Updated</th>
+                                                    <th className="text-left pb-2 font-medium">Updated By</th>
+                                                    <th className="text-left pb-2 font-medium">Removed</th>
+                                                    <th className="text-left pb-2 font-medium">Removed By</th>
+                                                    <th className="text-left pb-2 font-medium">Cooling Off</th>
+                                                    <th className="text-left pb-2 font-medium">Expires</th>
+                                                    <th className="text-left pb-2 font-medium">Progress</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {gambLimitHistory.map((h, i) => {
+                                                    const limitVal = Number(h.value || 0);
+                                                    const progressVal = Number(h.progress || 0);
+                                                    const remaining = limitVal - progressVal;
+                                                    const pct = limitVal > 0 ? ((progressVal / limitVal) * 100).toFixed(1) : 0;
+                                                    return (
+                                                      <tr key={h.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                        <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60 capitalize">{h.type || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 capitalize">{h.period || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{fmtMoney(h.value, h.currency)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{h.active ? 'true' : 'false'}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(h.createdAt)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{h.createdBy?.name || '—'}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(h.updatedAt)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{h.updatedBy?.name || '—'}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{h.removedAt ? fmtDate(h.removedAt) : 'N/A'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{h.removedBy?.name || '—'}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60">{h.coolingOff ? fmtDate(h.coolingOff) : 'N/A'}</td>
+                                                        <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(h.expireAt)}</td>
+                                                        <td className="py-1.5 text-gray-700 dark:text-white/60 min-w-[120px]">
+                                                          <div className="font-mono text-[10px]">{fmtMoney(remaining, h.currency)} left</div>
+                                                          <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
+                                                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 90 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#22c55e' }} />
+                                                          </div>
+                                                          <div className="text-[9px] text-gray-400 dark:text-white/20 mt-0.5">{pct}%</div>
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })() : sectionId === 'money-laundering' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  const userId = u?.id;
+                                  const outstanding = u?.outstandingWagerAmount || [];
+                                  const fmtDate = (ts) => { if (!ts) return '—'; const d = new Date(/^\d+$/.test(String(ts)) ? Number(ts) : ts); return isNaN(d) ? '—' : d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric' }); };
+                                  const mlTabs = [
+                                    { id: 'outstanding', label: 'Outstanding' },
+                                    { id: 'logs', label: 'Logs' },
+                                  ];
+                                  const currentLogs = mlLogsByCurrency[mlLogsCurrency] || [];
+                                  return (
+                                    <div>
+                                      <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-white/[0.06] mb-3">
+                                        {mlTabs.map(t => (
+                                          <button key={t.id} onClick={() => {
+                                            setMlTab(t.id);
+                                            if (t.id === 'logs' && !mlLogsDiscovered && userId) discoverMlLogs(userId);
+                                          }}
+                                            className={`px-2.5 py-1.5 text-[10px] font-medium border-b-2 transition-colors ${
+                                              mlTab === t.id ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-400 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/40'
+                                            }`}>{t.label}</button>
+                                        ))}
+                                      </div>
+
+                                      {mlTab === 'outstanding' && (
+                                        <div>
+                                          {outstanding.length === 0 ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No outstanding wager amounts</span>
+                                          ) : (
+                                            <div className="max-h-[320px] overflow-y-auto">
+                                              <table className="w-full text-[11px]">
+                                                <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                  <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                    <th className="text-left pb-2 pl-1 font-medium">Currency</th>
+                                                    <th className="text-left pb-2 font-medium">Outstanding Amount</th>
+                                                    <th className="text-left pb-2 font-medium">Updated At</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {outstanding.map((o, i) => (
+                                                    <tr key={i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                      <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60">
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                          <img src={`https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/32/color/${(o.currency || '').toLowerCase()}.png`} alt="" className="w-3.5 h-3.5 rounded-full inline-block"
+                                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                          <span className="w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-white/10 items-center justify-center text-[6px] font-bold text-gray-500 dark:text-white/40 hidden shrink-0">
+                                                            {(o.currency || '').slice(0,2).toUpperCase()}
+                                                          </span>
+                                                          <span className="uppercase font-medium">{o.currency || '—'}</span>
+                                                        </span>
+                                                      </td>
+                                                      <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{o.amount != null ? Number(o.amount).toFixed(2) : '—'}</td>
+                                                      <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(o.updatedAt)}</td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {mlTab === 'logs' && (
+                                        <div>
+                                          {mlLogsLoading ? (
+                                            <div className="flex items-center justify-center py-6">
+                                              <Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/15" />
+                                              <span className="ml-2 text-[10px] text-gray-400 dark:text-white/25">Scanning currencies...</span>
+                                            </div>
+                                          ) : mlAvailableCurrencies.length === 0 && mlLogsDiscovered ? (
+                                            <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No event logs found for any currency</span>
+                                          ) : mlAvailableCurrencies.length > 0 ? (
+                                            <>
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">Currency:</span>
+                                                <select
+                                                  value={mlLogsCurrency}
+                                                  onChange={(e) => setMlLogsCurrency(e.target.value)}
+                                                  className="text-[10px] bg-gray-100 dark:bg-[#1a1a1a] text-gray-600 dark:text-white/50 rounded px-1.5 py-0.5 border-0 outline-none [&>option]:bg-white [&>option]:dark:bg-[#1a1a1a] [&>option]:dark:text-white/60"
+                                                >
+                                                  {mlAvailableCurrencies.map(c => (
+                                                    <option key={c} value={c}>{c.toUpperCase()}</option>
+                                                  ))}
+                                                </select>
+                                                <span className="text-[9px] text-gray-300 dark:text-white/15">{mlAvailableCurrencies.length} currencies with logs</span>
+                                              </div>
+
+                                              {currentLogs.length === 0 ? (
+                                                <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No event logs for {mlLogsCurrency.toUpperCase()}</span>
+                                              ) : (
+                                                <div className="max-h-[400px] overflow-y-auto">
+                                                  <table className="w-full text-[11px]">
+                                                    <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                      <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                        <th className="text-left pb-2 pl-1 font-medium">Date</th>
+                                                        <th className="text-left pb-2 font-medium">Outstanding</th>
+                                                        <th className="text-left pb-2 font-medium">Event Type</th>
+                                                        <th className="text-left pb-2 font-medium">Data</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      {currentLogs.map((log, i) => {
+                                                        let parsedData = null;
+                                                        try { parsedData = typeof log.data === 'string' ? JSON.parse(log.data) : log.data; } catch { parsedData = log.data; }
+                                                        return (
+                                                          <tr key={log.id || i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                            <td className="py-1.5 pl-1 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(log.date)}</td>
+                                                            <td className="py-1.5 text-gray-700 dark:text-white/60 font-mono">{log.outstanding != null ? Number(log.outstanding).toFixed(2) : '—'}</td>
+                                                            <td className="py-1.5 text-gray-700 dark:text-white/60">{log.eventType || '—'}</td>
+                                                            <td className="py-1.5 text-gray-500 dark:text-white/30 font-mono text-[10px] break-all">{parsedData && typeof parsedData === 'object' ? JSON.stringify(parsedData) : (parsedData || '—')}</td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              )}
+                                            </>
+                                          ) : null}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })() : sectionId === 'notes' ? (() => {
+                                  const u = acpData?.data?.user;
+                                  const userId = u?.id;
+                                  const fmtDate = (ts) => { if (!ts) return '—'; const d = new Date(/^\d+$/.test(String(ts)) ? Number(ts) : ts); return isNaN(d) ? '—' : d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric' }); };
+
+                                  // Auto-fetch on first render
+                                  if (acpNotes.length === 0 && !acpNotesLoading && userId) {
+                                    setTimeout(() => fetchAcpNotes(userId, 0, acpNotesType), 0);
+                                  }
+
+                                  const noteTypeOptions = ['all','action','add_role','admin_auth_transfer_oauth_to_password','admin_disable_user_oauth_identity','admin_email_update','admin_password_update','admin_tfa_disable','api_key_reveal','assign_campaign_owner','auto_suspension','break_in_play','campaign_user_add','campaign_user_remove','custom_note','delete_role','deposit_holding_balance','email_confirmed','email_update','event','failed_account_access','geocomply_bypass','immediate_self_exclusion','kyc','login','migrated_stake','mute','name_change','oauth_device_change','oauth_payment','passkey_deleted_by_support','passkey_deletion','password_link_reset','password_update','rakeback','record','register','request_password_link_reset','self_exclusion_confirm','self_exclusion_request','self_exclusion_stage_2_confirm','session_limit_change','setting_update','staff_offboarded','tag_add','tag_delete','tag_remove','tfa_disable','tfa_enable','unconfirmed_email_update','veriff_biometric_status_update','veriff_decision_add_role','veriff_decision_remove_role','veriff_user_status_update','verify_passkey_authentication','verify_passkey_registration','vip_host_status_update','visit_url'];
+
+                                  const getNoteTypeAndAction = (note) => {
+                                    const d = note.data || {};
+                                    const t = note.type || '';
+                                    switch (t) {
+                                      case 'login': return { type: 'Auth', action: 'Login' };
+                                      case 'register': return { type: 'Auth', action: 'Register' };
+                                      case 'add_role': return { type: 'Role', action: `Add role ${d.role || ''}`.trim() };
+                                      case 'delete_role': return { type: 'Role', action: `Delete role ${d.role || ''}`.trim() };
+                                      default: {
+                                        const action = d.action || '—';
+                                        return { type: t, action };
+                                      }
+                                    }
+                                  };
+
+                                  const extractField = (note, field) => {
+                                    const d = note.data || {};
+                                    switch (field) {
+                                      case 'expireAt': return d.expireAt;
+                                      case 'createdBy': return d.user?.name || d.admin?.name || '—';
+                                      case 'ip': return d.ip || '—';
+                                      case 'country': return d.country || '—';
+                                      case 'message': return d.message || d.roleMessage || d.breakInPlayMessage || d.immediateSelfExclusionMessage || d.campaignOwnerMessage || d.note || d.reason || d.email || '—';
+                                      case 'balances': return d.balances || '—';
+                                      default: return '—';
+                                    }
+                                  };
+
+                                  return (
+                                    <div>
+                                      {/* Filter dropdown */}
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <select
+                                          value={acpNotesType}
+                                          onChange={(e) => {
+                                            const newType = e.target.value;
+                                            setAcpNotesType(newType);
+                                            if (userId) fetchAcpNotes(userId, 0, newType);
+                                          }}
+                                          className="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-700 dark:text-white/60 outline-none focus:border-indigo-300 dark:focus:border-indigo-500/30"
+                                        >
+                                          {noteTypeOptions.map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+                                      {acpNotesLoading ? (
+                                        <div className="flex items-center justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-gray-300 dark:text-white/15" /></div>
+                                      ) : acpNotes.length === 0 ? (
+                                        <span className="text-[11px] text-gray-400 dark:text-white/25 italic">No notes found</span>
+                                      ) : (
+                                        <>
+                                          <div className="max-h-[400px] overflow-y-auto">
+                                            <table className="w-full text-[11px]">
+                                              <thead className="sticky top-0 bg-white dark:bg-[#0a0a0a] z-[1]">
+                                                <tr className="text-[10px] text-gray-400 dark:text-white/25 uppercase tracking-wider">
+                                                  <th className="text-left pb-2 pl-1 font-medium">Type</th>
+                                                  <th className="text-left pb-2 font-medium">Action</th>
+                                                  <th className="text-left pb-2 font-medium">Created at</th>
+                                                  <th className="text-left pb-2 font-medium">Expire at</th>
+                                                  <th className="text-left pb-2 font-medium">Created by</th>
+                                                  <th className="text-left pb-2 font-medium">IP</th>
+                                                  <th className="text-left pb-2 font-medium">Country</th>
+                                                  <th className="text-left pb-2 font-medium">Message</th>
+                                                  <th className="text-left pb-2 font-medium">Balances</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {acpNotes.map((note, i) => {
+                                                  const { type: displayType, action: displayAction } = getNoteTypeAndAction(note);
+                                                  return (
+                                                  <tr key={i} className="border-t border-gray-50 dark:border-white/[0.03] align-top">
+                                                    <td className="py-1.5 pl-1 text-gray-700 dark:text-white/60">{displayType}</td>
+                                                    <td className="py-1.5 text-gray-700 dark:text-white/60">{displayAction}</td>
+                                                    <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(note.createdAt)}</td>
+                                                    <td className="py-1.5 text-gray-500 dark:text-white/30 whitespace-nowrap">{fmtDate(extractField(note, 'expireAt'))}</td>
+                                                    <td className="py-1.5 text-gray-700 dark:text-white/60">{extractField(note, 'createdBy')}</td>
+                                                    <td className="py-1.5 text-gray-500 dark:text-white/30 font-mono text-[10px]">{extractField(note, 'ip')}</td>
+                                                    <td className="py-1.5 text-gray-700 dark:text-white/60">{extractField(note, 'country')}</td>
+                                                    <td className="py-1.5 text-gray-700 dark:text-white/60 max-w-[200px] truncate">{extractField(note, 'message')}</td>
+                                                    <td className="py-1.5 text-gray-700 dark:text-white/60">{extractField(note, 'balances')}</td>
+                                                  </tr>
+                                                  ); })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                          {/* Pagination */}
+                                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-white/[0.04]">
+                                            <span className="text-[10px] text-gray-400 dark:text-white/20">Page {acpNotesPage + 1}</span>
+                                            <div className="flex items-center gap-1">
+                                              <button
+                                                disabled={acpNotesPage === 0}
+                                                onClick={() => fetchAcpNotes(userId, acpNotesPage - 1, acpNotesType)}
+                                                className="px-2 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-gray-200 dark:hover:bg-white/[0.1] disabled:opacity-30 transition-colors"
+                                              >Prev</button>
+                                              <button
+                                                disabled={!acpNotesHasMore}
+                                                onClick={() => fetchAcpNotes(userId, acpNotesPage + 1, acpNotesType)}
+                                                className="px-2 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-gray-200 dark:hover:bg-white/[0.1] disabled:opacity-30 transition-colors"
+                                              >Next</button>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   );
                                 })() : (
