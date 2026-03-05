@@ -764,6 +764,7 @@ const ChannelHealthCard = ({ channel, orgColor }) => {
     .map(([date, count]) => ({ label: date, value: count }));
 
   const isPending = !channel.totalCases && !channel.agents?.length;
+  const noBotInstalled = channel.botInstalled === false;
 
   if (isPending) {
     return (
@@ -772,8 +773,17 @@ const ChannelHealthCard = ({ channel, orgColor }) => {
           <Hash className="w-3.5 h-3.5 text-gray-300 dark:text-[#3A3A45]" />
           <span className="text-sm font-medium text-gray-400 dark:text-[#5B5D67]">{channel.name}</span>
         </div>
-        <p className="text-xs text-gray-400 dark:text-[#5B5D67]">Pending setup</p>
-        <p className="text-[10px] text-gray-300 dark:text-[#3A3A45] mt-1">No data yet</p>
+        {noBotInstalled ? (
+          <>
+            <p className="text-xs text-amber-500 dark:text-amber-400">Bot not installed</p>
+            <p className="text-[10px] text-gray-300 dark:text-[#3A3A45] mt-1">Waiting for bot access to channel</p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-gray-400 dark:text-[#5B5D67]">Pending setup</p>
+            <p className="text-[10px] text-gray-300 dark:text-[#3A3A45] mt-1">No data yet</p>
+          </>
+        )}
       </div>
     );
   }
@@ -785,9 +795,17 @@ const ChannelHealthCard = ({ channel, orgColor }) => {
           <Hash className="w-3.5 h-3.5 text-gray-400 dark:text-[#5B5D67]" />
           <span className="text-sm font-medium text-gray-900 dark:text-[#E8E9ED]">{channel.name}</span>
         </div>
-        {channel.trackingMode === 'message_count' && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1E1E28] dark:text-[#5B5D67] font-medium">MSG COUNT</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {noBotInstalled && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 font-medium">NO BOT</span>
+          )}
+          {channel.trackingMode === 'message_count' && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1E1E28] dark:text-[#5B5D67] font-medium">MSG COUNT</span>
+          )}
+          {channel.trackingMode === 'hybrid' && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 font-medium">HYBRID</span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3">
