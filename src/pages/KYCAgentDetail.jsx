@@ -265,7 +265,7 @@ const KYCAgentDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0C0C10] flex items-center justify-center">
+      <div className="h-full bg-gray-50 dark:bg-[#0C0C10] flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400 dark:text-[#5B5D67]" />
       </div>
     );
@@ -273,7 +273,7 @@ const KYCAgentDetail = () => {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0C0C10] flex items-center justify-center">
+      <div className="h-full bg-gray-50 dark:bg-[#0C0C10] flex items-center justify-center">
         <p className="text-sm text-gray-500 dark:text-[#6B6D77]">Agent not found</p>
       </div>
     );
@@ -301,28 +301,34 @@ const KYCAgentDetail = () => {
   const dateGroups = Object.entries(groupedTimeline).sort(([a], [b]) => b.localeCompare(a));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0C0C10]">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-[#0C0C10]">
+      {/* Header bar */}
+      <div className="flex-shrink-0 border-b border-gray-200 dark:border-[#1E1E28] bg-white dark:bg-[#0C0C10]">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-2">
           <button
-            onClick={() => navigate('/kyc-goals')}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1E1E28] transition-colors"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1 text-sm text-gray-500 dark:text-[#6B6D77] hover:text-gray-900 dark:hover:text-[#E8E9ED] transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-400 dark:text-[#5B5D67]" />
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Back</span>
           </button>
+          <div className="h-5 w-px bg-gray-200 dark:bg-[#252530]" />
           {agent.slackAvatarUrl ? (
-            <img src={agent.slackAvatarUrl} alt={agent.name} className="w-10 h-10 rounded-full object-cover" />
+            <img src={agent.slackAvatarUrl} alt={agent.name} className="w-7 h-7 rounded-full object-cover" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-[#E8E9ED] flex items-center justify-center">
-              <span className="text-sm font-bold text-white dark:text-[#0C0C10]">{getInitials(agent.name)}</span>
+            <div className="w-7 h-7 rounded-full bg-gray-900 dark:bg-[#E8E9ED] flex items-center justify-center">
+              <span className="text-[10px] font-bold text-white dark:text-[#0C0C10]">{getInitials(agent.name)}</span>
             </div>
           )}
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E8E9ED]">{agent.name}</h1>
-            <p className="text-xs text-gray-500 dark:text-[#6B6D77]">{agent.email}</p>
+            <h1 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED]">{agent.name}</h1>
+            <p className="text-[11px] text-gray-500 dark:text-[#6B6D77] -mt-0.5">{agent.email}</p>
           </div>
         </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-5">
 
         {/* Two column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -524,6 +530,7 @@ const KYCAgentDetail = () => {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

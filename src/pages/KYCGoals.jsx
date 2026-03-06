@@ -1298,7 +1298,7 @@ const KYCGoals = () => {
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [fetchData]);
 
-  const TABS = [
+  const VIEW_TABS = [
     { key: 'agents', label: 'Agents', icon: Users },
     { key: 'channels', label: 'Channels', icon: Hash },
     { key: 'trends', label: 'Trends', icon: Activity },
@@ -1313,14 +1313,16 @@ const KYCGoals = () => {
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[#0C0C10]">
-      {/* Header */}
+      {/* Header bar */}
       <div className="flex-shrink-0 border-b border-gray-200 dark:border-[#1E1E28]">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED]">KYC Goals</h1>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-500/20">
-              BETA
-            </span>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED]">KYC Goals</h1>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-500/20">
+                BETA
+              </span>
+            </div>
             {dayCount > 0 && (
               <span className="text-xs text-gray-400 dark:text-[#5B5D67] hidden sm:block">
                 {range.startDate} - {range.endDate} ({dayCount}d)
@@ -1329,15 +1331,7 @@ const KYCGoals = () => {
           </div>
 
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => navigate('/kyc-goals/activity')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors text-gray-500 dark:text-[#6B6D77] hover:bg-gray-100 dark:hover:bg-[#1E1E28] mr-1"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Feed</span>
-            </button>
-            <div className="w-px h-5 bg-gray-200 dark:bg-[#1E1E28] mr-1" />
-            {TABS.map(({ key, label, icon: Icon }) => (
+            {VIEW_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setView(key)}
@@ -1351,6 +1345,16 @@ const KYCGoals = () => {
                 <span className="hidden sm:inline">{label}</span>
               </button>
             ))}
+
+            <div className="h-5 w-px bg-gray-200 dark:bg-[#252530] mx-1" />
+
+            <button
+              onClick={() => navigate('/kyc-goals/activity')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors text-gray-500 dark:text-[#6B6D77] hover:text-gray-700 dark:hover:text-[#A0A2AC] hover:bg-gray-50 dark:hover:bg-[#1A1A21]"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Feed</span>
+            </button>
 
             <div className="h-5 w-px bg-gray-200 dark:bg-[#252530] mx-1" />
 
