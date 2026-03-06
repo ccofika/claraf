@@ -5,12 +5,12 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Clock, CheckCircle2, AlertCircle,
-  User, Hash, Activity, Loader2, Sun, Sunset, Moon,
-  TrendingUp, Zap, MessageSquare, ArrowRight, Target, BarChart3, Calendar
+  Users, Hash, Activity, Loader2, Sun, Sunset, Moon,
+  Zap, MessageSquare, ArrowRight, Target, BarChart3, Calendar
 } from 'lucide-react';
 import {
-  BarChart, Bar, AreaChart, Area,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell
+  BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -94,19 +94,25 @@ const StatCard = ({ label, value, subValue, icon: Icon, color }) => (
 );
 
 // ============================================
-// Channel Breakdown Row
+// Agent Breakdown Row
 // ============================================
-const ChannelRow = ({ channel, maxCases }) => {
-  const orgCfg = ORG_COLORS[channel.organization] || ORG_COLORS['Stake.com'];
-  const barWidth = maxCases > 0 ? (channel.cases / maxCases) * 100 : 0;
+const AgentRow = ({ agent, maxCases, orgColor, navigate }) => {
+  const barWidth = maxCases > 0 ? (agent.cases / maxCases) * 100 : 0;
 
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="w-32 flex-shrink-0">
-        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${orgCfg.tag}`}>
-          <Hash className="w-2.5 h-2.5" />
-          {channel.name}
-        </span>
+    <div
+      className="flex items-center gap-3 py-2 cursor-pointer group"
+      onClick={() => navigate(`/kyc-goals/agent/${agent._id}`)}
+    >
+      <div className="w-28 flex-shrink-0 flex items-center gap-2">
+        {agent.slackAvatarUrl ? (
+          <img src={agent.slackAvatarUrl} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-5 h-5 rounded-full bg-gray-100 dark:bg-[#1E1E28] flex items-center justify-center flex-shrink-0">
+            <span className="text-[8px] font-bold text-gray-500 dark:text-[#6B6D77]">{getInitials(agent.name)}</span>
+          </div>
+        )}
+        <span className="text-[11px] text-gray-700 dark:text-[#A0A2AC] truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{agent.name}</span>
       </div>
       <div className="flex-1 flex items-center gap-2">
         <div className="flex-1 h-5 bg-gray-50 dark:bg-[#0C0C10] rounded overflow-hidden relative">
@@ -115,16 +121,16 @@ const ChannelRow = ({ channel, maxCases }) => {
             animate={{ width: `${barWidth}%` }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
             className="h-full rounded"
-            style={{ backgroundColor: orgCfg.fill, opacity: 0.7 }}
+            style={{ backgroundColor: orgColor || '#3b82f6', opacity: 0.7 }}
           />
           <span className="absolute inset-0 flex items-center pl-2 text-[10px] font-bold text-gray-700 dark:text-[#B0B1B8]">
-            {channel.cases} cases
+            {agent.cases} cases
           </span>
         </div>
         <div className="flex items-center gap-1 w-20 justify-end">
-          <span className={`w-1.5 h-1.5 rounded-full ${getResponseDot(channel.avgResponseTime)}`} />
-          <span className={`text-xs tabular-nums font-medium ${getResponseColor(channel.avgResponseTime)}`}>
-            {formatDuration(channel.avgResponseTime)}
+          <span className={`w-1.5 h-1.5 rounded-full ${getResponseDot(agent.avgResponseTime)}`} />
+          <span className={`text-xs tabular-nums font-medium ${getResponseColor(agent.avgResponseTime)}`}>
+            {formatDuration(agent.avgResponseTime)}
           </span>
         </div>
       </div>
@@ -133,18 +139,16 @@ const ChannelRow = ({ channel, maxCases }) => {
 };
 
 // ============================================
-// Agent Timeline Item
+// Timeline Item
 // ============================================
-const AgentTimelineItem = ({ item, isLast }) => {
+const ChannelTimelineItem = ({ item, isLast, navigate }) => {
   const statusCfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
   const shiftCfg = SHIFT_CONFIG[item.shift];
   const ShiftIcon = shiftCfg?.icon || Sun;
-  const orgCfg = ORG_COLORS[item.organization] || ORG_COLORS['Stake.com'];
   const isInstant = item.caseType === 'agent_initiated';
 
   return (
     <div className="relative flex gap-3">
-      {/* Timeline connector */}
       <div className="flex flex-col items-center">
         <div className={`w-2.5 h-2.5 rounded-full border-2 flex-shrink-0 mt-1.5 ${
           item.status === 'resolved' ? 'bg-emerald-500 border-emerald-400' :
@@ -155,7 +159,6 @@ const AgentTimelineItem = ({ item, isLast }) => {
         {!isLast && <div className="w-px flex-1 bg-gray-200 dark:bg-[#1E1E28] min-h-[32px]" />}
       </div>
 
-      {/* Content */}
       <motion.div
         initial={{ opacity: 0, x: -6 }}
         animate={{ opacity: 1, x: 0 }}
@@ -163,9 +166,6 @@ const AgentTimelineItem = ({ item, isLast }) => {
       >
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border font-medium ${orgCfg.tag}`}>
-              <Hash className="w-2.5 h-2.5" />{item.channel}
-            </span>
             <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>
               {item.status === 'resolved' ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
               {statusCfg.label}
@@ -188,27 +188,58 @@ const AgentTimelineItem = ({ item, isLast }) => {
           <p className="text-xs text-gray-600 dark:text-[#9A9BA3] line-clamp-2 mb-1.5 leading-relaxed">{item.messageText}</p>
         )}
 
-        {!isInstant && (item.timeToClaimSeconds > 0 || item.responseTimeSeconds > 0) && (
-          <div className="flex items-center gap-3">
-            {item.timeToClaimSeconds > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                <Clock className="w-2.5 h-2.5" />
-                Claim: <span className={getResponseColor(item.timeToClaimSeconds)}>{formatDuration(item.timeToClaimSeconds)}</span>
-              </span>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            {item.claimedBy && (
+              <button onClick={(e) => { e.stopPropagation(); navigate(`/kyc-goals/agent/${item.claimedBy._id}`); }} className="flex items-center gap-1 group/agent">
+                {item.claimedBy.slackAvatarUrl ? (
+                  <img src={item.claimedBy.slackAvatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full bg-gray-100 dark:bg-[#1E1E28] flex items-center justify-center">
+                    <span className="text-[7px] font-bold text-gray-500">{getInitials(item.claimedBy.name)}</span>
+                  </div>
+                )}
+                <span className="text-[10px] text-gray-600 dark:text-[#9A9BA3] group-hover/agent:text-gray-900 dark:group-hover/agent:text-[#E8E9ED] transition-colors">{item.claimedBy.name}</span>
+              </button>
             )}
-            {item.responseTimeSeconds > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                <CheckCircle2 className="w-2.5 h-2.5" />
-                Resolve: <span className={getResponseColor(item.responseTimeSeconds)}>{formatDuration(item.responseTimeSeconds)}</span>
-              </span>
-            )}
-            {item.replyCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                <MessageSquare className="w-2.5 h-2.5" />{item.replyCount}
-              </span>
+            {item.resolvedBy && item.resolvedBy._id !== item.claimedBy?._id && (
+              <>
+                <ArrowRight className="w-2.5 h-2.5 text-gray-300 dark:text-[#3A3A45]" />
+                <button onClick={(e) => { e.stopPropagation(); navigate(`/kyc-goals/agent/${item.resolvedBy._id}`); }} className="flex items-center gap-1 group/agent">
+                  {item.resolvedBy.slackAvatarUrl ? (
+                    <img src={item.resolvedBy.slackAvatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-gray-100 dark:bg-[#1E1E28] flex items-center justify-center">
+                      <span className="text-[7px] font-bold text-gray-500">{getInitials(item.resolvedBy.name)}</span>
+                    </div>
+                  )}
+                  <span className="text-[10px] text-gray-600 dark:text-[#9A9BA3] group-hover/agent:text-gray-900 dark:group-hover/agent:text-[#E8E9ED] transition-colors">{item.resolvedBy.name}</span>
+                </button>
+              </>
             )}
           </div>
-        )}
+          {!isInstant && (
+            <div className="flex items-center gap-3">
+              {item.timeToClaimSeconds > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
+                  <Clock className="w-2.5 h-2.5" />
+                  <span className={getResponseColor(item.timeToClaimSeconds)}>{formatDuration(item.timeToClaimSeconds)}</span>
+                </span>
+              )}
+              {item.responseTimeSeconds > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  <span className={getResponseColor(item.responseTimeSeconds)}>{formatDuration(item.responseTimeSeconds)}</span>
+                </span>
+              )}
+              {item.replyCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#6B6D77]">
+                  <MessageSquare className="w-2.5 h-2.5" />{item.replyCount}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </motion.div>
     </div>
   );
@@ -234,10 +265,10 @@ const CustomTooltip = ({ active, payload, label }) => {
 // ============================================
 // Main Component
 // ============================================
-const KYCAgentDetail = () => {
-  const { agentId } = useParams();
+const KYCChannelDetail = () => {
+  const { channelId } = useParams();
   const navigate = useNavigate();
-  const [agent, setAgent] = useState(null);
+  const [channel, setChannel] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
@@ -248,18 +279,18 @@ const KYCAgentDetail = () => {
     else setTimelineLoading(true);
 
     try {
-      const res = await axios.get(`${API_URL}/api/kyc-goals/agents/${agentId}?page=${page}&limit=30`, getAuthHeaders());
+      const res = await axios.get(`${API_URL}/api/kyc-goals/channels/${channelId}?page=${page}&limit=30`, getAuthHeaders());
       const data = res.data;
-      setAgent(data.agent);
+      setChannel(data.channel);
       setTimeline(data.timeline || []);
       setPagination(data.pagination || { page: 1, total: 0, totalPages: 0 });
     } catch (err) {
-      toast.error('Failed to load agent data');
+      toast.error('Failed to load channel data');
     } finally {
       setLoading(false);
       setTimelineLoading(false);
     }
-  }, [agentId]);
+  }, [channelId]);
 
   useEffect(() => { fetchData(1, true); }, [fetchData]);
 
@@ -271,18 +302,19 @@ const KYCAgentDetail = () => {
     );
   }
 
-  if (!agent) {
+  if (!channel) {
     return (
       <div className="h-full bg-gray-50 dark:bg-[#0C0C10] flex items-center justify-center">
-        <p className="text-sm text-gray-500 dark:text-[#6B6D77]">Agent not found</p>
+        <p className="text-sm text-gray-500 dark:text-[#6B6D77]">Channel not found</p>
       </div>
     );
   }
 
-  const stats = agent.stats || {};
-  const channelBreakdown = agent.channelBreakdown || [];
-  const dailyActivity = agent.dailyActivity || [];
-  const maxChannelCases = Math.max(...channelBreakdown.map(c => c.cases), 1);
+  const stats = channel.stats || {};
+  const agentBreakdown = channel.agentBreakdown || [];
+  const dailyActivity = channel.dailyActivity || [];
+  const maxAgentCases = Math.max(...agentBreakdown.map(a => a.cases), 1);
+  const orgCfg = ORG_COLORS[channel.organization] || ORG_COLORS['Stake.com'];
 
   const totalShift = (stats.shifts?.morning || 0) + (stats.shifts?.afternoon || 0) + (stats.shifts?.night || 0);
   const shiftPcts = {
@@ -303,7 +335,7 @@ const KYCAgentDetail = () => {
   return (
     <div className="h-full bg-gray-50 dark:bg-[#0C0C10] overflow-y-auto">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-5">
-        {/* Agent header */}
+        {/* Channel header */}
         <div className="flex items-center gap-3 mb-5">
           <button
             onClick={() => navigate(-1)}
@@ -311,16 +343,19 @@ const KYCAgentDetail = () => {
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          {agent.slackAvatarUrl ? (
-            <img src={agent.slackAvatarUrl} alt={agent.name} className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-[#E8E9ED] flex items-center justify-center">
-              <span className="text-sm font-bold text-white dark:text-[#0C0C10]">{getInitials(agent.name)}</span>
-            </div>
-          )}
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: orgCfg.fill + '20' }}>
+            <Hash className="w-5 h-5" style={{ color: orgCfg.fill }} />
+          </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E8E9ED]">{agent.name}</h1>
-            <p className="text-xs text-gray-500 dark:text-[#6B6D77]">{agent.email}</p>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E8E9ED]">{channel.name}</h1>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border font-medium ${orgCfg.tag}`}>{channel.organization}</span>
+              {channel.trackingMode !== 'full' && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1E1E28] dark:text-[#5B5D67] font-medium uppercase">
+                  {channel.trackingMode}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -332,9 +367,9 @@ const KYCAgentDetail = () => {
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Total Cases" value={stats.totalCases} icon={BarChart3} color="text-blue-500" />
               <StatCard label="Resolved" value={stats.resolvedCases} subValue={`${stats.resolutionRate}% rate`} icon={CheckCircle2} color="text-emerald-500" />
-              <StatCard label="Avg Response" value={formatDuration(stats.avgResponseTime)} subValue={stats.minResponseTime > 0 ? `Min: ${formatDuration(stats.minResponseTime)}` : undefined} icon={Clock} color={getResponseColor(stats.avgResponseTime).replace('text-', '').includes('emerald') ? 'text-emerald-500' : 'text-amber-500'} />
+              <StatCard label="Avg Response" value={formatDuration(stats.avgResponseTime)} subValue={stats.minResponseTime > 0 ? `Min: ${formatDuration(stats.minResponseTime)}` : undefined} icon={Clock} color={stats.avgResponseTime < 180 ? 'text-emerald-500' : stats.avgResponseTime < 300 ? 'text-amber-500' : 'text-red-500'} />
               <StatCard label="Avg Claim" value={formatDuration(stats.avgClaimTime)} icon={Target} color="text-purple-500" />
-              <StatCard label="Active Channels" value={stats.activeChannels} icon={Hash} color="text-gray-500 dark:text-[#6B6D77]" />
+              <StatCard label="Active Agents" value={stats.activeAgents} icon={Users} color="text-gray-500 dark:text-[#6B6D77]" />
               <StatCard label="Active Days" value={stats.activeDays} icon={Calendar} color="text-gray-500 dark:text-[#6B6D77]" />
             </div>
 
@@ -364,16 +399,15 @@ const KYCAgentDetail = () => {
             {/* Shift distribution */}
             <div className="bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg p-4">
               <h3 className="text-xs font-semibold text-gray-900 dark:text-[#E8E9ED] mb-3">Shift Distribution</h3>
-              {/* Stacked bar */}
               <div className="h-3 w-full rounded-full overflow-hidden flex mb-3 bg-gray-100 dark:bg-[#0C0C10]">
                 {shiftPcts.morning > 0 && (
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.morning}%` }} className="h-full bg-amber-400" title={`Morning: ${shiftPcts.morning}%`} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.morning}%` }} className="h-full bg-amber-400" />
                 )}
                 {shiftPcts.afternoon > 0 && (
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.afternoon}%` }} className="h-full bg-orange-400" title={`Afternoon: ${shiftPcts.afternoon}%`} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.afternoon}%` }} className="h-full bg-orange-400" />
                 )}
                 {shiftPcts.night > 0 && (
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.night}%` }} className="h-full bg-blue-400" title={`Night: ${shiftPcts.night}%`} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${shiftPcts.night}%` }} className="h-full bg-blue-400" />
                 )}
               </div>
               <div className="space-y-1.5">
@@ -396,13 +430,13 @@ const KYCAgentDetail = () => {
               </div>
             </div>
 
-            {/* Channel breakdown */}
-            {channelBreakdown.length > 0 && (
+            {/* Agent breakdown */}
+            {agentBreakdown.length > 0 && (
               <div className="bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg p-4">
-                <h3 className="text-xs font-semibold text-gray-900 dark:text-[#E8E9ED] mb-3">Channel Breakdown</h3>
+                <h3 className="text-xs font-semibold text-gray-900 dark:text-[#E8E9ED] mb-3">Agent Breakdown</h3>
                 <div className="space-y-0">
-                  {channelBreakdown.sort((a, b) => b.cases - a.cases).map(ch => (
-                    <ChannelRow key={ch.name} channel={ch} maxCases={maxChannelCases} />
+                  {agentBreakdown.map(a => (
+                    <AgentRow key={a._id} agent={a} maxCases={maxAgentCases} orgColor={orgCfg.fill} navigate={navigate} />
                   ))}
                 </div>
               </div>
@@ -425,14 +459,14 @@ const KYCAgentDetail = () => {
                       />
                       <YAxis tick={{ fontSize: 9, fill: '#6B6D77' }} axisLine={false} tickLine={false} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="cases" radius={[2, 2, 0, 0]} fill="#3b82f6" opacity={0.7} />
+                      <Bar dataKey="cases" radius={[2, 2, 0, 0]} fill={orgCfg.fill} opacity={0.7} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             )}
 
-            {/* Response time stats */}
+            {/* Response time range */}
             {stats.maxResponseTime > 0 && (
               <div className="bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg p-4">
                 <h3 className="text-xs font-semibold text-gray-900 dark:text-[#E8E9ED] mb-3">Response Time Range</h3>
@@ -490,7 +524,7 @@ const KYCAgentDetail = () => {
                     </div>
                     <div className="pl-1">
                       {dateItems.map((item, i) => (
-                        <AgentTimelineItem key={item._id} item={item} isLast={i === dateItems.length - 1} />
+                        <ChannelTimelineItem key={item._id} item={item} isLast={i === dateItems.length - 1} navigate={navigate} />
                       ))}
                     </div>
                   </div>
@@ -529,4 +563,4 @@ const KYCAgentDetail = () => {
   );
 };
 
-export default KYCAgentDetail;
+export default KYCChannelDetail;

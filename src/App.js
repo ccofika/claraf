@@ -69,6 +69,7 @@ import KYCGoals from './pages/KYCGoals';
 import KYCGoalsLayout from './pages/KYCGoalsLayout';
 import KYCActivityFeed from './pages/KYCActivityFeed';
 import KYCAgentDetail from './pages/KYCAgentDetail';
+import KYCChannelDetail from './pages/KYCChannelDetail';
 import ActiveIssues from './pages/ActiveIssues';
 import {
   TLLayout,
@@ -286,6 +287,7 @@ function App() {
                           <Route index element={<KYCGoals />} />
                           <Route path="activity" element={<KYCActivityFeed />} />
                           <Route path="agent/:agentId" element={<KYCAgentDetail />} />
+                          <Route path="channel/:channelId" element={<KYCChannelDetail />} />
                         </Route>
 
 

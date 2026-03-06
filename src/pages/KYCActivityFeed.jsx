@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, Hash, Clock, ChevronLeft, ChevronRight, Filter,
-  CheckCircle2, AlertCircle, Loader2, ArrowRight, ArrowLeft,
+  CheckCircle2, AlertCircle, Loader2, ArrowRight,
   Sun, Sunset, Moon, MessageSquare, Zap, X, Search,
   AlertTriangle, History, Timer, ExternalLink
 } from 'lucide-react';
@@ -19,10 +19,10 @@ const SHIFT_CONFIG = {
 };
 
 const STATUS_CONFIG = {
-  open: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20', label: 'Open' },
-  claimed: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20', label: 'Claimed' },
-  in_progress: { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20', label: 'In Progress' },
-  resolved: { color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', label: 'Resolved' }
+  open: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20', label: 'Open', dot: 'bg-blue-500', accent: 'border-l-blue-400 dark:border-l-blue-500' },
+  claimed: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20', label: 'Claimed', dot: 'bg-amber-500', accent: 'border-l-amber-400 dark:border-l-amber-500' },
+  in_progress: { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20', label: 'In Progress', dot: 'bg-purple-500', accent: 'border-l-purple-400 dark:border-l-purple-500' },
+  resolved: { color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', label: 'Resolved', dot: 'bg-emerald-500', accent: 'border-l-emerald-400 dark:border-l-emerald-500' }
 };
 
 const ORG_COLORS = {
@@ -52,6 +52,15 @@ const formatTime = (date) => {
   });
 };
 
+const formatTimeShort = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleString('en-GB', {
+    timeZone: 'Europe/Belgrade',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false
+  });
+};
+
 const getResponseColor = (seconds) => {
   if (!seconds || seconds <= 0) return 'text-gray-400 dark:text-[#5B5D67]';
   if (seconds < 180) return 'text-emerald-600 dark:text-emerald-400';
@@ -59,10 +68,15 @@ const getResponseColor = (seconds) => {
   return 'text-red-600 dark:text-red-400';
 };
 
-const getWaitingSeverity = (seconds) => {
-  if (seconds < 900) return 'border-amber-300 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5'; // 10-15 min
-  if (seconds < 1800) return 'border-orange-300 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5'; // 15-30 min
-  return 'border-red-300 dark:border-red-500/30 bg-red-50/50 dark:bg-red-500/5'; // 30+ min
+const getWaitBarWidth = (seconds) => {
+  const maxSeconds = 7200; // 2 hours = full bar
+  return Math.min((seconds / maxSeconds) * 100, 100);
+};
+
+const getWaitBarColor = (seconds) => {
+  if (seconds < 900) return 'bg-amber-400 dark:bg-amber-500';
+  if (seconds < 1800) return 'bg-orange-400 dark:bg-orange-500';
+  return 'bg-red-400 dark:bg-red-500';
 };
 
 const getAuthHeaders = () => {
@@ -82,55 +96,100 @@ const openInSlack = async (slackChannelId, slackMessageTs) => {
       `${API_URL}/api/kyc-goals/slack-permalink?channel=${slackChannelId}&message_ts=${slackMessageTs}`,
       getAuthHeaders()
     );
-    if (res.data.permalink) {
-      window.open(res.data.permalink, '_blank');
-    }
+    if (res.data.permalink) window.open(res.data.permalink, '_blank');
   } catch {
     toast.error('Failed to get Slack link');
   }
 };
 
-const Avatar = ({ agent, size = 'w-5 h-5' }) => {
+// ============================================
+// Avatar with ring + hover scale
+// ============================================
+const Avatar = ({ agent, size = 'sm' }) => {
+  const sizes = {
+    xs: { box: 'w-4 h-4', text: 'text-[7px]' },
+    sm: { box: 'w-5 h-5', text: 'text-[8px]' },
+    md: { box: 'w-7 h-7', text: 'text-[10px]' },
+  };
+  const s = sizes[size] || sizes.sm;
   if (!agent) return null;
   if (agent.slackAvatarUrl) {
-    return <img src={agent.slackAvatarUrl} alt="" className={`${size} rounded-full object-cover flex-shrink-0`} />;
+    return <img src={agent.slackAvatarUrl} alt="" className={`${s.box} rounded-full object-cover flex-shrink-0 ring-1 ring-gray-200/50 dark:ring-[#252530]`} />;
   }
   return (
-    <div className={`${size} rounded-full bg-gray-100 dark:bg-[#1E1E28] flex items-center justify-center flex-shrink-0`}>
-      <span className="text-[9px] font-bold text-gray-500 dark:text-[#6B6D77]">{getInitials(agent.name)}</span>
+    <div className={`${s.box} rounded-full bg-gray-100 dark:bg-[#1E1E28] flex items-center justify-center flex-shrink-0 ring-1 ring-gray-200/50 dark:ring-[#252530]`}>
+      <span className={`${s.text} font-bold text-gray-500 dark:text-[#6B6D77]`}>{getInitials(agent.name)}</span>
     </div>
   );
 };
 
 // ============================================
-// Timeline Item (left column)
+// Timeline Card
 // ============================================
-const TimelineItem = ({ item, isLast, navigate }) => {
+const TimelineCard = ({ item, navigate, index }) => {
   const statusCfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
   const shiftCfg = SHIFT_CONFIG[item.shift];
   const ShiftIcon = shiftCfg?.icon || Sun;
   const orgColor = ORG_COLORS[item.organization] || ORG_COLORS['Stake.com'];
   const isInstant = item.caseType === 'agent_initiated';
+  const hasMetrics = !isInstant && (item.timeToClaimSeconds > 0 || item.responseTimeSeconds > 0);
+  const agent = item.claimedBy || item.resolvedBy;
 
   return (
-    <div className="relative flex gap-3">
-      <div className="flex flex-col items-center">
-        <div className={`w-2.5 h-2.5 rounded-full border-2 flex-shrink-0 mt-1.5 ${
-          item.status === 'resolved' ? 'bg-emerald-500 border-emerald-400' :
-          item.status === 'open' ? 'bg-blue-500 border-blue-400' :
-          item.status === 'claimed' ? 'bg-amber-500 border-amber-400' :
-          'bg-purple-500 border-purple-400'
-        }`} />
-        {!isLast && <div className="w-px flex-1 bg-gray-200 dark:bg-[#1E1E28] min-h-[32px]" />}
-      </div>
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.025, 0.3), duration: 0.2 }}
+      className="group"
+    >
+      <div className="flex gap-3 bg-white dark:bg-[#111116] border border-gray-200/70 dark:border-[#1E1E28] rounded-xl overflow-hidden hover:border-gray-300 dark:hover:border-[#2A2A36] transition-all duration-150 p-3">
+        {/* Left: Avatar */}
+        {agent && (
+          <button onClick={() => navigate(`/kyc-goals/agent/${agent._id}`)} className="flex-shrink-0 group/a mt-0.5">
+            <div className="group-hover/a:scale-105 transition-transform">
+              <Avatar agent={agent} size="md" />
+            </div>
+          </button>
+        )}
 
-      <motion.div
-        initial={{ opacity: 0, x: -6 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="flex-1 mb-3 bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg p-3 hover:border-gray-300 dark:hover:border-[#252530] transition-colors"
-      >
-        <div className="flex items-start justify-between gap-2 mb-1.5">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Agent name + message + time */}
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <div className="flex items-baseline gap-2 min-w-0">
+              {agent && (
+                <button onClick={() => navigate(`/kyc-goals/agent/${agent._id}`)} className="group/a flex-shrink-0">
+                  <span className="text-[13px] font-medium text-gray-900 dark:text-[#E8E9ED] group-hover/a:text-blue-600 dark:group-hover/a:text-blue-400 transition-colors">{agent.name}</span>
+                </button>
+              )}
+              {item.resolvedBy && item.resolvedBy._id !== item.claimedBy?._id && (
+                <span className="flex items-center gap-1 flex-shrink-0">
+                  <ArrowRight className="w-3 h-3 text-gray-300 dark:text-[#3A3A45]" />
+                  <button onClick={() => navigate(`/kyc-goals/agent/${item.resolvedBy._id}`)} className="group/a">
+                    <span className="text-[13px] font-medium text-gray-700 dark:text-[#C8C9CD] group-hover/a:text-blue-600 dark:group-hover/a:text-blue-400 transition-colors">{item.resolvedBy.name}</span>
+                  </button>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <ShiftIcon className={`w-3 h-3 ${shiftCfg?.color} opacity-70`} />
+              <span className="text-xs text-gray-400 dark:text-[#5B5D67] tabular-nums">{formatTimeShort(item.createdAt)}</span>
+              <button
+                onClick={() => openInSlack(item.slackChannelId, item.slackMessageTs)}
+                className="p-0.5 rounded text-gray-300 dark:text-[#3A3A45] hover:text-gray-500 dark:hover:text-[#9A9BA3] opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Message text */}
+          {item.messageText && (
+            <p className="text-xs text-gray-600 dark:text-[#9A9BA3] line-clamp-1 leading-relaxed mb-1.5">{item.messageText}</p>
+          )}
+
+          {/* Row 3: Badges + metrics inline */}
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border font-medium ${orgColor}`}>
               <Hash className="w-2.5 h-2.5" />{item.channel}
             </span>
@@ -139,131 +198,160 @@ const TimelineItem = ({ item, isLast, navigate }) => {
               {statusCfg.label}
             </span>
             {isInstant && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1E1E28] dark:text-[#5B5D67] font-medium">
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1A1A21] dark:text-[#5B5D67] font-medium">
                 <Zap className="w-2.5 h-2.5" />Instant
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button
-              onClick={() => openInSlack(item.slackChannelId, item.slackMessageTs)}
-              title="Open in Slack"
-              className="p-0.5 rounded text-gray-300 dark:text-[#3A3A45] hover:text-gray-600 dark:hover:text-[#9A9BA3] transition-colors"
-            >
-              <ExternalLink className="w-3 h-3" />
-            </button>
-            <ShiftIcon className={`w-3 h-3 ${shiftCfg?.color}`} />
-            <span className="text-[10px] text-gray-400 dark:text-[#5B5D67] tabular-nums whitespace-nowrap">
-              {formatTime(item.createdAt)}
-            </span>
-          </div>
-        </div>
-
-        {item.messageText && (
-          <p className="text-xs text-gray-600 dark:text-[#9A9BA3] mb-2 line-clamp-2 leading-relaxed">{item.messageText}</p>
-        )}
-
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            {item.claimedBy && (
-              <button onClick={() => navigate(`/kyc-goals/agent/${item.claimedBy._id}`)} className="flex items-center gap-1 group">
-                <Avatar agent={item.claimedBy} />
-                <span className="text-[11px] text-gray-600 dark:text-[#9A9BA3] group-hover:text-gray-900 dark:group-hover:text-[#E8E9ED] transition-colors">{item.claimedBy.name}</span>
-              </button>
-            )}
-            {item.resolvedBy && item.resolvedBy._id !== item.claimedBy?._id && (
+            {hasMetrics && (
               <>
-                <ArrowRight className="w-2.5 h-2.5 text-gray-300 dark:text-[#3A3A45]" />
-                <button onClick={() => navigate(`/kyc-goals/agent/${item.resolvedBy._id}`)} className="flex items-center gap-1 group">
-                  <Avatar agent={item.resolvedBy} />
-                  <span className="text-[11px] text-gray-600 dark:text-[#9A9BA3] group-hover:text-gray-900 dark:group-hover:text-[#E8E9ED] transition-colors">{item.resolvedBy.name}</span>
-                </button>
+                <span className="text-gray-200 dark:text-[#1E1E28]">|</span>
+                {item.timeToClaimSeconds > 0 && (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium tabular-nums ${getResponseColor(item.timeToClaimSeconds)}`}>
+                    <Clock className="w-3 h-3" />{formatDuration(item.timeToClaimSeconds)}
+                  </span>
+                )}
+                {item.responseTimeSeconds > 0 && (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium tabular-nums ${getResponseColor(item.responseTimeSeconds)}`}>
+                    <CheckCircle2 className="w-3 h-3" />{formatDuration(item.responseTimeSeconds)}
+                  </span>
+                )}
               </>
             )}
+            {item.replyCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-gray-400 dark:text-[#5B5D67] tabular-nums">
+                <MessageSquare className="w-3 h-3" />{item.replyCount}
+              </span>
+            )}
           </div>
-          {!isInstant && (
-            <div className="flex items-center gap-2">
-              {item.timeToClaimSeconds > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                  <Clock className="w-2.5 h-2.5" />
-                  <span className={getResponseColor(item.timeToClaimSeconds)}>{formatDuration(item.timeToClaimSeconds)}</span>
-                </span>
-              )}
-              {item.responseTimeSeconds > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
-                  <span className={getResponseColor(item.responseTimeSeconds)}>{formatDuration(item.responseTimeSeconds)}</span>
-                </span>
-              )}
-              {item.replyCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500 dark:text-[#6B6D77]">
-                  <MessageSquare className="w-2.5 h-2.5" />{item.replyCount}
-                </span>
-              )}
-            </div>
-          )}
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 };
 
 // ============================================
-// Long Waiting Card (right column)
+// Long Waiting Card
 // ============================================
-const LongWaitingCard = ({ item, navigate, showResolveTime, onDismiss }) => {
+const LongWaitingCard = ({ item, navigate, showResolveTime, onDismiss, index }) => {
   const orgColor = ORG_COLORS[item.organization] || ORG_COLORS['Stake.com'];
   const waitSeconds = item.waitingSeconds || 0;
-  const severity = showResolveTime ? 'border-gray-200 dark:border-[#1E1E28]' : getWaitingSeverity(waitSeconds);
+  const displaySeconds = showResolveTime ? item.totalHandlingTimeSeconds : waitSeconds;
 
   return (
-    <div className={`border rounded-lg p-2.5 ${severity} transition-colors group/card relative`}>
-      <button
-        onClick={() => onDismiss(item._id)}
-        title="Dismiss (false alarm)"
-        className="absolute top-1.5 right-1.5 p-0.5 rounded text-gray-300 dark:text-[#3A3A45] hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover/card:opacity-100 transition-all"
-      >
-        <X className="w-3 h-3" />
-      </button>
-
-      <div className="flex items-center justify-between gap-2 mb-1 pr-4">
-        <span className={`inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded border font-medium ${orgColor}`}>
-          <Hash className="w-2 h-2" />{item.channel}
-        </span>
-        <span className={`text-[10px] font-bold tabular-nums ${showResolveTime ? getResponseColor(item.totalHandlingTimeSeconds) : 'text-red-600 dark:text-red-400'}`}>
-          {showResolveTime ? formatDuration(item.totalHandlingTimeSeconds) : formatDuration(waitSeconds)}
-        </span>
-      </div>
-
-      {item.messageText && (
-        <p className="text-[11px] text-gray-600 dark:text-[#9A9BA3] line-clamp-1 mb-1 leading-relaxed">{item.messageText}</p>
+    <motion.div
+      initial={{ opacity: 0, x: 4 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index * 0.02, 0.2), duration: 0.15 }}
+      className="group/card relative bg-white dark:bg-[#111116] border border-gray-200/60 dark:border-[#1E1E28] rounded-xl overflow-hidden hover:border-gray-300 dark:hover:border-[#2A2A36] transition-all"
+    >
+      {/* Severity bar */}
+      {!showResolveTime && (
+        <div className="h-[2px] bg-gray-100 dark:bg-[#1A1A21]">
+          <div
+            className={`h-full ${getWaitBarColor(waitSeconds)} transition-all`}
+            style={{ width: `${getWaitBarWidth(waitSeconds)}%` }}
+          />
+        </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          {item.claimedBy ? (
-            <button onClick={() => navigate(`/kyc-goals/agent/${item.claimedBy._id}`)} className="flex items-center gap-1 group">
-              <Avatar agent={item.claimedBy} size="w-4 h-4" />
-              <span className="text-[10px] text-gray-500 dark:text-[#6B6D77] group-hover:text-gray-900 dark:group-hover:text-[#E8E9ED]">{item.claimedBy.name}</span>
-            </button>
-          ) : (
-            <span className="text-[10px] text-red-500 font-medium">Unclaimed</span>
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        {/* Avatar */}
+        {item.claimedBy ? (
+          <button onClick={() => navigate(`/kyc-goals/agent/${item.claimedBy._id}`)} className="flex-shrink-0 group/a">
+            <div className="group-hover/a:scale-105 transition-transform">
+              <Avatar agent={item.claimedBy} size="sm" />
+            </div>
+          </button>
+        ) : (
+          <div className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-500/10 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-2.5 h-2.5 text-red-500" />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {item.claimedBy ? (
+                <button onClick={() => navigate(`/kyc-goals/agent/${item.claimedBy._id}`)} className="group/a">
+                  <span className="text-xs font-medium text-gray-800 dark:text-[#C8C9CD] group-hover/a:text-blue-600 dark:group-hover/a:text-blue-400 transition-colors">{item.claimedBy.name}</span>
+                </button>
+              ) : (
+                <span className="text-xs text-red-500 dark:text-red-400 font-medium">Unclaimed</span>
+              )}
+              <span className={`inline-flex items-center gap-0.5 text-[9px] px-1 py-px rounded border font-medium flex-shrink-0 ${orgColor}`}>
+                <Hash className="w-2 h-2" />{item.channel}
+              </span>
+            </div>
+            <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${showResolveTime ? getResponseColor(displaySeconds) : 'text-red-600 dark:text-red-400'}`}>
+              {formatDuration(displaySeconds)}
+            </span>
+          </div>
+          {item.messageText && (
+            <p className="text-[11px] text-gray-400 dark:text-[#5B5D67] line-clamp-1 leading-snug mt-0.5">{item.messageText}</p>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-all">
           <button
             onClick={() => openInSlack(item.slackChannelId, item.slackMessageTs)}
-            title="Open in Slack"
-            className="p-0.5 rounded text-gray-300 dark:text-[#3A3A45] hover:text-gray-600 dark:hover:text-[#9A9BA3] opacity-0 group-hover/card:opacity-100 transition-all"
+            className="p-1 rounded-md text-gray-400 dark:text-[#5B5D67] hover:text-gray-600 dark:hover:text-[#9A9BA3] hover:bg-gray-100 dark:hover:bg-[#1A1A21] transition-all"
           >
-            <ExternalLink className="w-2.5 h-2.5" />
+            <ExternalLink className="w-3 h-3" />
           </button>
-          <span className="text-[9px] text-gray-400 dark:text-[#5B5D67] tabular-nums">{formatTime(item.createdAt)}</span>
+          <button
+            onClick={() => onDismiss(item._id)}
+            className="p-1 rounded-md text-gray-400 dark:text-[#5B5D67] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
+
+// ============================================
+// Right Panel Section
+// ============================================
+const RightPanelSection = ({ icon: Icon, iconColor, title, count, countStyle, children, style, pag, onPageChange }) => (
+  <div className="flex flex-col min-h-0" style={style}>
+    <div className="flex-shrink-0 px-3 py-2 border-b border-gray-200/60 dark:border-[#1E1E28] flex items-center justify-between">
+      <div className="flex items-center gap-1.5">
+        <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+        <h3 className="text-[11px] font-semibold text-gray-900 dark:text-[#E8E9ED]">{title}</h3>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {pag && pag.totalPages > 1 && (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => onPageChange(pag.page - 1)}
+              disabled={pag.page <= 1}
+              className="p-0.5 rounded text-gray-400 dark:text-[#5B5D67] hover:text-gray-600 dark:hover:text-[#9A9BA3] disabled:opacity-25 transition-colors"
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </button>
+            <span className="text-[9px] text-gray-400 dark:text-[#5B5D67] tabular-nums">{pag.page}/{pag.totalPages}</span>
+            <button
+              onClick={() => onPageChange(pag.page + 1)}
+              disabled={pag.page >= pag.totalPages}
+              className="p-0.5 rounded text-gray-400 dark:text-[#5B5D67] hover:text-gray-600 dark:hover:text-[#9A9BA3] disabled:opacity-25 transition-colors"
+            >
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+        <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded ${countStyle}`}>
+          {pag ? pag.total : count}
+        </span>
+      </div>
+    </div>
+    <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+      {children}
+    </div>
+  </div>
+);
 
 // ============================================
 // Main Component
@@ -275,16 +363,21 @@ const KYCActivityFeed = () => {
   const [longWaiting, setLongWaiting] = useState([]);
   const [longWaitingHistory, setLongWaitingHistory] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
+  const [lwPagination, setLwPagination] = useState({ page: 1, total: 0, totalPages: 0 });
+  const [lhPagination, setLhPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState('');
   const [channelDropdownOpen, setChannelDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const leftPanelRef = useRef(null);
 
-  const fetchData = useCallback(async (page = 1) => {
+  const fetchData = useCallback(async (page = 1, lwPage = null, lhPage = null) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: 30 });
       if (selectedChannel) params.append('channel', selectedChannel);
+      if (lwPage) params.append('lwPage', lwPage);
+      if (lhPage) params.append('lhPage', lhPage);
 
       const res = await axios.get(`${API_URL}/api/kyc-goals/activity-feed?${params}`, getAuthHeaders());
       const data = res.data;
@@ -293,6 +386,8 @@ const KYCActivityFeed = () => {
       setLongWaiting(data.longWaiting || []);
       setLongWaitingHistory(data.longWaitingHistory || []);
       setPagination(data.pagination || { page: 1, total: 0, totalPages: 0 });
+      setLwPagination(data.longWaitingPagination || { page: 1, total: 0, totalPages: 0 });
+      setLhPagination(data.longWaitingHistoryPagination || { page: 1, total: 0, totalPages: 0 });
     } catch (err) {
       toast.error('Failed to load activity feed');
     } finally {
@@ -302,11 +397,38 @@ const KYCActivityFeed = () => {
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
+  useEffect(() => {
+    if (leftPanelRef.current) leftPanelRef.current.scrollTop = 0;
+  }, [items]);
+
+  // Fetch only long waiting panel data (without reloading main feed)
+  const fetchLwPage = async (newPage) => {
+    try {
+      const params = new URLSearchParams({ page: pagination.page, limit: 30, lwPage: newPage, lhPage: lhPagination.page });
+      if (selectedChannel) params.append('channel', selectedChannel);
+      const res = await axios.get(`${API_URL}/api/kyc-goals/activity-feed?${params}`, getAuthHeaders());
+      setLongWaiting(res.data.longWaiting || []);
+      setLwPagination(res.data.longWaitingPagination || { page: 1, total: 0, totalPages: 0 });
+    } catch { toast.error('Failed to load'); }
+  };
+
+  const fetchLhPage = async (newPage) => {
+    try {
+      const params = new URLSearchParams({ page: pagination.page, limit: 30, lwPage: lwPagination.page, lhPage: newPage });
+      if (selectedChannel) params.append('channel', selectedChannel);
+      const res = await axios.get(`${API_URL}/api/kyc-goals/activity-feed?${params}`, getAuthHeaders());
+      setLongWaitingHistory(res.data.longWaitingHistory || []);
+      setLhPagination(res.data.longWaitingHistoryPagination || { page: 1, total: 0, totalPages: 0 });
+    } catch { toast.error('Failed to load'); }
+  };
+
   const handleDismiss = async (ticketId) => {
     try {
       await axios.post(`${API_URL}/api/kyc-goals/tickets/${ticketId}/dismiss`, {}, getAuthHeaders());
       setLongWaiting(prev => prev.filter(t => t._id !== ticketId));
       setLongWaitingHistory(prev => prev.filter(t => t._id !== ticketId));
+      setLwPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+      setLhPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
       toast.success('Ticket dismissed');
     } catch (err) {
       toast.error('Failed to dismiss ticket');
@@ -329,42 +451,57 @@ const KYCActivityFeed = () => {
   });
   const dateGroups = Object.entries(groupedByDate).sort(([a], [b]) => b.localeCompare(a));
 
+  let cumulativeIndex = 0;
+  const hasLongWaiting = lwPagination.total > 0 || longWaiting.length > 0;
+  const hasHistory = lhPagination.total > 0 || longWaitingHistory.length > 0;
+
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-[#0C0C10]">
-      {/* Header bar */}
-      <div className="flex-shrink-0 border-b border-gray-200 dark:border-[#1E1E28] bg-white dark:bg-[#0C0C10]">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-2">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-[#0C0C10] overflow-hidden">
+      {/* Compact toolbar */}
+      <div className="flex-shrink-0 px-4 sm:px-6 py-2 border-b border-gray-200/60 dark:border-[#1E1E28] bg-white/60 dark:bg-[#0C0C10]/80 backdrop-blur-sm relative z-50">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/kyc-goals')}
-              className="flex items-center gap-1 text-sm text-gray-500 dark:text-[#6B6D77] hover:text-gray-900 dark:hover:text-[#E8E9ED] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Overview</span>
-            </button>
-            <div className="h-5 w-px bg-gray-200 dark:bg-[#252530]" />
-            <h1 className="text-base font-semibold text-gray-900 dark:text-[#E8E9ED]">Activity Feed</h1>
-            <span className="text-xs text-gray-400 dark:text-[#5B5D67]">{pagination.total} cases</span>
+            <span className="text-xs text-gray-500 dark:text-[#6B6D77] tabular-nums">{pagination.total.toLocaleString()} cases</span>
+            <div className="h-3 w-px bg-gray-200 dark:bg-[#1E1E28]" />
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => fetchData(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className="p-0.5 rounded text-gray-400 dark:text-[#5B5D67] hover:text-gray-600 dark:hover:text-[#9A9BA3] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[11px] text-gray-500 dark:text-[#6B6D77] tabular-nums min-w-[60px] text-center">
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchData(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+                className="p-0.5 rounded text-gray-400 dark:text-[#5B5D67] hover:text-gray-600 dark:hover:text-[#9A9BA3] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Channel filter */}
           <div className="relative">
             <button
               onClick={() => setChannelDropdownOpen(!channelDropdownOpen)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors ${
                 selectedChannel
-                  ? 'border-blue-300 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                  : 'border-gray-200 dark:border-[#1E1E28] bg-white dark:bg-[#141419] text-gray-600 dark:text-[#9A9BA3] hover:border-gray-300 dark:hover:border-[#252530]'
+                  ? 'border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                  : 'border-gray-200 dark:border-[#1E1E28] bg-white dark:bg-[#111116] text-gray-500 dark:text-[#6B6D77] hover:border-gray-300 dark:hover:border-[#252530]'
               }`}
             >
-              <Filter className="w-3.5 h-3.5" />
-              {selectedChannel ? selectedChannelDoc?.name || 'Channel' : 'All Channels'}
+              <Filter className="w-3 h-3" />
+              <span>{selectedChannel ? selectedChannelDoc?.name || 'Channel' : 'All Channels'}</span>
               {selectedChannel && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setSelectedChannel(''); setChannelDropdownOpen(false); }}
-                  className="ml-1 p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-500/20"
+                  className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-500/20 -mr-0.5"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-2.5 h-2.5" />
                 </button>
               )}
             </button>
@@ -375,17 +512,18 @@ const KYCActivityFeed = () => {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg shadow-lg z-50 overflow-hidden"
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-[#111116] border border-gray-200 dark:border-[#1E1E28] rounded-xl shadow-lg z-50 overflow-hidden"
                 >
                   <div className="p-2 border-b border-gray-100 dark:border-[#1E1E28]">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Search channels..."
+                        placeholder="Search..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-gray-50 dark:bg-[#0C0C10] border border-gray-200 dark:border-[#1E1E28] rounded text-gray-900 dark:text-[#E8E9ED] placeholder-gray-400"
+                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-gray-50 dark:bg-[#0C0C10] border border-gray-200 dark:border-[#1E1E28] rounded-lg text-gray-900 dark:text-[#E8E9ED] placeholder-gray-400"
                         autoFocus
                       />
                     </div>
@@ -393,7 +531,7 @@ const KYCActivityFeed = () => {
                   <div className="max-h-60 overflow-y-auto p-1">
                     <button
                       onClick={() => { setSelectedChannel(''); setChannelDropdownOpen(false); setSearchQuery(''); }}
-                      className={`w-full text-left px-3 py-1.5 rounded text-xs transition-colors ${
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
                         !selectedChannel ? 'bg-gray-100 dark:bg-[#1E1E28] text-gray-900 dark:text-[#E8E9ED]' : 'text-gray-600 dark:text-[#9A9BA3] hover:bg-gray-50 dark:hover:bg-[#111116]'
                       }`}
                     >
@@ -407,18 +545,18 @@ const KYCActivityFeed = () => {
                       }, {})
                     ).map(([org, chs]) => (
                       <div key={org}>
-                        <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-[#5B5D67] uppercase tracking-wider mt-1">{org}</div>
+                        <div className="px-2.5 py-1 text-[9px] font-semibold text-gray-400 dark:text-[#5B5D67] uppercase tracking-wider mt-1">{org}</div>
                         {chs.map(c => (
                           <button
                             key={c.slackChannelId}
                             onClick={() => { setSelectedChannel(c.slackChannelId); setChannelDropdownOpen(false); setSearchQuery(''); }}
-                            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2 ${
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
                               selectedChannel === c.slackChannelId
                                 ? 'bg-gray-100 dark:bg-[#1E1E28] text-gray-900 dark:text-[#E8E9ED]'
                                 : 'text-gray-600 dark:text-[#9A9BA3] hover:bg-gray-50 dark:hover:bg-[#111116]'
                             }`}
                           >
-                            <Hash className="w-3 h-3 text-gray-400 dark:text-[#5B5D67]" />
+                            <Hash className="w-2.5 h-2.5 text-gray-400 dark:text-[#5B5D67]" />
                             {c.name}
                           </button>
                         ))}
@@ -432,133 +570,91 @@ const KYCActivityFeed = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
-        {/* Two-column layout */}
-        <div className="flex gap-6">
-          {/* LEFT: Activity Feed Timeline (65%) */}
-          <div className="flex-[65] min-w-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400 dark:text-[#5B5D67]" />
-              </div>
-            ) : items.length === 0 ? (
-              <div className="text-center py-20">
-                <Activity className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-[#3A3A45]" />
-                <p className="text-sm text-gray-500 dark:text-[#6B6D77]">No activity found</p>
-              </div>
-            ) : (
-              <div>
-                {dateGroups.map(([date, dateItems]) => (
-                  <div key={date} className="mb-5">
-                    <div className="sticky top-0 z-10 mb-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-[#1E1E28] text-xs font-medium text-gray-600 dark:text-[#9A9BA3] border border-gray-200 dark:border-[#252530]">
-                        {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                        <span className="text-gray-400 dark:text-[#5B5D67]">({dateItems.length})</span>
+      {/* Main split layout */}
+      <div className="flex-1 flex min-h-0">
+        {/* LEFT: Timeline — scrollable */}
+        <div ref={leftPanelRef} className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 py-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-400 dark:text-[#5B5D67]" />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-20">
+              <Activity className="w-8 h-8 mx-auto mb-3 text-gray-300 dark:text-[#3A3A45]" />
+              <p className="text-sm text-gray-500 dark:text-[#6B6D77]">No activity found</p>
+            </div>
+          ) : (
+            <div>
+              {dateGroups.map(([date, dateItems]) => {
+                const startIndex = cumulativeIndex;
+                cumulativeIndex += dateItems.length;
+                return (
+                  <div key={date} className="mb-4">
+                    <div className="sticky top-0 z-10 mb-2 py-0.5">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/90 dark:bg-[#111116]/90 text-[10px] font-medium text-gray-500 dark:text-[#6B6D77] border border-gray-200/60 dark:border-[#1E1E28] backdrop-blur-sm">
+                        {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        <span className="text-gray-400 dark:text-[#5B5D67]">{dateItems.length}</span>
                       </span>
                     </div>
-                    <div className="pl-1">
+                    <div className="space-y-2">
                       {dateItems.map((item, i) => (
-                        <TimelineItem key={item._id} item={item} isLast={i === dateItems.length - 1} navigate={navigate} />
+                        <TimelineCard key={item._id} item={item} navigate={navigate} index={startIndex + i} />
                       ))}
                     </div>
                   </div>
-                ))}
-
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-[#1E1E28]">
-                    <p className="text-xs text-gray-500 dark:text-[#6B6D77]">
-                      Page {pagination.page} of {pagination.totalPages}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => fetchData(pagination.page - 1)}
-                        disabled={pagination.page <= 1}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#1E1E28] text-xs text-gray-600 dark:text-[#9A9BA3] hover:bg-gray-50 dark:hover:bg-[#111116] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" /> Prev
-                      </button>
-                      <button
-                        onClick={() => fetchData(pagination.page + 1)}
-                        disabled={pagination.page >= pagination.totalPages}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#1E1E28] text-xs text-gray-600 dark:text-[#9A9BA3] hover:bg-gray-50 dark:hover:bg-[#111116] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT: Long Waiting Panels (35%) */}
-          <div className="flex-[35] min-w-0 hidden lg:block">
-            <div className="sticky top-4 space-y-5">
-              {/* Current Long Waiting */}
-              <div className="bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-[#1E1E28] flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED]">Long Waiting</h3>
-                  </div>
-                  <span className={`text-xs font-bold tabular-nums px-1.5 py-0.5 rounded ${
-                    longWaiting.length > 0 ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                  }`}>
-                    {longWaiting.length}
-                  </span>
-                </div>
-                <div className="p-3 max-h-[40vh] overflow-y-auto">
-                  {longWaiting.length === 0 ? (
-                    <div className="text-center py-6">
-                      <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-emerald-400 dark:text-emerald-500" />
-                      <p className="text-xs text-gray-500 dark:text-[#6B6D77]">No cases waiting over 10 min</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {longWaiting.map(item => (
-                        <LongWaitingCard key={item._id} item={item} navigate={navigate} onDismiss={handleDismiss} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Long Waiting History */}
-              <div className="bg-white dark:bg-[#141419] border border-gray-200 dark:border-[#1E1E28] rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-[#1E1E28] flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-gray-400 dark:text-[#5B5D67]" />
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E8E9ED]">Long Wait History</h3>
-                  </div>
-                  <span className="text-xs text-gray-400 dark:text-[#5B5D67] tabular-nums">
-                    {longWaitingHistory.length} cases
-                  </span>
-                </div>
-                <div className="p-3 max-h-[40vh] overflow-y-auto">
-                  {longWaitingHistory.length === 0 ? (
-                    <div className="text-center py-6">
-                      <Timer className="w-6 h-6 mx-auto mb-2 text-gray-300 dark:text-[#3A3A45]" />
-                      <p className="text-xs text-gray-500 dark:text-[#6B6D77]">No long-wait cases recorded yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {longWaitingHistory.map(item => (
-                        <LongWaitingCard key={item._id} item={item} navigate={navigate} showResolveTime onDismiss={handleDismiss} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                );
+              })}
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* RIGHT: Long Waiting — fixed, internal scroll */}
+        <div className="w-[550px] flex-shrink-0 hidden lg:flex flex-col border-l border-gray-200/60 dark:border-[#1E1E28] bg-white/30 dark:bg-[#0A0A0E]">
+          <RightPanelSection
+            icon={AlertTriangle}
+            iconColor="text-red-500"
+            title="Long Waiting"
+            countStyle={lwPagination.total > 0 ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'}
+            pag={lwPagination}
+            onPageChange={fetchLwPage}
+            style={{ height: hasHistory ? '60%' : '100%' }}
+          >
+            {longWaiting.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <CheckCircle2 className="w-5 h-5 mb-1.5 text-emerald-400 dark:text-emerald-500" />
+                <p className="text-[11px] text-gray-500 dark:text-[#6B6D77]">All clear</p>
+              </div>
+            ) : (
+              longWaiting.map((item, i) => (
+                <LongWaitingCard key={item._id} item={item} navigate={navigate} onDismiss={handleDismiss} index={i} />
+              ))
+            )}
+          </RightPanelSection>
+
+          <RightPanelSection
+            icon={History}
+            iconColor="text-gray-400 dark:text-[#5B5D67]"
+            title="History"
+            countStyle="text-gray-500 dark:text-[#5B5D67]"
+            pag={lhPagination}
+            onPageChange={fetchLhPage}
+            style={{ height: hasLongWaiting ? '40%' : '100%' }}
+          >
+            {longWaitingHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Timer className="w-5 h-5 mb-1.5 text-gray-300 dark:text-[#3A3A45]" />
+                <p className="text-[11px] text-gray-500 dark:text-[#6B6D77]">No long-wait cases yet</p>
+              </div>
+            ) : (
+              longWaitingHistory.map((item, i) => (
+                <LongWaitingCard key={item._id} item={item} navigate={navigate} showResolveTime onDismiss={handleDismiss} index={i} />
+              ))
+            )}
+          </RightPanelSection>
         </div>
       </div>
-      </div>
 
-      {/* Click outside to close dropdown */}
+      {/* Dropdown backdrop */}
       {channelDropdownOpen && (
         <div className="fixed inset-0 z-40" onClick={() => { setChannelDropdownOpen(false); setSearchQuery(''); }} />
       )}
