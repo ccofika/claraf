@@ -235,7 +235,7 @@ const TimelineCard = ({ item, navigate, index }) => {
 const LongWaitingCard = ({ item, navigate, showResolveTime, onDismiss, index }) => {
   const orgColor = ORG_COLORS[item.organization] || ORG_COLORS['Stake.com'];
   const waitSeconds = item.waitingSeconds || 0;
-  const displaySeconds = showResolveTime ? item.totalHandlingTimeSeconds : waitSeconds;
+  const displaySeconds = showResolveTime ? (item.responseTimeSeconds || item.totalHandlingTimeSeconds || 0) : waitSeconds;
 
   return (
     <motion.div
